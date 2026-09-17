@@ -7,3 +7,18 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Regras de acessibilidade do VLibras */
+[vw] {
+    position: relative;
+    z-index: 99999 !important;
+}
+
+[vw] [vw-access-button] {
+    z-index: 99999 !important;
+}
+
+[vw] [vw-plugin-wrapper] {
+    z-index: 99999 !important;
+}
+
