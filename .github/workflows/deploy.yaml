@@ -22,4 +22,3 @@ jobs:
             composer install --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
             php artisan optimize
-            php artisan serve
