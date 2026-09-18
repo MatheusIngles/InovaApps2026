@@ -325,7 +325,3 @@ public function index()
 - Laracasts (vídeo-aulas): https://laracasts.com
 - Documentação do VLibras: https://www.gov.br/governodigital/pt-br/vlibras
 - Documentação do Tailwind CSS: https://tailwindcss.com/docs
-
----
-
-## 🤖 Este README foi criado com o auxílio do Claude Code.
