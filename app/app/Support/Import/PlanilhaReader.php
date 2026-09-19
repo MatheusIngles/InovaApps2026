@@ -16,20 +16,23 @@ class PlanilhaReader
     private const ABAS_DESAFIO = ['clientes', 'atendimento_mensal', 'pesquisas_nps', 'situacao_clientes'];
 
     /** @return array{cabecalhos: list<string>, linhas: list<array<string, mixed>>} */
-    public static function ler(string $caminho, string $extensao): array
+    public static function ler(string $caminho, string $extensao, ?int $previa = null): array
     {
         if (! is_file($caminho)) {
             throw new RuntimeException('Arquivo não encontrado.');
         }
 
+        // $previa: lê só o cabeçalho e as primeiras linhas (não carrega planilhas enormes só para mostrar a prévia)
+        $max = $previa === null ? null : $previa + 1;
         $abas = match (strtolower($extensao)) {
-            'xlsx' => self::abasXlsx($caminho),
-            'csv', 'txt' => ['csv' => self::linhasCsv($caminho)],
+            'xlsx' => self::abasXlsx($caminho, $max),
+            'csv', 'txt' => ['csv' => self::linhasCsv($caminho, $max)],
             default => throw new RuntimeException('Formato não suportado: envie um arquivo .xlsx ou .csv.'),
         };
 
         if (count(array_intersect_key($abas, array_flip(self::ABAS_DESAFIO))) === 4) {
-            return self::achatar($abas);
+            // as 4 abas se ligam por cliente: o achatamento precisa delas inteiras (planilha pequena)
+            return self::achatar($max === null ? $abas : self::abasXlsx($caminho, null));
         }
 
         $linhas = reset($abas) ?: [];
@@ -43,7 +46,7 @@ class PlanilhaReader
     }
 
     /** @return array<string, list<list<mixed>>> */
-    private static function abasXlsx(string $caminho): array
+    private static function abasXlsx(string $caminho, ?int $max = null): array
     {
         $reader = new XlsxReader;
         $reader->open($caminho);
@@ -51,7 +54,10 @@ class PlanilhaReader
 
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
-                foreach ($sheet->getRowIterator() as $row) {
+                foreach ($sheet->getRowIterator() as $i => $row) {
+                    if ($max !== null && $i > $max) {
+                        break;
+                    }
                     $abas[$sheet->getName()][] = array_map(fn ($v) => $v instanceof \DateTimeInterface ? $v->format('Y-m-d') : $v, $row->toArray());
                 }
             }
@@ -63,7 +69,7 @@ class PlanilhaReader
     }
 
     /** @return list<list<mixed>> */
-    private static function linhasCsv(string $caminho): array
+    private static function linhasCsv(string $caminho, ?int $max = null): array
     {
         $bruto = (string) file_get_contents($caminho, false, null, 0, 65536);
         $primeira = strtok($bruto, "\n") ?: '';
@@ -77,7 +83,10 @@ class PlanilhaReader
 
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
-                foreach ($sheet->getRowIterator() as $row) {
+                foreach ($sheet->getRowIterator() as $i => $row) {
+                    if ($max !== null && $i > $max) {
+                        break;
+                    }
                     $linhas[] = array_map(fn ($v) => is_string($v) ? trim(ltrim($v, "\xEF\xBB\xBF")) : $v, $row->toArray());
                 }
             }

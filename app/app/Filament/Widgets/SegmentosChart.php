@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Customer;
+use App\Support\Tenancy\CompanyContext;
 use Filament\Widgets\ChartWidget;
 
 class SegmentosChart extends ChartWidget
@@ -26,7 +27,7 @@ class SegmentosChart extends ChartWidget
 
         return [
             'labels' => $s->keys()->all(),
-            'datasets' => [['label' => 'Score médio', 'data' => $s->map(fn ($v) => round($v))->values()->all(), 'backgroundColor' => '#2563eb']],
+            'datasets' => [['label' => 'Score médio', 'data' => $s->map(fn ($v) => round($v))->values()->all(), 'backgroundColor' => app(CompanyContext::class)->current()->tema()['primary']]],
         ];
     }
 

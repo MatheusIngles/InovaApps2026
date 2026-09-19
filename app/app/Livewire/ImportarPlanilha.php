@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Jobs\ImportarPlanilhaJob;
 use App\Models\Customer;
 use App\Support\Import\ImportService;
 use App\Support\Import\PlanilhaReader;
@@ -25,6 +26,9 @@ use Livewire\WithFileUploads;
 class ImportarPlanilha extends Component implements HasSchemas
 {
     use InteractsWithSchemas, WithFileUploads;
+
+    /** Acima disso (bytes) a importação roda em fila, sem prender a requisição. */
+    private const LIMITE_SINCRONO = 2 * 1024 * 1024;
 
     #[Validate('nullable|file|max:20480|extensions:xlsx,csv,txt')]
     public $arquivo = null;
@@ -59,7 +63,7 @@ class ImportarPlanilha extends Component implements HasSchemas
         $this->extensao = $extensao;
 
         try {
-            $tabela = PlanilhaReader::ler(Storage::path($this->caminho), $extensao);
+            $tabela = PlanilhaReader::ler(Storage::path($this->caminho), $extensao, previa: 5);
         } catch (\Throwable $e) {
             $this->descartar();
             Notification::make()->title('Não foi possível ler a planilha')->body($e->getMessage())->danger()->send();
@@ -78,6 +82,15 @@ class ImportarPlanilha extends Component implements HasSchemas
         $mapa = $this->form->getState()['mapa'] ?? [];
         $company = app(CompanyContext::class)->current();
         $primeiraCarga = ! Customer::exists();
+
+        if (Storage::size($this->caminho) > self::LIMITE_SINCRONO) {
+            ImportarPlanilhaJob::dispatch($company->id, auth()->id(), $this->caminho, $this->extensao, $mapa);
+            $this->caminho = null; // o job apaga o arquivo ao terminar
+            $this->descartar();
+            Notification::make()->title('Importação em andamento')->body('A planilha é grande e está sendo processada. Avisamos pelas notificações quando terminar.')->info()->send();
+
+            return;
+        }
 
         try {
             $tabela = PlanilhaReader::ler(Storage::path($this->caminho), $this->extensao);

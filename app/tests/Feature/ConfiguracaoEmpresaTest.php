@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
+use App\Support\Tenancy\Tema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -125,5 +126,37 @@ class ConfiguracaoEmpresaTest extends TestCase
 
         $this->assertNull($b->fresh()->metric_weights);
         $this->assertSame(Risco::PESOS['uso'], $b->fresh()->pesos()['uso']);
+    }
+
+    public function test_cor_primaria_clara_demais_e_recusada(): void
+    {
+        $company = Company::factory()->create();
+        $d = CompanyConfig::ler($company);
+        $d['tema']['primary'] = '#fde68a'; // amarelo claro: texto branco dos botões não seria legível
+
+        $this->assertLessThan(3, Tema::contrasteComBranco('#fde68a'));
+        $this->assertGreaterThan(3, Tema::contrasteComBranco('#2563eb'));
+        $this->expectException(ValidationException::class);
+        CompanyConfig::salvar($company, $d);
+    }
+
+    public function test_cor_do_logo_ignora_o_branco_e_pega_o_vermelho(): void
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            $this->markTestSkipped('Extensão GD não ativa.');
+        }
+
+        $img = imagecreatetruecolor(100, 100);
+        imagefill($img, 0, 0, imagecolorallocate($img, 234, 29, 44)); // vermelho
+        imagefilledrectangle($img, 20, 30, 80, 60, imagecolorallocate($img, 255, 255, 255)); // "texto" branco
+        $arquivo = tempnam(sys_get_temp_dir(), 'logo');
+        imagepng($img, $arquivo);
+
+        [$r, $g] = sscanf(Tema::corDoLogo($arquivo), '#%02x%02x');
+        $this->assertTrue($r > 200 && $g < 60, 'esperava o vermelho, não o branco');
+
+        imagefill($img, 0, 0, imagecolorallocate($img, 128, 128, 128)); // logo só em cinza: mantém o padrão
+        imagepng($img, $arquivo);
+        $this->assertNull(Tema::corDoLogo($arquivo));
     }
 }
