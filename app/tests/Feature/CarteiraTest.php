@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\Planilha;
 use App\Filament\Resources\Empresas\EmpresaResource;
+use App\Filament\Resources\Empresas\Pages\ListEmpresas;
 use App\Livewire\AssistenteChat;
 use App\Models\Company;
 use App\Models\Customer;
@@ -92,6 +93,20 @@ class CarteiraTest extends TestCase
         $this->get('/empresas/X999')->assertNotFound();
     }
 
+    public function test_lista_de_empresas_filtra_situacao_e_faixa_de_score(): void
+    {
+        $this->entrar();
+
+        Livewire::test(ListEmpresas::class)
+            ->filterTable('status', 'Cancelado')
+            ->assertCountTableRecords(22)
+            ->filterTable('score_range', ['min' => 90])
+            ->assertCountTableRecords(Customer::dashboard()
+                ->where('customers.status', 'Cancelado')
+                ->where('assessment.health_score', '>=', 90)
+                ->count());
+    }
+
     public function test_assistente_responde_carteira_e_empresa(): void
     {
         $top = Customer::ativas()->first();
@@ -100,10 +115,10 @@ class CarteiraTest extends TestCase
         $this->assertStringContainsString($top->nome, Assistente::responder('por que '.$top->codigo.' está em risco?'));
     }
 
-    public function test_raiz_leva_a_empresa_prioritaria_ou_a_planilha_se_nao_ha_dados(): void
+    public function test_raiz_leva_a_lista_de_empresas_ou_a_planilha_se_nao_ha_dados(): void
     {
         $this->entrar();
-        $this->get('/')->assertRedirect(EmpresaResource::getUrl('view', ['record' => Customer::ativas()->first()]));
+        $this->get('/')->assertRedirect(EmpresaResource::getUrl());
 
         $this->flushSession(); // outra pessoa, outra sessão
         $this->actingAs(User::factory()->create()); // empresa nova, sem dados

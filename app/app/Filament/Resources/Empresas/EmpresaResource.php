@@ -7,6 +7,7 @@ use App\Filament\Resources\Empresas\Pages\ViewEmpresa;
 use App\Models\Customer;
 use App\Support\Tenancy\CompanyContext;
 use BackedEnum;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
@@ -14,6 +15,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,7 +28,7 @@ class EmpresaResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'nome';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
@@ -90,6 +92,40 @@ class EmpresaResource extends Resource
                         };
                     }),
                 SelectFilter::make('segment')->label('Segmento')->options(fn () => Customer::distinct()->orderBy('segment')->pluck('segment', 'segment')->all()),
+                SelectFilter::make('status')->label('Situação')
+                    ->options(['Ativo' => 'Ativo', 'Cancelado' => 'Cancelado'])
+                    ->query(fn (Builder $query, array $data) => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $query) => $query->where('customers.status', $data['value'])
+                    )),
+                SelectFilter::make('size')->label('Porte')
+                    ->options(fn () => Customer::distinct()->orderBy('size')->pluck('size', 'size')->all())
+                    ->query(fn (Builder $query, array $data) => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $query) => $query->where('customers.size', $data['value'])
+                    )),
+                SelectFilter::make('plan')->label('Plano')
+                    ->options(fn () => Customer::distinct()->orderBy('plan')->pluck('plan', 'plan')->all())
+                    ->query(fn (Builder $query, array $data) => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $query) => $query->where('customers.plan', $data['value'])
+                    )),
+                Filter::make('score_range')->label('Faixa de score')
+                    ->schema([
+                        TextInput::make('min')->label('Score mínimo')->numeric()->minValue(0)->maxValue(100),
+                        TextInput::make('max')->label('Score máximo')->numeric()->minValue(0)->maxValue(100),
+                    ])
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '>=', $data['min']))
+                        ->when(filled($data['max'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '<=', $data['max']))),
+                Filter::make('monthly_value_range')->label('Valor mensal')
+                    ->schema([
+                        TextInput::make('min')->label('Valor mínimo (R$)')->numeric()->minValue(0),
+                        TextInput::make('max')->label('Valor máximo (R$)')->numeric()->minValue(0),
+                    ])
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('customers.monthly_value', '>=', $data['min']))
+                        ->when(filled($data['max'] ?? null), fn (Builder $query) => $query->where('customers.monthly_value', '<=', $data['max']))),
             ])
             ->recordActions([]);
     }
