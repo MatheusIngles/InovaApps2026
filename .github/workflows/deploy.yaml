@@ -3,26 +3,42 @@ name: Automate Deploy
 on:
   push:
     branches:
-      - main # Se a sua branch principal for master, mude aqui
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Conectar e Atualizar no Servidor
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
+
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 2222
+
           script: |
+            set -e
+
             cd /home/matheus/InovaApps2026
             git pull origin main
+
             cd /home/matheus/InovaApps2026/app
-            git pull origin main
-            composer install --no-interaction --prefer-dist --optimize-autoloader
-            php artisan migrate --force
-            php artisan optimize
-            npm install
+
+            composer install \
+              --no-dev \
+              --no-interaction \
+              --prefer-dist \
+              --optimize-autoloader
+
+            npm ci
             npm run build
+
+            php artisan migrate --force
+
+            php artisan optimize:clear
+            php artisan optimize
+
+            php artisan reload || true
