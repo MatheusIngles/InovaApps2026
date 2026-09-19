@@ -6,7 +6,9 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use App\Filament\Pages\Painel;
+use App\Filament\Resources\Empresas\EmpresaResource;
+use App\Models\Customer;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -29,15 +31,18 @@ class AppPanelProvider extends PanelProvider
             ->login()
             ->registration()
             ->passwordReset()
-            ->brandName('InovaApps 2026')
+            ->brandName('Radar de Retenção')
+            ->topNavigation()
+            ->homeUrl(fn () => ($c = Customer::ativas()->first()) ? EmpresaResource::getUrl('view', ['record' => $c]) : Painel::getUrl())
             ->font('Plus Jakarta Sans')
             ->darkMode(false) // identidade azul e branco
             ->colors(['primary' => Color::Blue, 'gray' => Color::Slate])
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
-            ->pages([Dashboard::class])
+            ->pages([Painel::class])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('tema'))
             ->renderHook(PanelsRenderHook::BODY_END, fn () => view('vlibras'))
             ->middleware([
                 EncryptCookies::class,

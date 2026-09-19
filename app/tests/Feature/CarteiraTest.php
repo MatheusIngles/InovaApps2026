@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\Empresas\EmpresaResource;
-use App\Filament\Resources\Empresas\Pages\ViewEmpresa;
 use App\Livewire\AssistenteChat;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
@@ -14,6 +13,9 @@ use App\Support\Assistente;
 use Database\Seeders\CustomerDataSeeder;
 use Database\Seeders\RiskAssessmentSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Support\Llm\Llm;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -32,7 +34,7 @@ class CarteiraTest extends TestCase
     {
         $this->get('/')->assertRedirect('/login');
         $this->get('/empresas')->assertRedirect('/login');
-        $this->actingAs(User::factory()->create())->get('/')->assertOk()->assertSee('vlibras', false);
+        $this->actingAs(User::factory()->create())->get('/painel')->assertOk()->assertSee('vlibras', false);
     }
 
     public function test_base_importada_e_score_separa_cancelados_de_ativos(): void
@@ -68,7 +70,7 @@ class CarteiraTest extends TestCase
         $top = Customer::ordenar(Customer::dashboard())->first();
 
         $this->get('/empresas')->assertOk()->assertSee($top->nome);
-        $this->get('/empresas/'.$top->codigo)->assertOk()->assertSee($top->sinais[0]['texto'])->assertSee('Chat da empresa')
+        $this->get('/empresas/'.$top->codigo)->assertOk()->assertSee($top->sinais[0]['texto'])->assertSee('Chat com a IA')
             ->assertSee(EmpresaResource::getUrl('view', ['record' => $top->similares[0]['codigo']]));
         $this->get('/assistente')->assertOk();
         $this->get('/empresas/X999')->assertNotFound();
@@ -82,15 +84,41 @@ class CarteiraTest extends TestCase
         $this->assertStringContainsString($top->nome, Assistente::responder('por que '.$top->codigo.' está em risco?'));
     }
 
-    public function test_chat_livewire_e_modal_da_empresa(): void
+    public function test_raiz_redireciona_para_a_empresa_prioritaria(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $this->get('/')->assertRedirect(EmpresaResource::getUrl('view', ['record' => Customer::ativas()->first()]));
+    }
+
+    public function test_chat_usa_ollama_com_contexto_da_empresa(): void
     {
         $this->actingAs(User::factory()->create());
         $top = Customer::ativas()->first();
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local']])]);
 
-        Livewire::test(AssistenteChat::class, ['seletor' => true])
-            ->call('enviar', 'Quem devo ligar primeiro?')
-            ->assertSee($top->codigo)->assertSet('pergunta', '');
-        Livewire::test(ViewEmpresa::class, ['record' => $top->codigo])
-            ->mountAction('chat')->assertActionMounted('chat');
+        Livewire::test(AssistenteChat::class)->set('codigo', $top->codigo)->call('enviar', 'Por que está em risco?')
+            ->assertSee('Resposta local')->assertSee('Modelo local');
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
+    }
+
+    public function test_pergunta_complexa_escala_para_api_externa(): void
+    {
+        config(['llm.api.key' => 'k']);
+        Http::fake([
+            'api.openai.com/*' => Http::response(['choices' => [['message' => ['content' => 'Resposta da API']]]]),
+            'localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local']]),
+        ]);
+
+        $r = Llm::responder('sistema', [['role' => 'user', 'content' => 'Monte uma estratégia de retenção']]);
+        $this->assertSame('api', $r['provedor']);
+        $this->assertSame('ollama', Llm::responder('sistema', [['role' => 'user', 'content' => 'oi']])['provedor']);
+    }
+
+    public function test_sem_llm_o_chat_cai_para_as_regras(): void
+    {
+        $this->actingAs(User::factory()->create());
+        Http::fake(fn () => throw new ConnectionException('offline'));
+
+        Livewire::test(AssistenteChat::class)->call('enviar', 'Resumo da carteira')->assertSee('Respostas por regras');
     }
 }

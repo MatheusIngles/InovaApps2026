@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'admin@inova.com'],
             [
-                'name' => 'Administrador InovaApps',
+                'name' => 'Administrador',
                 'password' => Hash::make('senha123'),
                 'email_verified_at' => now(),
             ]
