@@ -144,6 +144,7 @@ class ConfiguracaoEmpresaTest extends TestCase
     {
         $company = Company::factory()->create(['theme' => ['primary' => '#0d9488', 'secondary' => '#115e59', 'font' => 'Inter']]);
         $this->actingAs(User::factory()->for($company)->create());
+        app(CompanyContext::class)->within($company, fn () => Customer::factory()->create(['company_id' => $company->id])); // já fez a carga inicial
 
         $this->get('/configuracoes')->assertOk()->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('#115e59', false)->assertSee('Inter')
             ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');

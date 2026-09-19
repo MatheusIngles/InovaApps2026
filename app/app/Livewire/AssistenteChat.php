@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Models\ChatMessage;
 use App\Models\Customer;
 use App\Support\Assistente;
 use App\Support\Llm\Contexto;
@@ -13,7 +12,8 @@ use Livewire\Component;
 
 /**
  * Chat em tela cheia. Com uma empresa em foco a IA recebe o contexto dela; sem foco, o resumo da carteira.
- * O histórico é persistido por (empresa/tenant, usuário, foco) e o escopo do tenant impede qualquer vazamento entre empresas.
+ * A conversa vive só no estado do componente: recarregar a página, sair e voltar ou trocar a empresa em foco começa do zero.
+ * Nada é gravado no banco, e cada pergunta é respondida só com os dados atuais da carteira/empresa (do tenant logado).
  */
 class AssistenteChat extends Component
 {
@@ -25,14 +25,9 @@ class AssistenteChat extends Component
     /** @var array<int, array{eu: bool, texto: string, fonte?: string}> */
     public array $mensagens = [];
 
-    public function mount(): void
-    {
-        $this->carregar();
-    }
-
     public function updatedCodigo(): void
     {
-        $this->carregar();
+        $this->mensagens = [];
     }
 
     public function enviar(?string $texto = null): void
@@ -45,7 +40,7 @@ class AssistenteChat extends Component
 
         $empresa = $this->empresa($texto);
         $config = app(CompanyContext::class)->current()->chat();
-        $this->guardar('user', $texto);
+        $this->mensagens[] = ['eu' => true, 'texto' => $texto];
 
         try {
             if (! $config['enabled']) {
@@ -53,39 +48,10 @@ class AssistenteChat extends Component
             }
             // Sem histórico: cada pergunta é respondida só com a carteira/empresa atual, sempre atualizada.
             $r = Llm::responder(Contexto::sistema($empresa), [['role' => 'user', 'content' => $texto]], $config['ollama_model']);
-            $this->guardar('assistant', $r['texto'], $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)');
+            $this->mensagens[] = ['eu' => false, 'texto' => $r['texto'], 'fonte' => $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)'];
         } catch (\Throwable) {
-            $this->guardar('assistant', Assistente::responder($texto, $empresa?->codigo), 'Respostas por regras (IA indisponível)');
+            $this->mensagens[] = ['eu' => false, 'texto' => Assistente::responder($texto, $empresa?->codigo), 'fonte' => 'Respostas por regras (IA indisponível)'];
         }
-
-        $this->carregar();
-    }
-
-    public function limpar(): void
-    {
-        $this->consulta()->delete();
-        $this->mensagens = [];
-    }
-
-    private function escopo(): ?string
-    {
-        return $this->codigo ? strtoupper($this->codigo) : null;
-    }
-
-    private function consulta()
-    {
-        return ChatMessage::where('user_id', auth()->id())->where('customer_code', $this->escopo());
-    }
-
-    private function guardar(string $papel, string $texto, ?string $fonte = null): void
-    {
-        ChatMessage::create(['user_id' => auth()->id(), 'customer_code' => $this->escopo(), 'role' => $papel, 'content' => $texto, 'provider' => $fonte]);
-    }
-
-    private function carregar(): void
-    {
-        $this->mensagens = $this->consulta()->orderByDesc('id')->limit(30)->get()->reverse()
-            ->map(fn (ChatMessage $m) => ['eu' => $m->role === 'user', 'texto' => $m->content] + ($m->provider ? ['fonte' => $m->provider] : []))->values()->all();
     }
 
     /** Empresa selecionada ou citada na pergunta (ex.: C012). */

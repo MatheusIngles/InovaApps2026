@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Filament\Pages\Planilha;
+use App\Models\Customer;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Tenancy\Tema;
 use App\Support\Tenancy\TenantResolver;
@@ -39,6 +41,11 @@ class SetCompanyContext
 
         if ($company) {
             Tema::aplicar($company);
+        }
+
+        // empresa nova (sem dados): só a tela de planilha até a primeira carga
+        if ($request->user() && $request->isMethod('GET') && ! $request->is('planilha', 'livewire*', 'logout') && ! Customer::exists()) {
+            return redirect(Planilha::getUrl());
         }
 
         return $next($request);

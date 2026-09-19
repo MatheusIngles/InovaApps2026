@@ -11,6 +11,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
@@ -79,19 +80,23 @@ class EmpresaResource extends Resource
                 ])->space(3),
             ])
             ->filters([
-                SelectFilter::make('nivel')->label('Nível')
+                SelectFilter::make('nivel')->label('Nível de risco')->multiple()
                     ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelada' => 'Cancelada'])
                     ->query(function (Builder $query, array $data) {
+                        $niveis = array_filter($data['values'] ?? []);
                         $l = app(CompanyContext::class)->current()->limiares(); // limiares da empresa
 
-                        return match ($data['value'] ?? null) {
-                            null, '' => $query,
-                            'Cancelada' => $query->where('customers.status', 'Cancelado'),
-                            'Crítico' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['critico']),
-                            'Alto' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
-                            'Médio' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),
-                            default => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '<', $l['medio']),
-                        };
+                        return $query->when($niveis, fn (Builder $query) => $query->where(function (Builder $query) use ($niveis, $l) {
+                            foreach ($niveis as $nivel) {
+                                $query->orWhere(fn (Builder $q) => match ($nivel) {
+                                    'Cancelada' => $q->where('customers.status', 'Cancelado'),
+                                    'Crítico' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['critico']),
+                                    'Alto' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
+                                    'Médio' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),
+                                    default => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '<', $l['medio']),
+                                });
+                            }
+                        }));
                     }),
                 SelectFilter::make('segment')->label('Segmento')->options(fn () => Customer::distinct()->orderBy('segment')->pluck('segment', 'segment')->all()),
                 SelectFilter::make('status')->label('Situação')
@@ -112,24 +117,43 @@ class EmpresaResource extends Resource
                         filled($data['value'] ?? null),
                         fn (Builder $query) => $query->where('customers.plan', $data['value'])
                     )),
-                Filter::make('score_range')->label('Faixa de score')
+                Filter::make('score_range')->label('Faixa de score')->columnSpanFull()
+                    ->indicateUsing(fn (array $data) => self::indicadorFaixa('Score', $data))
                     ->schema([
                         TextInput::make('min')->label('Score mínimo')->numeric()->minValue(0)->maxValue(100),
                         TextInput::make('max')->label('Score máximo')->numeric()->minValue(0)->maxValue(100),
-                    ])
+                    ])->columns(2)
                     ->query(fn (Builder $query, array $data) => $query
                         ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '>=', $data['min']))
                         ->when(filled($data['max'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '<=', $data['max']))),
-                Filter::make('monthly_value_range')->label('Valor mensal')
+                Filter::make('monthly_value_range')->label('Valor mensal')->columnSpanFull()
+                    ->indicateUsing(fn (array $data) => self::indicadorFaixa('Valor', $data, 'R$ '))
                     ->schema([
                         TextInput::make('min')->label('Valor mínimo (R$)')->numeric()->minValue(0),
                         TextInput::make('max')->label('Valor máximo (R$)')->numeric()->minValue(0),
-                    ])
+                    ])->columns(2)
                     ->query(fn (Builder $query, array $data) => $query
                         ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('customers.monthly_value', '>=', $data['min']))
                         ->when(filled($data['max'] ?? null), fn (Builder $query) => $query->where('customers.monthly_value', '<=', $data['max']))),
             ])
+            ->filtersFormColumns(2)
+            ->filtersFormWidth(Width::Large)
+            ->deferFilters(false) // aplica assim que o filtro muda, sem botão
             ->recordActions([]);
+    }
+
+    /** Texto do chip de filtro ativo para faixas (mínimo/máximo). */
+    private static function indicadorFaixa(string $nome, array $data, string $prefixo = ''): ?string
+    {
+        $min = $data['min'] ?? null;
+        $max = $data['max'] ?? null;
+
+        return match (true) {
+            filled($min) && filled($max) => "$nome: $prefixo$min a $prefixo$max",
+            filled($min) => "$nome ≥ $prefixo$min",
+            filled($max) => "$nome ≤ $prefixo$max",
+            default => null,
+        };
     }
 
     public static function getPages(): array
