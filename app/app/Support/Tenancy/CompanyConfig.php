@@ -46,7 +46,7 @@ class CompanyConfig
     {
         $v = Validator::make($dados, [
             'metricas' => 'required|array|size:'.count(Risco::PESOS),
-            'metricas.*.k' => 'required|in:'.implode(',', array_keys(Risco::PESOS)),
+            'metricas.*.k' => 'required|distinct|in:'.implode(',', array_keys(Risco::PESOS)),
             'metricas.*.peso' => 'required|numeric|min:0|max:100',
             'limiares.critico' => 'required|integer|between:1,100',
             'limiares.alto' => 'required|integer|between:1,100|lt:limiares.critico',

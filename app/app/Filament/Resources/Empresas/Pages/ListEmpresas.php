@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Ordem por risco × valor do contrato, ajustável em Configurações. O score não é probabilidade de cancelamento. Canceladas ao final.';
+        return 'Ativas primeiro, pela combinação de score e valor do contrato ajustada em Configurações. Abra um cliente para ver a origem do score.';
     }
 }

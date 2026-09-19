@@ -12,8 +12,8 @@ use Livewire\Component;
 
 /**
  * Chat em tela cheia. Com uma empresa em foco a IA recebe o contexto dela; sem foco, o resumo da carteira.
- * A conversa vive só no estado do componente: recarregar a página, sair e voltar ou trocar a empresa em foco começa do zero.
- * Nada é gravado no banco, e cada pergunta é respondida só com os dados atuais da carteira/empresa (do tenant logado).
+ * A conversa vive apenas no estado do componente. Sair ou recarregar a tela apaga o histórico;
+ * enquanto ela está aberta, o modelo recebe as mensagens recentes junto com dados atuais da carteira.
  */
 class AssistenteChat extends Component
 {
@@ -38,6 +38,8 @@ class AssistenteChat extends Component
         }
         $this->pergunta = '';
 
+        $historico = collect($this->mensagens)->take(-20)
+            ->map(fn (array $mensagem): array => ['role' => $mensagem['eu'] ? 'user' : 'assistant', 'content' => $mensagem['texto']])->all();
         $empresa = $this->empresa($texto);
         $config = app(CompanyContext::class)->current()->chat();
         $this->mensagens[] = ['eu' => true, 'texto' => $texto];
@@ -46,8 +48,7 @@ class AssistenteChat extends Component
             if (! $config['enabled']) {
                 throw new \RuntimeException('IA desativada para esta empresa.');
             }
-            // Sem histórico: cada pergunta é respondida só com a carteira/empresa atual, sempre atualizada.
-            $r = Llm::responder(Contexto::sistema($empresa), [['role' => 'user', 'content' => $texto]], $config['ollama_model']);
+            $r = Llm::responder(Contexto::sistema($empresa), [...$historico, ['role' => 'user', 'content' => $texto]], $config['ollama_model']);
             $this->mensagens[] = ['eu' => false, 'texto' => $r['texto'], 'fonte' => $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)'];
         } catch (\Throwable) {
             $this->mensagens[] = ['eu' => false, 'texto' => Assistente::responder($texto, $empresa?->codigo), 'fonte' => 'Respostas por regras (IA indisponível)'];

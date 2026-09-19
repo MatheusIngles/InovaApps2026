@@ -49,12 +49,12 @@ class ConfiguracaoEmpresaTest extends TestCase
         $company = $this->empresaComCliente();
         $score = fn () => app(CompanyContext::class)->within($company, fn () => Customer::dashboard()->first()->score);
 
-        $this->assertTrue(CompanyConfig::salvar($company, $this->dados($company, ['uso' => 100])));
+        $this->assertTrue(CompanyConfig::salvar($company, $this->dados($company, ['uso' => 20])));
         $this->assertSame(100, $score());
 
-        $this->assertTrue(CompanyConfig::salvar($company, $this->dados($company, ['sla' => 100])));
+        $this->assertTrue(CompanyConfig::salvar($company, $this->dados($company, ['sla' => 20])));
         $this->assertSame(0, $score()); // SLA perfeito
-        $this->assertFalse(CompanyConfig::salvar($company, $this->dados($company, ['sla' => 100]))); // nada mudou: sem recálculo
+        $this->assertFalse(CompanyConfig::salvar($company, $this->dados($company, ['sla' => 20]))); // nada mudou: sem recálculo
     }
 
     public function test_reordenar_metricas_na_tela_altera_score_e_exposicao_do_cliente(): void
@@ -147,7 +147,8 @@ class ConfiguracaoEmpresaTest extends TestCase
         $this->actingAs(User::factory()->for($company)->create());
         app(CompanyContext::class)->within($company, fn () => Customer::factory()->create(['company_id' => $company->id])); // já fez a carga inicial
 
-        $this->get('/configuracoes')->assertOk()->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('#115e59', false)->assertSee('Inter')
+        $this->get('/configuracoes')->assertOk()->assertSee('Prioridades')->assertSee('Fila de prioridade')->assertSee('Níveis de risco')->assertSee('Identidade visual')
+            ->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
             ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->call('salvar')->assertHasNoErrors();
         $this->assertSame(70, $company->fresh()->limiares()['critico']);
@@ -156,7 +157,7 @@ class ConfiguracaoEmpresaTest extends TestCase
     public function test_configuracao_de_uma_empresa_nao_afeta_outra(): void
     {
         [$a, $b] = [Company::factory()->create(), Company::factory()->create()];
-        CompanyConfig::salvar($a, $this->dados($a, ['uso' => 50, 'sla' => 50]));
+        CompanyConfig::salvar($a, $this->dados($a, ['uso' => 20, 'sla' => 20]));
 
         $this->assertNull($b->fresh()->metric_weights);
         $this->assertSame(Risco::PESOS['uso'], $b->fresh()->pesos()['uso']);
@@ -203,15 +204,16 @@ class ConfiguracaoEmpresaTest extends TestCase
                 RiskAssessment::factory()->create(['customer_id' => $c->id, 'health_score' => $score, 'model_version' => 'rules-v1']);
             }
         });
-        $fila = fn () => app(CompanyContext::class)->within($company, fn () => Customer::ordenar(Customer::dashboard())->pluck('external_code')->all());
+        $fila = fn () => app(CompanyContext::class)->within($company->fresh(), fn () => Customer::ordenar(Customer::dashboard())->pluck('external_code')->all());
 
         $this->assertSame(['GRANDE', 'ALTO'], $fila()); // K = 50: o contrato grande pesa mais
 
-        $d = CompanyConfig::ler($company);
-        $d['prioridade'] = 0; // só o risco decide
-        CompanyConfig::salvar($company, $d);
+        $this->actingAs(User::factory()->for($company)->create());
+        Livewire::test(Configuracoes::class)->set('data.prioridade', 0)->call('salvar')->assertHasNoErrors();
+        $this->assertSame(0, $company->fresh()->prioridadeK());
         $this->assertSame(['ALTO', 'GRANDE'], $fila());
 
+        $d = CompanyConfig::ler($company->fresh());
         $d['prioridade'] = 600; // fora do limite
         $this->expectException(ValidationException::class);
         CompanyConfig::salvar($company, $d);

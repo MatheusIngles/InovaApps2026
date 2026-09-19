@@ -1,19 +1,7 @@
 <x-filament-panels::page>
-    <form wire:submit="salvar" class="pl-form">
+    <div class="pl-form">
         {{ $this->form }}
-
-        <div class="ui-actions">
-            <x-filament::button type="submit" wire:loading.attr="disabled" wire:target="salvar">Salvar configuração</x-filament::button>
-        </div>
-    </form>
-
-    <section class="pl" aria-labelledby="novos-meses">
-        <div>
-            <h2 id="novos-meses" class="ui-h2">Acrescentar novos meses</h2>
-            <p class="ui-muted">Envie a planilha com os meses novos para continuar populando os dados. O risco de todos os clientes é recalculado.</p>
-        </div>
-        <livewire:importar-planilha />
-    </section>
+    </div>
 
     <script>
         // Prévia das cores do logo: sobrescreve as variáveis do tema até salvar (ao recarregar volta ao que está salvo).
