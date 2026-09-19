@@ -69,7 +69,7 @@ parcela do sinal = arredondar(intensidade × peso do sinal ÷ soma dos pesos ati
 score = arredondar(soma das parcelas, número inteiro)
 ```
 
-A normalização mantém o score entre 0 e 100 mesmo quando os pesos configurados não somam 100. Por exemplo, intensidade 0,5 em um sinal de peso 20, com soma de pesos 100, acrescenta 10 pontos. Os sinais visíveis nos detalhes são aqueles cuja parcela chega a **35% ou mais do máximo daquele sinal**; parcelas menores ainda entram no score. Os sinais visíveis são ordenados pelos pontos, com a ordem configurada dos pesos como desempate.
+A normalização mantém o score entre 0 e 100 mesmo quando os pesos configurados não somam 100. Por exemplo, intensidade 0,5 em um sinal de peso 20, com soma de pesos 100, acrescenta 10 pontos. Na página do cliente, cada linha separa a **parcela da métrica** (`intensidade × 12,5`, peso neutro dos oito sinais) do **ajuste pela prioridade** (`parcela final − parcela da métrica`). Esse ajuste pode ser positivo ou negativo; a soma das duas partes é a parcela final daquele sinal. Os sinais em destaque são aqueles cuja parcela final chega a **35% ou mais do máximo daquele sinal**; parcelas menores ainda entram no score.
 
 Os níveis **padrão** são:
 
@@ -80,7 +80,7 @@ Os níveis **padrão** são:
 | 40–54 | Alto |
 | 55–100 | Crítico |
 
-Em **Configurações**, cada empresa pode reordenar e desligar sinais. A posição dos sinais ativos distribui a escala fixa de pesos `20, 15, 15, 12, 10, 10, 10, 8`; sinais desligados recebem peso zero e os pesos ativos são normalizados. Também é possível mudar os limites dos níveis, desde que `médio < alto < crítico`. Ao salvar uma mudança de pesos ou limites, o sistema recalcula a carteira. Restaurar os padrões também recalcula. A cor e o nome do nível exibido usam os limites atuais da empresa.
+Em **Configurações**, a aba **Prioridades** tem um controle de **0 a 20** para cada métrica, em passos de 0,1. Zero a desativa; números maiores dão mais influência relativa ao sinal. Os valores são normalizados pela soma dos pesos ativos, então 20 é o peso configurado, não necessariamente 20 pontos finais. As abas **Níveis de risco** e **Identidade visual** separam os outros ajustes. Os limites precisam seguir `médio < alto < crítico`. Salvar pesos ou limites recalcula a carteira; restaurar os padrões também recalcula.
 
 **Atenção à diferença de critérios:** o cartão “Score alto ou crítico” e os cartões da comparação exploratória usam o corte **fixo de 40 pontos**, mesmo quando os limites personalizados de Alto e Crítico mudam. Já o gráfico por nível, o rótulo do cliente e o filtro “Nível” usam os limites configurados. Assim, após uma personalização, a quantidade no cartão pode diferir da soma de Alto e Crítico no gráfico.
 
@@ -112,6 +112,7 @@ A fila no Painel mostra **até oito clientes ativos**, em ordem decrescente de e
 
 - **Indicadores atuais:** contrato mensal, uso e SLA do **último mês armazenado no histórico**, e exposição da **última avaliação**. Para um cliente cancelado, esse último mês exibido pode ser diferente do mês usado no score, pois o histórico da tela não aplica o recorte anterior ao cancelamento.
 - **Sinais em destaque:** motivo, pontos e ação sugerida definidos nas regras. Para cancelados, aparecem os sinais anteriores à saída, sem o texto de ação.
+- **Composição do score:** mostra as oito parcelas, incluindo as pequenas, com a parte neutra da métrica e o ajuste provocado pela prioridade configurada.
 - **Histórico mensal:** do mais recente para o mais antigo; mostra chamados, reaberturas, SLA, uso, reclamações, dias de atraso e reuniões realizadas/previstas. “—” no SLA significa dado não informado.
 - **Empresas parecidas que cancelaram:** até três clientes cancelados da mesma carteira, ordenados pela semelhança dos oito sinais. A semelhança é baseada na distância entre as intensidades; **100% significa intensidades iguais**, não chance de cancelamento. Para uma avaliação histórica, não entram saídas posteriores ao mês avaliado.
 - **Satisfação (NPS):** apresenta cada pesquisa armazenada, inclusive as sem resposta (“—”). Notas 0–6 são marcadas como detratoras, 7–8 como neutras e 9–10 como promotoras. A tela pode mostrar pesquisas posteriores ao mês usado no score de um cancelado; o cálculo do score, porém, só usa pesquisas até o mês avaliado.
