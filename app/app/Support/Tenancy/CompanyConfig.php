@@ -88,15 +88,17 @@ class CompanyConfig
     }
 
     /**
-     * Pesos a partir da posição na lista de prioridade: a escala padrão (20, 15, 15, 12...) distribuída na ordem dada.
-     * Métricas desligadas ficam com peso 0 e não ocupam posição.
+     * Pesos a partir da posição na lista de prioridade: a escala (a dos pesos informados ou, sem eles, a padrão
+     * 20, 15, 15, 12...) distribuída na ordem dada, do maior para o menor. Desligadas ficam com peso 0 e não ocupam posição.
      *
-     * @param  list<array{k: string, ativa?: bool}>  $metricas
+     * @param  list<array{k: string, ativa?: bool, peso?: float|int}>  $metricas
      * @return list<array{k: string, peso: float|int}>
      */
     public static function pesosPorPosicao(array $metricas): array
     {
-        $escala = collect(Risco::PESOS)->sortDesc()->values();
+        $escala = collect($metricas)->filter(fn ($m) => $m['ativa'] ?? true)
+            ->map(fn ($m) => ($m['peso'] ?? 0) > 0 ? (float) $m['peso'] : Risco::PESOS[$m['k']])
+            ->sortDesc()->values();
         $i = 0;
 
         $out = [];

@@ -2,8 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Validacao\Backtest;
+use App\Support\Validacao\Configurador;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
@@ -19,11 +21,19 @@ class PainelSegmentos extends Component
         return '<div class="ui-card ui-pad ui-muted" role="status">Analisando os segmentos…</div>';
     }
 
+    public function aplicarConfiguracaoRecomendada(): void
+    {
+        CompanyConfig::aplicarConfiguracaoDosDados(app(CompanyContext::class)->current());
+        $this->redirect('/painel?aba=por-segmento'); // recarrega com os novos pesos e cortes
+    }
+
     public function render(): View
     {
-        $segmentos = Backtest::resumo(app(CompanyContext::class)->current())['segmentos'];
+        $company = app(CompanyContext::class)->current();
+        $r = Backtest::resumo($company);
+        $segmentos = $r['segmentos'];
         $atual = $segmentos[$this->segmento] ?? reset($segmentos) ?: null; // padrão: o segmento com maior taxa de cancelamento
 
-        return view('livewire.painel-segmentos', ['segmentos' => $segmentos, 'atual' => $atual]);
+        return view('livewire.painel-segmentos', ['segmentos' => $segmentos, 'atual' => $atual, 'extras' => $r['extras'], 'perfis' => $r['perfis'], 'evidencia_suficiente' => $r['evidencia_suficiente'], 'recomendada' => Configurador::recomendada($company)]);
     }
 }

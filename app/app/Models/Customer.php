@@ -196,7 +196,7 @@ class Customer extends Model
         $principais = collect($this->contribuicoesScore())->sortByDesc('pontos')->take(3)
             ->map(fn ($item) => "{$item['rotulo']} +{$item['pontos']}")->join('; ');
 
-        return "Score por regras: soma ponderada de 8 sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
+        return "Risco por regras (índice em %): soma ponderada de 8 sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
     }
 
     public function getSimilaresAttribute(): array

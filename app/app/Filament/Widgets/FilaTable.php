@@ -10,7 +10,7 @@ use Filament\Widgets\TableWidget;
 
 class FilaTable extends TableWidget
 {
-    protected static ?int $sort = 6;
+    protected static ?int $sort = 7;
 
     protected int|string|array $columnSpan = 'full';
 
@@ -26,7 +26,7 @@ class FilaTable extends TableWidget
                 TextColumn::make('nome')->weight('semibold')->description(fn (Customer $e) => $e->codigo),
                 TextColumn::make('nivel')->label('Nível')->badge()
                     ->color(fn (string $state) => ['Crítico' => 'danger', 'Alto' => 'warning', 'Médio' => 'info'][$state] ?? 'success'),
-                TextColumn::make('score')->label('Score')->tooltip(fn (Customer $e) => $e->resumoScore()),
+                TextColumn::make('score')->label('Risco')->formatStateUsing(fn ($state) => $state.'%')->tooltip(fn (Customer $e) => $e->resumoScore()),
                 TextColumn::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Customer::brl($state)),
                 TextColumn::make('motivo')->label('Principal motivo')->state(fn (Customer $e) => $e->sinais[0]['label'] ?? 'Sem sinal forte'),
             ]);

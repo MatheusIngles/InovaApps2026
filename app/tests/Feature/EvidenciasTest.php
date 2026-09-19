@@ -3,18 +3,22 @@
 namespace Tests\Feature;
 
 use App\Filament\Widgets\InsatisfacaoChart;
-use App\Livewire\PainelEvidencias;
+use App\Jobs\GerarRelatorioCarteiraJob;
+use App\Jobs\GerarRelatorioEmpresaJob;
 use App\Livewire\PainelSegmentos;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
 use App\Models\User;
+use App\Support\Relatorio\RelatorioService;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Validacao\Backtest;
 use App\Support\Validacao\Previsao;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -70,15 +74,27 @@ class EvidenciasTest extends TestCase
         $this->assertFalse($r['evidencia_suficiente']); // 1 cancelamento não calibra nada
     }
 
-    public function test_abas_do_painel_renderizam_evidencias_e_segmentos(): void
+    public function test_painel_renderiza_segmentos_com_evidencias_e_gera_relatorio_da_carteira(): void
     {
         $company = $this->carteira();
         $this->actingAs(User::factory()->for($company)->create());
 
-        $this->get('/painel')->assertOk()->assertSee('Evidências')->assertSee('Por segmento');
-        Livewire::test(PainelEvidencias::class)->call('$refresh')->assertSee('Antecedência mediana do alerta')->assertSee('Quanto cada variável separa')
-            ->set('nivel', 'critico')->assertSee('Crítico')->set('nivel', 'invalido')->assertSet('nivel', 'alto');
-        Livewire::test(PainelSegmentos::class)->call('$refresh')->assertSee('Cancelamentos por segmento');
+        $this->get('/painel')->assertOk()->assertSee('Por segmento')->assertSee('Gerar relatório de evidências');
+        Livewire::test(PainelSegmentos::class)->call('$refresh')->assertSee('Cancelamentos por segmento')->assertSee('Evidências da carteira');
+        $this->assertStringStartsWith('%PDF', RelatorioService::carteira($company));
+    }
+
+    public function test_relatorio_da_carteira_roda_na_fila_e_guarda_o_pdf_para_download(): void
+    {
+        Storage::fake('local');
+        $company = $this->carteira();
+        $user = User::factory()->for($company)->create();
+        $arquivo = (string) Str::uuid();
+
+        (new GerarRelatorioCarteiraJob($company->id, $user->id, $arquivo))->handle();
+
+        Storage::disk('local')->assertExists(GerarRelatorioEmpresaJob::caminho($company->id, $user->id, $arquivo));
+        $this->actingAs($user)->get(route('relatorios.download', ['arquivo' => $arquivo]))->assertOk();
     }
 
     public function test_previsao_do_proximo_mes_segue_a_tendencia(): void

@@ -63,7 +63,7 @@ class NotificacaoService
         self::enviar($usuarios, $chave,
             Notification::make()
                 ->title("{$cliente->displayName()} está subindo de nível de risco")
-                ->body("Foi de {$nivelAntes} para {$nivelDepois} este mês (score {$resultado['score']}/100)."
+                ->body("Foi de {$nivelAntes} para {$nivelDepois} este mês (risco {$resultado['score']}%)."
                     .($critico
                         ? ' Chegou ao ponto mais alto de atenção — vale priorizar um contato ainda hoje.'
                         : ' Antes que continue subindo, um contato próximo agora pode reverter o quadro.'))

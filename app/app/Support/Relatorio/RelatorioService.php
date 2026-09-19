@@ -2,9 +2,12 @@
 
 namespace App\Support\Relatorio;
 
+use App\Models\Company;
 use App\Models\Customer;
 use App\Support\Llm\Llm;
 use App\Support\Tenancy\CompanyContext;
+use App\Support\Validacao\Backtest;
+use App\Support\Validacao\Configurador;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Throwable;
 
@@ -35,6 +38,17 @@ class RelatorioService
             'metricas' => collect($empresa->contribuicoesScore())->filter(fn ($m) => $m['peso'] > 0)->values()->all(),
             'geradoEm' => now(),
         ])->setPaper([0, 0, 960, 540])->output();
+    }
+
+    /** Relatório geral da carteira (A4, texto corrido): a evidência do backtest em linguagem simples. */
+    public static function carteira(Company $company): string
+    {
+        return Pdf::loadView('relatorios.carteira', [
+            'empresa' => $company->name ?? 'Carteira',
+            'r' => Backtest::resumo($company),
+            'recomendada' => Configurador::recomendada($company),
+            'geradoEm' => now(),
+        ])->setPaper('a4', 'landscape')->output();
     }
 
     /** @return list<string> um parágrafo de análise por sinal, na mesma ordem/quantidade de $sinais */

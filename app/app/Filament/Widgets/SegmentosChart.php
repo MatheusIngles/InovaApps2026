@@ -27,7 +27,7 @@ class SegmentosChart extends ChartWidget
 
         return [
             'labels' => $s->keys()->all(),
-            'datasets' => [['label' => 'Score médio', 'data' => $s->map(fn ($v) => round($v))->values()->all(), 'backgroundColor' => app(CompanyContext::class)->current()->tema()['primary']]],
+            'datasets' => [['label' => 'Risco médio (%)', 'data' => $s->map(fn ($v) => round($v))->values()->all(), 'backgroundColor' => app(CompanyContext::class)->current()->tema()['primary']]],
         ];
     }
 

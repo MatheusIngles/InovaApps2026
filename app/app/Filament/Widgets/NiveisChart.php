@@ -11,7 +11,7 @@ class NiveisChart extends ChartWidget
 
     protected ?string $heading = 'Clientes ativos por nível de risco';
 
-    protected ?string $description = 'Contagem por faixas do score de sinais (0–100), conforme limites configurados; não é probabilidade.';
+    protected ?string $description = 'Contagem por faixas do risco (0–100%), conforme limites configurados; não é probabilidade.';
 
     protected ?string $maxHeight = '260px';
 

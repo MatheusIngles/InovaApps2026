@@ -25,10 +25,10 @@ class BacktestWidget extends StatsOverviewWidget
         $na = $ativ->count();
 
         return [
-            Stat::make('Score médio dos cancelados', round($canc->avg('score') ?? 0))->description('Média dos scores; vs '.round($ativ->avg('score') ?? 0).' nos ativos'),
-            Stat::make('Cancelados com score ≥ 40', $canc->where('score', '>=', 40)->count()." de $nc")->color('success')
+            Stat::make('Risco médio dos cancelados', round($canc->avg('score') ?? 0).'%')->description('Média do risco; vs '.round($ativ->avg('score') ?? 0).'% nos ativos'),
+            Stat::make('Cancelados com risco ≥ 40%', $canc->where('score', '>=', 40)->count()." de $nc")->color('success')
                 ->description('Contagem com corte fixo de 40; última avaliação antes da saída'),
-            Stat::make('Ativos com score ≥ 40', $ativ->where('score', '>=', 40)->count()." de $na")->color('warning')
+            Stat::make('Ativos com risco ≥ 40%', $ativ->where('score', '>=', 40)->count()." de $na")->color('warning')
                 ->description('Contagem com corte fixo de 40; última avaliação disponível'),
         ];
     }

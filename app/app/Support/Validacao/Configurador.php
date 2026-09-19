@@ -52,6 +52,7 @@ class Configurador
             $linhas[] = sprintf('- %s: separação %.2f; antecedência %s; alarme falso %s%%; peso sugerido %s', $v['rotulo'], $v['auc'], $v['antecedencia'] === null ? 'n/d' : $v['antecedencia'].' meses', $v['alarme_falso_pct'], $v['peso_sugerido']);
         }
         $linhas[] = '';
+        $linhas[] = 'VARIÁVEIS FORA DO SCORE: são colunas guardadas da planilha que o score atual não usa (ele só soma os sinais acima). A separação é o AUC, calculado com a média dos 3 últimos meses de cada cliente, comparando cancelados (mês antes da saída) e retidos (mês mais recente); mostra correlação, não causa.';
         $linhas[] = 'VARIÁVEIS FORA DO SCORE (separação): '.collect($r['extras'])->map(fn ($v) => $v['rotulo'].' '.number_format($v['auc'], 2, ',', ''))->implode('; ').'.';
         $linhas[] = '';
         $linhas[] = 'EFEITO DE CADA CORTE ATUAL (cancelados alertados / antecedência mediana / alarme falso entre retidos):';

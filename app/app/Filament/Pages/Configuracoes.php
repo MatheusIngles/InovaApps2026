@@ -7,6 +7,7 @@ use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Tenancy\Tema;
 use BackedEnum;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
@@ -20,6 +21,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -36,6 +38,8 @@ class Configuracoes extends Page implements HasSchemas
     use InteractsWithSchemas;
 
     protected static ?string $title = 'Configurações';
+
+    protected static bool $shouldRegisterNavigation = false; // abre pelo menu do avatar
 
     protected static ?int $navigationSort = 5;
 
@@ -56,17 +60,18 @@ class Configuracoes extends Page implements HasSchemas
             Tabs::make('Configurações')->tabs([
                 Tab::make('Prioridades')->schema([
                     Section::make('Prioridade das métricas')
-                        ->description('Ordene da mais para a menos importante: a que fica no topo pesa mais. Desligue uma métrica para ignorá-la no cálculo; ligue de novo quando quiser voltar a usá-la.')
+                        ->description('Arraste as métricas para ordenar: a que fica no topo pesa mais. Use "Editar pesos" para definir o peso de cada uma. Desligue uma métrica para ignorá-la no cálculo.')
+                        ->headerActions([$this->editarPesosAction()])
                         ->schema([
-                            Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()->reorderableWithButtons()
+                            Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()
                                 ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
-                                ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
+                                ->schema([Hidden::make('k'), Hidden::make('peso'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
                             View::make('filament.components.salvar-configuracao'),
                         ]),
                 ]),
                 Tab::make('Fila de prioridade')->schema([
                     Section::make('Ordem da lista de clientes')
-                        ->description('A fila ordena as empresas ativas por score × (score + K) × valor mensal do contrato. K baixo reforça a diferença entre scores; K alto aproxima a ordem de score × contrato.')
+                        ->description('A fila ordena as empresas ativas por risco × (risco + K) × valor mensal do contrato. K baixo reforça a diferença entre scores; K alto aproxima a ordem de score × contrato.')
                         ->schema([
                             TextInput::make('prioridade')->label('Equilíbrio da fila (K)')->numeric()->integer()->minValue(0)->maxValue(500)->step(5)->required()
                                 ->helperText('De 0 a 500. O padrão é 50; o valor do contrato participa da ordem em toda a faixa.'),
@@ -74,7 +79,7 @@ class Configuracoes extends Page implements HasSchemas
                     View::make('filament.components.salvar-configuracao'),
                 ]),
                 Tab::make('Níveis de risco')->schema([
-                    Section::make('Limites dos níveis')->description('Score mínimo (0 a 100) de cada nível.')->columns(3)->schema([
+                    Section::make('Limites dos níveis')->description('Risco mínimo (0 a 100%) de cada nível.')->columns(3)->schema([
                         TextInput::make('limiares.critico')->label('Crítico a partir de')->numeric()->required(),
                         TextInput::make('limiares.alto')->label('Alto a partir de')->numeric()->required(),
                         TextInput::make('limiares.medio')->label('Médio a partir de')->numeric()->required(),
@@ -106,6 +111,33 @@ class Configuracoes extends Page implements HasSchemas
                 ]),
             ])->columnSpanFull(),
         ]);
+    }
+
+    /** Os pesos pertencem às posições da lista (1º = maior peso), não às métricas: o modal edita a escala, de forma decrescente. */
+    private function editarPesosAction(): Action
+    {
+        $posicoes = fn (): int => max(1, collect($this->data['metricas'] ?? [])->where('ativa', true)->count());
+
+        return Action::make('editarPesos')->label('Editar pesos')->icon(Heroicon::OutlinedAdjustmentsHorizontal)->color('gray')
+            ->modalHeading('Editar pesos por posição')
+            ->modalDescription('Cada posição da lista tem um peso: a 1ª pesa mais. Os pesos não podem aumentar de uma posição para a seguinte. Para trocar quem ocupa cada posição, arraste as métricas. Depois clique em Salvar para aplicar.')
+            ->modalSubmitActionLabel('Aplicar')
+            ->fillForm(fn (): array => ['pos' => collect(CompanyConfig::pesosPorPosicao($this->data['metricas'] ?? []))->where('peso', '>', 0)->pluck('peso')->values()->all()])
+            ->schema(fn (): array => collect(range(0, $posicoes() - 1))->map(fn (int $i) => TextInput::make("pos.$i")
+                ->label(($i + 1).'º · '.(Risco::ROTULOS[collect($this->data['metricas'] ?? [])->where('ativa', true)->values()[$i]['k'] ?? ''] ?? ''))
+                ->numeric()->minValue(1)->maxValue(100)->required()
+                ->rule(fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get, $i): void {
+                    if ($i > 0 && (float) $value > (float) $get('pos.'.($i - 1))) {
+                        $fail('Não pode ser maior que o peso da posição anterior.');
+                    }
+                }))->all())
+            ->action(function (array $data): void {
+                $i = 0;
+                $metricas = collect($this->data['metricas'] ?? [])
+                    ->map(fn (array $m) => ['k' => $m['k'], 'ativa' => $m['ativa'] ?? true, 'peso' => ($m['ativa'] ?? true) ? (float) $data['pos'][$i++] : 0])
+                    ->values()->all();
+                $this->form->fill([...$this->data, 'metricas' => $metricas]);
+            });
     }
 
     public function salvar(): void
