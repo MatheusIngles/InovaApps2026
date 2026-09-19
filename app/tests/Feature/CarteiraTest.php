@@ -108,6 +108,38 @@ class CarteiraTest extends TestCase
                 ->count());
     }
 
+    public function test_filtros_da_lista_batem_com_os_criterios(): void
+    {
+        $this->entrar();
+        $todos = Customer::dashboard()->get();
+        $conta = fn (callable $f) => $todos->filter($f)->count();
+
+        // nível: cada opção e combinações (o rótulo vem dos limiares da empresa)
+        foreach (['Crítico', 'Alto', 'Médio', 'Baixo', 'Cancelada'] as $nivel) {
+            Livewire::test(ListEmpresas::class)->filterTable('nivel', [$nivel])
+                ->assertCountTableRecords($conta(fn ($c) => $c->rotulo() === $nivel));
+        }
+        Livewire::test(ListEmpresas::class)->filterTable('nivel', ['Crítico', 'Alto'])
+            ->assertCountTableRecords($conta(fn ($c) => in_array($c->rotulo(), ['Crítico', 'Alto'])));
+
+        // segmento, porte, plano e situação
+        $c = $todos->first();
+        Livewire::test(ListEmpresas::class)->filterTable('segment', $c->segment)->assertCountTableRecords($conta(fn ($x) => $x->segment === $c->segment));
+        Livewire::test(ListEmpresas::class)->filterTable('size', $c->size)->assertCountTableRecords($conta(fn ($x) => $x->size === $c->size));
+        Livewire::test(ListEmpresas::class)->filterTable('plan', $c->plan)->assertCountTableRecords($conta(fn ($x) => $x->plan === $c->plan));
+        Livewire::test(ListEmpresas::class)->filterTable('status', 'Ativo')->assertCountTableRecords($conta(fn ($x) => $x->status === 'Ativo'));
+
+        // faixas: mínimo, máximo e os dois juntos
+        Livewire::test(ListEmpresas::class)->filterTable('score_range', ['min' => 40, 'max' => 70])
+            ->assertCountTableRecords($conta(fn ($x) => $x->score >= 40 && $x->score <= 70));
+        Livewire::test(ListEmpresas::class)->filterTable('monthly_value_range', ['min' => 5000])
+            ->assertCountTableRecords($conta(fn ($x) => $x->monthly_value >= 5000));
+
+        // combinação: nível Crítico + segmento
+        Livewire::test(ListEmpresas::class)->filterTable('nivel', ['Crítico'])->filterTable('segment', $c->segment)
+            ->assertCountTableRecords($conta(fn ($x) => $x->rotulo() === 'Crítico' && $x->segment === $c->segment));
+    }
+
     public function test_assistente_responde_carteira_e_empresa(): void
     {
         $top = Customer::ativas()->first();
@@ -138,6 +170,7 @@ class CarteiraTest extends TestCase
         Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
     }
 
+<<<<<<< Updated upstream
     public function test_chat_conhece_prioridades_personalizadas_da_empresa_e_as_respostas_por_regras(): void
     {
         $this->entrar();
@@ -163,6 +196,52 @@ class CarteiraTest extends TestCase
         $resposta = Assistente::responder('Quais são minhas prioridades métricas?');
         $this->assertStringContainsString('SLA cumprido: peso 70', $resposta);
         $this->assertStringContainsString('alto a partir de 50', $resposta);
+=======
+    public function test_ia_e_especialista_na_empresa_certa_em_cada_caso(): void
+    {
+        $this->entrar();
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'ok']])]);
+        $ativas = Customer::ativas();
+        [$x, $y] = [$ativas[0], $ativas[1]];
+        $cancelada = Customer::dashboard()->where('customers.status', 'Cancelado')->first();
+        $sistema = fn () => Http::recorded()->last()[0]['messages'][0]['content'];
+
+        // 1) empresa escolhida no seletor: só ela está em foco, com os dados dela
+        Livewire::test(AssistenteChat::class)->set('codigo', $x->codigo)->call('enviar', 'Por que está em risco?');
+        $this->assertStringContainsString("EMPRESA EM FOCO: {$x->nome} (código {$x->codigo})", $sistema());
+        $this->assertStringContainsString("Score de risco: {$x->score}/100", $sistema());
+        $this->assertStringNotContainsString("código {$y->codigo})", $sistema());
+        $this->assertStringContainsString('SINAIS DE ALERTA', $sistema());
+        $this->assertStringContainsString('NPS', $sistema());
+
+        // 2) sem seletor, mas citando o código na pergunta: passa a ser especialista nela
+        Livewire::test(AssistenteChat::class)->call('enviar', "o que fazer com {$y->codigo}?");
+        $this->assertStringContainsString("EMPRESA EM FOCO: {$y->nome} (código {$y->codigo})", $sistema());
+
+        // 3) sem seletor e sem código: visão geral, nenhuma empresa em foco
+        Livewire::test(AssistenteChat::class)->call('enviar', 'Quem devo ligar primeiro?');
+        $this->assertStringContainsString('visão geral da carteira', $sistema());
+        $this->assertStringNotContainsString('EMPRESA EM FOCO', $sistema());
+
+        // 4) empresa cancelada vem marcada como cancelada
+        Livewire::test(AssistenteChat::class)->set('codigo', $cancelada->codigo)->call('enviar', 'Por que saiu?');
+        $this->assertStringContainsString("CANCELADA em {$cancelada->mes_cancel}", $sistema());
+
+        // 5) trocar a empresa em foco limpa a conversa
+        Livewire::test(AssistenteChat::class)->set('codigo', $x->codigo)->call('enviar', 'oi')->set('codigo', $y->codigo)->assertSet('mensagens', []);
+    }
+
+    public function test_ia_nao_ve_empresa_de_outro_tenant(): void
+    {
+        $this->entrar();
+        $outra = Company::factory()->create();
+        $alheio = app(CompanyContext::class)->within($outra, fn () => Customer::factory()->create(['external_code' => 'C999']));
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'ok']])]);
+
+        Livewire::test(AssistenteChat::class)->call('enviar', 'me fale da C999');
+
+        Http::assertSent(fn ($r) => ! str_contains($r['messages'][0]['content'], 'C999') && str_contains($r['messages'][0]['content'], 'visão geral da carteira'));
+>>>>>>> Stashed changes
     }
 
     public function test_pergunta_complexa_escala_para_api_externa(): void

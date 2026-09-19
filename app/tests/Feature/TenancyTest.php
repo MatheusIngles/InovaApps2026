@@ -18,6 +18,8 @@ use App\Models\Customer;
 use App\Models\User;
 use App\Support\Tenancy\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -95,17 +97,17 @@ class TenancyTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_chat_e_isolado_por_empresa_e_por_usuario(): void
+    public function test_chat_nao_guarda_conversa_e_recomeca_ao_voltar(): void
     {
-        $ua = User::factory()->for($this->a)->create();
-        $ub = User::factory()->for($this->b)->create();
-        app(CompanyContext::class)->within($this->a, fn () => ChatMessage::create(['user_id' => $ua->id, 'role' => 'user', 'content' => 'segredo da Acme']));
-        app(CompanyContext::class)->within($this->b, fn () => ChatMessage::create(['user_id' => $ub->id, 'role' => 'user', 'content' => 'segredo da Beta']));
+        $u = User::factory()->for($this->a)->create();
+        $this->actingAs($u);
+        app(CompanyContext::class)->set($this->a);
+        Http::fake(fn () => throw new ConnectionException('offline'));
 
-        $this->actingAs($ub);
-        app(CompanyContext::class)->set($this->b);
-        $this->assertSame(['segredo da Beta'], ChatMessage::pluck('content')->all());
-        Livewire::test(AssistenteChat::class)->assertSee('segredo da Beta')->assertDontSee('segredo da Acme');
+        Livewire::test(AssistenteChat::class)->call('enviar', 'Quanto rende a carteira?')->assertSee('Quanto rende a carteira?');
+
+        $this->assertSame(0, ChatMessage::count());
+        Livewire::test(AssistenteChat::class)->assertSet('mensagens', [])->assertDontSee('Quanto rende a carteira?'); // "voltou" à página: conversa vazia
     }
 
     public function test_contexto_lista_empresas_e_executa_dentro_de_um_contexto(): void
@@ -121,7 +123,7 @@ class TenancyTest extends TestCase
     {
         $this->actingAs(User::factory()->for($this->a)->create());
 
-        $this->get('/painel')->assertOk();
+        $this->get('/painel')->assertRedirect(Planilha::getUrl()); // a página só abre depois da primeira carga
         foreach ([KpisWidget::class, BacktestWidget::class, NiveisChart::class, SegmentosChart::class, TendenciaChart::class, FilaTable::class] as $widget) {
             Livewire::test($widget)->assertOk();
         }
@@ -130,5 +132,18 @@ class TenancyTest extends TestCase
     public function test_usuario_sem_empresa_nao_acessa_o_painel(): void
     {
         $this->actingAs(User::factory()->create(['company_id' => null]))->get('/planilha')->assertForbidden();
+    }
+
+    public function test_empresa_sem_dados_fica_presa_na_planilha_ate_importar(): void
+    {
+        $this->actingAs(User::factory()->for($this->a)->create());
+
+        foreach (['/', '/empresas', '/painel', '/assistente', '/configuracoes'] as $url) {
+            $this->get($url)->assertRedirect(Planilha::getUrl());
+        }
+        $this->get('/planilha')->assertOk()->assertSee('Enviar planilha')->assertDontSee('Painel de Controle');
+
+        $this->cliente($this->a, 'C001'); // primeira carga feita: o painel abre
+        $this->get('/empresas')->assertOk();
     }
 }
