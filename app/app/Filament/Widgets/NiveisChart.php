@@ -9,9 +9,9 @@ class NiveisChart extends ChartWidget
 {
     protected static ?int $sort = 2;
 
-    protected ?string $heading = 'Clientes ativos por nível de risco';
+    protected ?string $heading = 'Clientes ativos por nível de atenção';
 
-    protected ?string $description = 'Contagem por faixas do risco (0–100%), conforme limites configurados; não é probabilidade.';
+    protected ?string $description = 'Contagem por faixas da atenção (0–100), conforme limites configurados; não é probabilidade.';
 
     protected ?string $maxHeight = '260px';
 

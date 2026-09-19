@@ -82,7 +82,9 @@ class CarteiraTest extends TestCase
         $this->assertSame($status->sortBy(fn ($s) => $s === 'Cancelado')->values()->all(), $status->all());
         $ativas = Customer::ordenar(Customer::dashboard())->where('customers.status', 'Ativo')->get();
         $prioridade = fn ($c) => $c->score * ($c->score + 50) * $c->monthly_value;
-        $this->assertSame($ativas->sortByDesc($prioridade)->values()->pluck('codigo')->all(), $ativas->pluck('codigo')->all());
+        // duas camadas: em alerta (nível Médio, 25, ou mais) antes dos demais; em cada uma, por prioridade
+        $esperada = $ativas->sortBy(fn ($c) => [$c->score >= 25 ? 0 : 1, -$prioridade($c)])->values()->pluck('codigo')->all();
+        $this->assertSame($esperada, $ativas->pluck('codigo')->all());
 
         // exemplos do produto: 60% de R$ 12 mil > 40% de R$ 15 mil; médio (30) de R$ 33,9 mil > crítico (68) de R$ 8,7 mil > baixo (20) de R$ 32 mil
         $p = fn ($score, $valor) => $score * ($score + 50) * $valor;
@@ -118,15 +120,15 @@ class CarteiraTest extends TestCase
             ->assertOk()
             ->assertSee('empresa-tab-visao')
             ->assertSee('empresa-tab-historico')
-            ->assertDontSee('Parcelas do score')
+            ->assertDontSee('Parcelas da atenção')
             ->assertSee('Parcela da métrica:')
             ->assertSee('Ajuste da prioridade:')
-            ->assertSee('Como o score é calculado')
+            ->assertSee('Como a atenção é calculada')
             ->assertSee('Como a exposição é calculada')
             ->assertSee('não uma perda prevista');
 
         $this->assertCount(8, $parcelas);
-        $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'contribuiu para o score'));
+        $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'contribuiu para a atenção'));
         $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'class="ui-tip ui-tip-valor"'));
 
         Livewire::test(KpisWidget::class)->assertSee('Soma dos contratos mensais dos ativos');
@@ -153,7 +155,7 @@ class CarteiraTest extends TestCase
         $conta = fn (callable $f) => $todos->filter($f)->count();
 
         // nível: cada opção e combinações (o rótulo vem dos limiares da empresa)
-        foreach (['Crítico', 'Alto', 'Médio', 'Baixo', 'Cancelada'] as $nivel) {
+        foreach (['Crítico', 'Alto', 'Médio', 'Baixo', 'Cancelado'] as $nivel) {
             Livewire::test(ListEmpresas::class)->filterTable('nivel', [$nivel])
                 ->assertCountTableRecords($conta(fn ($c) => $c->rotulo() === $nivel));
         }
@@ -195,6 +197,18 @@ class CarteiraTest extends TestCase
         $this->actingAs(User::factory()->create()); // empresa nova, sem dados
         $this->get('/')->assertRedirect(Planilha::getUrl());
         $this->get('/planilha')->assertOk()->assertSee('Enviar planilha');
+    }
+
+    public function test_fila_poe_quem_esta_em_alerta_antes_dos_demais_mesmo_com_contrato_menor(): void
+    {
+        $medio = $this->entrar()->company->limiares()['medio'];
+
+        $ativas = Customer::ativas();
+        $primeiroSemAlerta = $ativas->search(fn ($c) => $c->score < $medio);
+
+        $this->assertNotFalse($primeiroSemAlerta);
+        $this->assertTrue($ativas->slice($primeiroSemAlerta)->every(fn ($c) => $c->score < $medio), 'depois do primeiro cliente sem alerta não pode vir ninguém em alerta');
+        $this->assertTrue($ativas->slice(0, $primeiroSemAlerta)->every(fn ($c) => $c->score >= $medio));
     }
 
     public function test_chat_usa_ollama_com_contexto_da_empresa(): void
@@ -310,20 +324,20 @@ class CarteiraTest extends TestCase
 
         // 1) empresa escolhida no seletor: só ela está em foco, com os dados dela
         Livewire::test(AssistenteChat::class)->set('codigo', $x->codigo)->call('enviar', 'Por que está em risco?');
-        $this->assertStringContainsString("EMPRESA EM FOCO: {$x->nome} (código {$x->codigo})", $sistema());
-        $this->assertStringContainsString("Risco: {$x->score}%", $sistema());
+        $this->assertStringContainsString("CLIENTE EM FOCO: {$x->nome} (código {$x->codigo})", $sistema());
+        $this->assertStringContainsString("Atenção: {$x->score}/100", $sistema());
         $this->assertStringNotContainsString("código {$y->codigo})", $sistema());
         $this->assertStringContainsString('SINAIS DE ALERTA', $sistema());
         $this->assertStringContainsString('NPS', $sistema());
 
         // 2) sem seletor, mas citando o código na pergunta: passa a ser especialista nela
         Livewire::test(AssistenteChat::class)->call('enviar', "o que fazer com {$y->codigo}?");
-        $this->assertStringContainsString("EMPRESA EM FOCO: {$y->nome} (código {$y->codigo})", $sistema());
+        $this->assertStringContainsString("CLIENTE EM FOCO: {$y->nome} (código {$y->codigo})", $sistema());
 
         // 3) sem seletor e sem código: visão geral, nenhuma empresa em foco
         Livewire::test(AssistenteChat::class)->call('enviar', 'Quem devo ligar primeiro?');
         $this->assertStringContainsString('visão geral da carteira', $sistema());
-        $this->assertStringNotContainsString('EMPRESA EM FOCO', $sistema());
+        $this->assertStringNotContainsString('CLIENTE EM FOCO', $sistema());
 
         // 4) empresa cancelada vem marcada como cancelada
         Livewire::test(AssistenteChat::class)->set('codigo', $cancelada->codigo)->call('enviar', 'Por que saiu?');

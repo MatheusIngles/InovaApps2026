@@ -34,6 +34,6 @@ class PainelSegmentos extends Component
         $segmentos = $r['segmentos'];
         $atual = $segmentos[$this->segmento] ?? reset($segmentos) ?: null; // padrão: o segmento com maior taxa de cancelamento
 
-        return view('livewire.painel-segmentos', ['segmentos' => $segmentos, 'atual' => $atual, 'extras' => $r['extras'], 'perfis' => $r['perfis'], 'evidencia_suficiente' => $r['evidencia_suficiente'], 'recomendada' => Configurador::recomendada($company)]);
+        return view('livewire.painel-segmentos', ['segmentos' => $segmentos, 'atual' => $atual, 'extras' => $r['extras'], 'perfis' => $r['perfis'], 'evidencia_suficiente' => $r['evidencia_suficiente'], 'validacao_temporal' => $r['validacao_temporal'], 'recomendada' => Configurador::recomendada($company)]);
     }
 }

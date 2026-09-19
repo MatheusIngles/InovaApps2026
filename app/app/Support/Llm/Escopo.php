@@ -10,7 +10,7 @@ class Escopo
     /** Palavra combinada com a IA (ver `prompt_base`) para marcar uma pergunta fora do assunto. */
     public const MARCADOR = '[FORA_DO_ESCOPO]';
 
-    public const RECUSA = 'Só posso ajudar com a carteira de clientes desta empresa: risco, score, sinais, prioridades, cancelamentos e o que fazer a respeito. Pergunte algo nessa linha, por exemplo "Quem devo ligar primeiro?".';
+    public const RECUSA = 'Só posso ajudar com a carteira de clientes desta empresa: risco, sinais, prioridades, cancelamentos e o que fazer a respeito. Pergunte algo nessa linha, por exemplo "Quem devo ligar primeiro?".';
 
     /** Tentativas de mudar o papel da IA, ignorar instruções ou sair do contexto. */
     private const PADROES = [

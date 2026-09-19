@@ -8,7 +8,7 @@ use App\Support\Validacao\Backtest;
 use App\Support\Validacao\Previsao;
 use Filament\Widgets\ChartWidget;
 
-/** Insatisfação (score de sinais) de uma empresa mês a mês, com a previsão do próximo mês pela tendência recente. */
+/** Insatisfação (índice de risco) de uma empresa mês a mês, com a previsão do próximo mês pela tendência recente. */
 class InsatisfacaoChart extends ChartWidget
 {
     protected static bool $isDiscovered = false; // só aparece na página da empresa, não no painel
@@ -61,7 +61,7 @@ class InsatisfacaoChart extends ChartWidget
         return [
             'labels' => $labels,
             'datasets' => [
-                ['label' => 'Insatisfação (risco %)', 'data' => $real, 'borderColor' => $primaria, 'backgroundColor' => $primaria, 'tension' => .3, 'pointRadius' => 3, 'spanGaps' => false],
+                ['label' => 'Insatisfação (atenção 0–100)', 'data' => $real, 'borderColor' => $primaria, 'backgroundColor' => $primaria, 'tension' => .3, 'pointRadius' => 3, 'spanGaps' => false],
                 ['label' => 'Previsão do próximo mês', 'data' => $prev, 'borderColor' => '#f59e0b', 'backgroundColor' => '#f59e0b', 'borderDash' => [6, 5], 'pointRadius' => 5, 'tension' => 0, 'spanGaps' => true],
             ],
         ];

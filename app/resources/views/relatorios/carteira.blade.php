@@ -43,9 +43,9 @@
     <p>{{ $alto['cancelados'] }} clientes cancelaram e {{ $alto['ativos'] }} seguem ativos. Este relatório olha para o passado dos que saíram para entender o que os diferenciava de quem ficou, e mostra onde ainda há clientes com o mesmo padrão.</p>
 
     <h2>2. O alerta funciona? (efeito de cada corte)</h2>
-    <p>Alerta = risco igual ou acima do corte do nível. Corte baixo avisa cedo, mas gera mais alarme falso; corte alto quase não erra, mas avisa tarde ou não avisa. "Acerto" = dos alertas emitidos, quantos viraram cancelamento.</p>
+    <p>Alerta = atenção igual ou acima do corte do nível. Corte baixo avisa cedo, mas gera mais alarme falso; corte alto quase não erra, mas avisa tarde ou não avisa. "Acerto" = dos alertas emitidos, quantos viraram cancelamento.</p>
     @if ($r['evidencia_suficiente'])
-        <p>Com o corte Alto (risco ≥ {{ $alto['limiar'] }}%), {{ $alto['detectados'] }} dos {{ $alto['cancelados'] }} clientes que cancelaram tinham sido alertados antes de sair{{ $alto['mediana_antecedencia'] !== null ? ', em geral '.$n($alto['mediana_antecedencia'], 1).' meses antes' : '' }}. O preço disso: {{ $n($alto['alarme_falso_pct'], 1) }}% dos meses de clientes que ficaram também passariam do corte (alarme falso), cerca de {{ $n($alto['alertas_por_mes'], 1) }} clientes por mês.</p>
+        <p>Com o corte Alto (atenção ≥ {{ $alto['limiar'] }}), {{ $alto['detectados'] }} dos {{ $alto['cancelados'] }} clientes que cancelaram tinham sido alertados antes de sair{{ $alto['mediana_antecedencia'] !== null ? ', em geral '.$n($alto['mediana_antecedencia'], 1).' meses antes' : '' }}. O preço disso: {{ $n($alto['alarme_falso_pct'], 1) }}% dos meses de clientes que ficaram também passariam do corte (alarme falso), cerca de {{ $n($alto['alertas_por_mes'], 1) }} clientes por mês.</p>
     @else
         <p>Ainda há poucos cancelamentos para tirar conclusões seguras; use a configuração padrão por enquanto.</p>
     @endif
@@ -82,10 +82,10 @@
             </tr>
         @endforeach
     </table>
-    <p>Risco completo (todos os sinais juntos): separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais e <b>{{ $n($r['auc_sugerido'], 3) }}</b> com os sugeridos.</p>
+    <p>Atenção completa (todos os sinais juntos): separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais e <b>{{ $n($r['auc_sugerido'], 3) }}</b> com os sugeridos.</p>
 
-    <h2>4. Variáveis que o score ainda não usa</h2>
-    <p>São colunas da planilha que não entram no cálculo do risco hoje. Testadas na mesma régua: as que separam bem podem valer a pena entrar nele.</p>
+    <h2>4. Variáveis que a atenção ainda não usa</h2>
+    <p>São colunas da planilha que não entram no cálculo da atenção hoje. Testadas na mesma régua: as que separam bem podem valer a pena entrar nele.</p>
     <table class="grade">
         <tr>
             <td style="width: 55%">
@@ -109,26 +109,43 @@
         </tr>
     </table>
 
+    <h2>4b. Isso vale para o futuro? (validação em período separado)</h2>
+    @php($vt = $r['validacao_temporal'])
+    @if ($vt['suficiente'])
+        <p>Para não avaliar nos mesmos dados usados para calibrar, refizemos o teste como se estivéssemos em {{ substr($vt['corte'], 5, 2) }}/{{ substr($vt['corte'], 0, 4) }}: pesos e corte foram calibrados só com os {{ $vt['treino']['cancelados'] }} cancelamentos até essa data (contra {{ $vt['treino']['ativos'] }} clientes ativos na época) e depois testados nos {{ $vt['teste']['cancelados'] }} cancelamentos seguintes, que o cálculo nunca viu.</p>
+        <table>
+            <tr><th>Medida</th><th>Resultado</th></tr>
+            <tr><td>Separação nos dados de calibração (referência)</td><td>{{ $n($vt['auc']['treino'], 2) }}</td></tr>
+            <tr><td>Separação no período de teste, com pesos calibrados antes do corte</td><td><b>{{ $n($vt['auc']['teste_pesos_treino'], 2) }}</b></td></tr>
+            <tr><td>Separação no período de teste, com os pesos padrão</td><td>{{ $n($vt['auc']['teste_pesos_padrao'], 2) }}</td></tr>
+            <tr><td>Cancelados do teste alertados (corte calibrado antes: atenção ≥ {{ $vt['corte_alto'] ?? '—' }})</td><td><b>{{ $vt['detectados'] }} de {{ $vt['teste']['cancelados'] }}</b></td></tr>
+            <tr><td>Alarme falso entre os que nunca cancelaram</td><td>{{ $n($vt['alarme_falso_pct'], 1) }}%</td></tr>
+        </table>
+        <p class="muted">Quanto mais perto a separação do teste estiver da de calibração, menos o resultado depende de ter sido ajustado aos mesmos casos. Os clientes que saíram depois do corte contam como ativos na calibração, como na época, o que a torna mais difícil que o teste. Com poucos cancelamentos por período, os números são indicativos.</p>
+    @else
+        <p>Não há cancelamentos suficientes antes e depois de um ponto de corte para validar em período separado.</p>
+    @endif
+
     <h2>5. Configuração recomendada</h2>
     @if ($r['evidencia_suficiente'])
         <ul>
             <li><b>Ordem das métricas:</b> {{ collect($recomendada['ordem'])->pluck('rotulo')->implode(' › ') }}.</li>
             <li><b>Desligar (não separam cancelados de retidos):</b> {{ $recomendada['desligadas'] ? implode(', ', $recomendada['desligadas']) : 'nenhuma' }}.</li>
             <li><b>Cortes de alerta:</b> Médio ≥ {{ $recomendada['limiares']['medio'] }} (até 30% de alarme falso), Alto ≥ {{ $recomendada['limiares']['alto'] }} (até 8%), Crítico ≥ {{ $recomendada['limiares']['critico'] }} (até 2%).</li>
-            <li><b>Equilíbrio risco × valor (K):</b> decisão de negócio, ajustável em Configurações.</li>
+            <li><b>Equilíbrio atenção × valor (K):</b> decisão de negócio, ajustável em Configurações.</li>
         </ul>
     @else
         <p>Sem cancelamentos suficientes para recomendar mudanças.</p>
     @endif
 
     <h2>6. Os {{ count($r['cancelamentos']['alto']) }} cancelamentos, um a um (corte Alto ≥ {{ $alto['limiar'] }})</h2>
-    <p>"Sem alerta" = o risco não estava acima do corte no último mês antes da saída.</p>
+    <p>"Sem alerta" = a atenção não estava acima do corte no último mês antes da saída.</p>
     <table class="grade">
         <tr>
             @foreach (collect($r['cancelamentos']['alto'])->chunk(max(1, (int) ceil(count($r['cancelamentos']['alto']) / 2))) as $metade)
                 <td style="width: 50%">
                     <table>
-                        <tr><th>Cliente</th><th>Saída</th><th>Contrato/mês</th><th>Alerta desde</th><th>Antec.</th><th>Risco</th></tr>
+                        <tr><th>Cliente</th><th>Saída</th><th>Contrato/mês</th><th>Alerta desde</th><th>Antec.</th><th>Atenção</th></tr>
                         @foreach ($metade as $c)
                             <tr>
                                 <td>{{ $c['nome'] }} ({{ $c['codigo'] }})</td>
@@ -136,7 +153,7 @@
                                 <td>{{ $brl($c['valor']) }}</td>
                                 <td>{{ $c['alerta_desde'] ?? 'Sem alerta' }}</td>
                                 <td>{{ $meses($c['antecedencia']) }}</td>
-                                <td>{{ $c['score_final'] }}%</td>
+                                <td>{{ $c['score_final'] }}</td>
                             </tr>
                         @endforeach
                     </table>
@@ -170,7 +187,7 @@
             <p><b>Elevado nos que cancelaram (último mês antes da saída):</b></p>
             <ul>
                 @foreach ($s['elevados'] as $i)
-                    <li><b>{{ $i['rotulo'] }}</b>{{ $i['extra'] ? ' (fora do score)' : '' }}: {{ $i['texto'] }}.</li>
+                    <li><b>{{ $i['rotulo'] }}</b>{{ $i['extra'] ? ' (fora da atenção)' : '' }}: {{ $i['texto'] }}.</li>
                 @endforeach
             </ul>
         @else
@@ -179,9 +196,9 @@
         @if ($s['expostos'])
             <p><b>Ativos que repetem o padrão hoje</b> ({{ count($s['expostos']) }} clientes, {{ $brl($s['receita_exposta']) }}/mês):</p>
             <table>
-                <tr><th>Cliente</th><th>Risco</th><th>Contrato/mês</th><th>Variáveis elevadas</th></tr>
+                <tr><th>Cliente</th><th>Atenção</th><th>Contrato/mês</th><th>Variáveis elevadas</th></tr>
                 @foreach ($s['expostos'] as $e)
-                    <tr><td>{{ $e['nome'] }}</td><td>{{ $e['score'] }}%</td><td>{{ $brl($e['valor']) }}</td><td>{{ implode(', ', $e['variaveis']) }}</td></tr>
+                    <tr><td>{{ $e['nome'] }}</td><td>{{ $e['score'] }}</td><td>{{ $brl($e['valor']) }}</td><td>{{ implode(', ', $e['variaveis']) }}</td></tr>
                 @endforeach
             </table>
         @else

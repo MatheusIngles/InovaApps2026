@@ -3,7 +3,7 @@
 namespace App\Support;
 
 /**
- * Score de risco de cancelamento (0-100) a partir dos 3 últimos meses de cada cliente.
+ * Risco de cancelamento (0-100) a partir dos 3 últimos meses de cada cliente.
  * Cada sinal vira uma severidade 0-1 multiplicada pelo seu peso; a soma dos pesos é 100.
  * Mediana (não média) nos 3 meses: ignora piora de um mês só.
  */
@@ -41,9 +41,9 @@ class Risco
      * @param  array<string, float|int>|null  $pesos  pesos da empresa, na ordem de prioridade (padrão: PESOS)
      * @return array{score:int, nivel:string, sinais:array, sev:array}
      *
-     * O score é a média ponderada das severidades: soma(severidade × peso) / soma(pesos) × 100.
+     * O risco é a média ponderada das severidades: soma(severidade × peso) / soma(pesos) × 100.
      * Normalizar pela soma dos pesos mantém a escala 0-100 quando a empresa usa pesos que não somam 100;
-     * soma zero (todos os pesos 0) resulta em score 0 em vez de divisão por zero.
+     * soma zero (todos os pesos 0) resulta em risco 0 em vez de divisão por zero.
      */
     public static function calcular(array $hist, array $nps, ?array $pesos = null, ?array $limiares = null): array
     {
@@ -81,7 +81,7 @@ class Risco
         return $pontos;
     }
 
-    /** Limiares padrão calibrados no backtest: cancelados ≈ 58 de score médio, ativos ≈ 20. */
+    /** Limiares padrão calibrados no backtest: cancelados ≈ 58 de risco médio, ativos ≈ 20. */
     public static function nivel(int $score, ?array $limiares = null): string
     {
         $l = $limiares ?? self::LIMIARES;

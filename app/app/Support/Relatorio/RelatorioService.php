@@ -92,9 +92,9 @@ class RelatorioService
             '@@2@@',
             '(parágrafo do segundo ponto, e assim por diante)',
             '',
-            "EMPRESA: {$c->nome} ({$c->codigo}) — {$c->segmento}, porte {$c->porte}, plano {$c->plano}.",
+            "CLIENTE: {$c->nome} ({$c->codigo}) — {$c->segmento}, porte {$c->porte}, plano {$c->plano}.",
             'Situação: '.($c->cancelada() ? "CANCELADA em {$c->mes_cancel}" : 'ATIVA').
-                " | Score de risco: {$c->score}/100 ({$c->nivel}) | Contrato: ".Customer::brl($c->valor).
+                " | Atenção: {$c->score}/100 ({$c->nivel}) | Contrato: ".Customer::brl($c->valor).
                 '/mês | Exposição mensal indicativa: '.Customer::brl($c->exposicao),
             '',
             'PONTOS CRÍTICOS, NA ORDEM QUE DEVEM SER ANALISADOS:',

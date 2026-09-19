@@ -77,7 +77,7 @@
             <div class="eyebrow">Relatório de pontos críticos</div>
             <h1>{{ $empresa->nome }}</h1>
             <p class="sub">{{ $empresa->segmento }} &middot; porte {{ $empresa->porte }} &middot; plano {{ $empresa->plano }} &middot; cliente desde {{ \Illuminate\Support\Carbon::parse($empresa->inicio)->format('m/Y') }}</p>
-            <div class="badge">{{ $empresa->rotulo() }}{{ $empresa->cancelada() ? '' : ' · risco '.$empresa->score.'%' }}</div>
+            <div class="badge">{{ $empresa->rotulo() }}{{ $empresa->cancelada() ? '' : ' · atenção '.$empresa->score.'/100' }}</div>
             <p class="rodape">Gerado em {{ $geradoEm->format('d/m/Y H:i') }} pelo InovaApps</p>
         </div>
     </section>
@@ -89,14 +89,14 @@
             <div class="kpi-grid">
                 <div class="kpi-row">
                     <div class="kpi-cell"><div class="kpi"><div class="valor">{{ $empresa->rotulo() }}</div><div class="rotulo">Nível</div></div></div>
-                    <div class="kpi-cell"><div class="kpi"><div class="valor">{{ $empresa->score }}%</div><div class="rotulo">Risco</div></div></div>
+                    <div class="kpi-cell"><div class="kpi"><div class="valor">{{ $empresa->score }}/100</div><div class="rotulo">Atenção</div></div></div>
                     <div class="kpi-cell"><div class="kpi"><div class="valor">{{ \App\Models\Customer::brl($empresa->valor) }}</div><div class="rotulo">Contrato/mês</div></div></div>
                     <div class="kpi-cell"><div class="kpi"><div class="valor">{{ \App\Models\Customer::brl($empresa->exposicao) }}</div><div class="rotulo">Exposição mensal</div></div></div>
                 </div>
             </div>
             <p class="footer">
-                Situação: {{ $empresa->cancelada() ? 'Cancelada em '.$empresa->mes_cancel : 'Ativa' }}.
-                Risco: soma das parcelas dos sinais, ponderadas pelos pesos configurados. Exposição: risco (%) × valor mensal do contrato.
+                Situação: {{ $empresa->cancelada() ? 'Cancelado em '.$empresa->mes_cancel : 'Ativo' }}.
+                Atenção: soma das parcelas dos sinais, ponderadas pelos pesos configurados. Exposição: atenção ÷ 100 × valor mensal do contrato.
                 São indicadores para priorização; não representam probabilidade de cancelamento nem perda financeira prevista.
             </p>
         </div>

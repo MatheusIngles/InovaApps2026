@@ -18,7 +18,7 @@ class Company extends Model
 
     public const TEMA_PADRAO = ['primary' => '#2563eb', 'secondary' => '#1d4ed8', 'font' => 'Plus Jakarta Sans', 'logo' => null, 'brand' => 'Seer'];
 
-    /** K da fila: score × (score + K) × valor. Menor reforça o score; maior aproxima score × valor. */
+    /** K da fila: risco × (risco + K) × valor. Menor reforça o risco; maior aproxima risco × valor. */
     public const PRIORIDADE_PADRAO = 50;
 
     public const CHAT_PADRAO = ['enabled' => true, 'ollama_model' => null, 'instrucoes' => null];
