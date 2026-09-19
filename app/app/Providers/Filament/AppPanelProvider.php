@@ -4,10 +4,12 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Configuracoes;
 use App\Filament\Pages\Painel;
 use App\Http\Middleware\SetCompanyContext;
 use App\Models\Customer;
 use App\Support\AvatarIniciais;
+use Filament\Actions\Action;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -16,6 +18,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -43,6 +46,7 @@ class AppPanelProvider extends PanelProvider
             ->topNavigation()
             ->navigation(fn (): bool => auth()->check() && Customer::exists()) // sem dados, só a planilha inicial
             ->defaultAvatarProvider(AvatarIniciais::class)
+            ->userMenuItems([Action::make('configuracoes')->label('Configurações')->icon(Heroicon::OutlinedCog6Tooth)->url(fn (): string => Configuracoes::getUrl())])
             ->homeUrl(fn () => url('/'))
             ->font('Plus Jakarta Sans')
             ->darkMode(true)

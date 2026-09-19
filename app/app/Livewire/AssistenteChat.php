@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Customer;
 use App\Support\Assistente;
 use App\Support\Llm\Contexto;
+use App\Support\Llm\Escopo;
 use App\Support\Llm\Llm;
 use App\Support\Tenancy\CompanyContext;
 use Livewire\Attributes\Url;
@@ -44,11 +45,22 @@ class AssistenteChat extends Component
         $config = app(CompanyContext::class)->current()->chat();
         $this->mensagens[] = ['eu' => true, 'texto' => $texto];
 
+        if (Escopo::tentaBurlar($texto)) {
+            $this->mensagens[] = ['eu' => false, 'texto' => Escopo::RECUSA, 'fonte' => 'Fora do escopo do assistente'];
+
+            return;
+        }
+
         try {
             if (! $config['enabled']) {
                 throw new \RuntimeException('IA desativada para esta empresa.');
             }
             $r = Llm::responder(Contexto::sistema($empresa), [...$historico, ['role' => 'user', 'content' => $texto]], $config['ollama_model']);
+            if (Escopo::foraDoAssunto($r['texto'])) {
+                $this->mensagens[] = ['eu' => false, 'texto' => Escopo::RECUSA, 'fonte' => 'Fora do escopo do assistente'];
+
+                return;
+            }
             $this->mensagens[] = ['eu' => false, 'texto' => $r['texto'], 'fonte' => $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)'];
         } catch (\Throwable) {
             $this->mensagens[] = ['eu' => false, 'texto' => Assistente::responder($texto, $empresa?->codigo), 'fonte' => 'Respostas por regras (IA indisponível)'];

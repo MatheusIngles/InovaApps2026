@@ -4,9 +4,9 @@
 @endphp
 <section class="ev" aria-labelledby="ev-resumo">
     <h2 id="ev-resumo" class="ui-h2">O alerta funciona? O que o histórico mostra
-        <details class="ui-tip"><summary aria-label="Como estes números foram calculados">?</summary><span class="ui-tip-content">Para cada cliente e cada mês recalculamos o score como o sistema faria naquele mês. "Alerta" = score no corte Alto ({{ $atual['limiar'] }}) ou acima. Antecedência = há quantos meses da saída o alerta começou e se manteve até o fim. Alarme falso = parte dos meses de clientes que ficaram em que o score passaria do corte. O corte pode ser mudado na aba Evidências.</span></details>
+        <details class="ui-tip"><summary aria-label="Como estes números foram calculados">?</summary><span class="ui-tip-content">Para cada cliente e cada mês recalculamos o score como o sistema faria naquele mês. "Alerta" = score no corte Alto ({{ $atual['limiar'] }}) ou acima. Antecedência = há quantos meses da saída o alerta começou e se manteve até o fim. Alarme falso = parte dos meses de clientes que ficaram em que o score passaria do corte.</span></details>
     </h2>
-    <p class="ui-muted">Com o corte Alto (score ≥ {{ $atual['limiar'] }}). Para testar outros cortes e ver o detalhe por variável, abra a aba Evidências.</p>
+    <p class="ui-muted">Com o corte Alto (risco ≥ {{ $atual['limiar'] }}%). O detalhe completo está no relatório de evidências (botão "Gerar relatório de evidências" no topo) e na área de evidências da aba Por segmento.</p>
     <div class="ev-kpis">
         <div class="ui-card ev-kpi">
             <span>Cancelados alertados com 3+ meses de antecedência</span>

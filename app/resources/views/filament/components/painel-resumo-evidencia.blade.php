@@ -1,1 +1,1 @@
-<livewire:painel-resumo-evidencia />
+<livewire:painel-resumo-evidencia :lazy="false" />

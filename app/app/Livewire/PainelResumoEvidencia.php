@@ -8,7 +8,7 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
-/** Visão geral do painel: o que o histórico diz sobre o alerta (corte Alto da empresa). O corte se escolhe na aba Evidências. */
+/** Visão geral do painel: o que o histórico diz sobre o alerta (corte Alto da empresa). */
 #[Lazy]
 class PainelResumoEvidencia extends Component
 {

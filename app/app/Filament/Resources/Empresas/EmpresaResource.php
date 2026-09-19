@@ -11,11 +11,11 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
-use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -70,7 +70,7 @@ class EmpresaResource extends Resource
                     ]),
                     Split::make([
                         TextColumn::make('score')->size(TextSize::Large)->weight(FontWeight::Bold)
-                            ->formatStateUsing(fn ($state) => "Score {$state}/100")
+                            ->formatStateUsing(fn ($state) => "Risco {$state}%")
                             ->description('8 sinais com pesos ajustáveis; veja as parcelas no cliente.')
                             ->tooltip(fn (Customer $e) => $e->resumoScore()),
                         TextColumn::make('valor')->alignEnd()
@@ -119,16 +119,16 @@ class EmpresaResource extends Resource
                         filled($data['value'] ?? null),
                         fn (Builder $query) => $query->where('customers.plan', $data['value'])
                     )),
-                Filter::make('score_range')->label('Faixa de score')->columnSpanFull()
-                    ->indicateUsing(fn (array $data) => self::indicadorFaixa('Score', $data))
+                Filter::make('score_range')->label('Faixa de risco')
+                    ->indicateUsing(fn (array $data) => self::indicadorFaixa('Risco', $data))
                     ->schema([
-                        TextInput::make('min')->label('Score mínimo')->numeric()->minValue(0)->maxValue(100),
-                        TextInput::make('max')->label('Score máximo')->numeric()->minValue(0)->maxValue(100),
+                        TextInput::make('min')->label('Risco mínimo (%)')->numeric()->minValue(0)->maxValue(100),
+                        TextInput::make('max')->label('Risco máximo (%)')->numeric()->minValue(0)->maxValue(100),
                     ])->columns(2)
                     ->query(fn (Builder $query, array $data) => $query
                         ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '>=', $data['min']))
                         ->when(filled($data['max'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '<=', $data['max']))),
-                Filter::make('monthly_value_range')->label('Valor mensal')->columnSpanFull()
+                Filter::make('monthly_value_range')->label('Valor mensal')
                     ->indicateUsing(fn (array $data) => self::indicadorFaixa('Valor', $data, 'R$ '))
                     ->schema([
                         TextInput::make('min')->label('Valor mínimo (R$)')->numeric()->minValue(0),
@@ -138,8 +138,8 @@ class EmpresaResource extends Resource
                         ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('customers.monthly_value', '>=', $data['min']))
                         ->when(filled($data['max'] ?? null), fn (Builder $query) => $query->where('customers.monthly_value', '<=', $data['max']))),
             ])
-            ->filtersFormColumns(2)
-            ->filtersFormWidth(Width::Large)
+            ->filtersLayout(FiltersLayout::AboveContentCollapsible) // filtros lado a lado, escondidos até clicar no botão de filtro
+            ->filtersFormColumns(3)
             ->deferFilters(false) // aplica assim que o filtro muda, sem botão
             ->recordActions([]);
     }

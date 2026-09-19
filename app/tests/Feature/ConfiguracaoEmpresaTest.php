@@ -218,4 +218,16 @@ class ConfiguracaoEmpresaTest extends TestCase
         $this->expectException(ValidationException::class);
         CompanyConfig::salvar($company, $d);
     }
+
+    public function test_pesos_editados_seguem_a_ordem_da_lista_e_desligada_fica_com_zero(): void
+    {
+        $metricas = [['k' => 'sla', 'peso' => 40, 'ativa' => true], ['k' => 'uso', 'peso' => 25, 'ativa' => true], ['k' => 'nps', 'peso' => 0, 'ativa' => false]];
+
+        $r = collect(CompanyConfig::pesosPorPosicao($metricas))->pluck('peso', 'k')->all();
+
+        $this->assertEquals(['sla' => 40.0, 'uso' => 25.0, 'nps' => 0], $r);
+        // arrastar uso para o topo entrega o maior peso a ele, sem inventar valores novos
+        $r = collect(CompanyConfig::pesosPorPosicao([$metricas[1], $metricas[0], $metricas[2]]))->pluck('peso', 'k')->all();
+        $this->assertEquals(['uso' => 40.0, 'sla' => 25.0, 'nps' => 0], $r);
+    }
 }

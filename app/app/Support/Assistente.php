@@ -23,7 +23,7 @@ class Assistente
             $resposta = Contexto::prioridades();
 
             if ($c) {
-                $resposta .= "\n\n{$c->nome}: score {$c->score}/100 ({$c->nivel}).";
+                $resposta .= "\n\n{$c->nome}: risco {$c->score}% ({$c->nivel}).";
                 $resposta .= "\nSinais que mais contribuíram nesta avaliação: ".
                     (collect($c->sinais)->map(fn ($s) => "{$s['label']} (+{$s['pts']} pts)")->join(', ') ?: 'nenhum sinal em destaque').'.';
             }
@@ -36,7 +36,7 @@ class Assistente
 
     private static function sobreEmpresa(Customer $c, string $q): string
     {
-        $cab = "{$c['nome']} ({$c['codigo']}) — {$c['nivel']}, score {$c['score']}/100.";
+        $cab = "{$c['nome']} ({$c['codigo']}) — {$c['nivel']}, risco {$c['score']}%.";
         $sinais = collect($c['sinais']);
         if ($c['status'] === 'Cancelado') {
             $cab .= " Cancelou em {$c['mes_cancel']}.";
@@ -70,8 +70,8 @@ class Assistente
         $risco = $a->where('score', '>=', 40);
 
         if (Str::contains($q, ['receita', 'exposi', 'dinheiro', 'financeir'])) {
-            return 'Exposição mensal indicativa (score de sinais × valor): '.Customer::brl($a->sum('exposicao')).' de '.Customer::brl($a->sum('valor')).
-                '. Clientes com score alto/crítico somam '.Customer::brl($risco->sum('valor')).'/mês.';
+            return 'Exposição mensal indicativa (risco × valor): '.Customer::brl($a->sum('exposicao')).' de '.Customer::brl($a->sum('valor')).
+                '. Clientes com risco alto/crítico somam '.Customer::brl($risco->sum('valor')).'/mês.';
         }
         if (Str::contains($q, ['segmento', 'setor'])) {
             return "Risco médio por segmento (ativos):\n".$a->groupBy('segmento')->map(fn ($g) => round($g->avg('score')))

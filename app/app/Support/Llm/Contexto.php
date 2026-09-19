@@ -65,7 +65,7 @@ INSTRUÇÕES DA EMPRESA:
             "EMPRESA EM FOCO: {$c->nome} (código {$c->codigo})",
             "Segmento: {$c->segmento} | Porte: {$c->porte} | Plano: {$c->plano} | Cliente desde: {$c->inicio}",
             'Contrato: '.Customer::brl($c->valor)."/mês, SLA contratado {$c->sla_h}h",
-            'Situação: '.($c->cancelada() ? "CANCELADA em {$c->mes_cancel}" : 'ATIVA')." | Score de risco: {$c->score}/100 ({$c->nivel}) | Exposição mensal: ".Customer::brl($c->exposicao),
+            'Situação: '.($c->cancelada() ? "CANCELADA em {$c->mes_cancel}" : 'ATIVA')." | Risco: {$c->score}% ({$c->nivel}) | Exposição mensal: ".Customer::brl($c->exposicao),
             '',
             'SINAIS DE ALERTA (últimos 3 meses):',
             ...($c->sinais ? array_map(fn ($s) => "- {$s['label']}: {$s['texto']} → ação sugerida: {$s['acao']}", $c->sinais) : ['- nenhum sinal relevante']),
@@ -89,7 +89,7 @@ INSTRUÇÕES DA EMPRESA:
             'CONTEXTO: visão geral da carteira (sem empresa específica em foco).',
             "Clientes ativos: {$ativas->count()} | Receita mensal ativa: ".Customer::brl($ativas->sum('valor')).' | Exposição mensal total: '.Customer::brl($ativas->sum('exposicao')),
             'FILA DE ATENDIMENTO (top 10 por prioridade = risco × valor do contrato):',
-            ...$ativas->take(10)->map(fn ($c, $i) => ($i + 1).". {$c->nome} ({$c->codigo}) — {$c->nivel}, score {$c->score}, ".Customer::brl($c->valor).'/mês, principal motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->all(),
+            ...$ativas->take(10)->map(fn ($c, $i) => ($i + 1).". {$c->nome} ({$c->codigo}) — {$c->nivel}, risco {$c->score}%, ".Customer::brl($c->valor).'/mês, principal motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->all(),
         ];
 
         return implode("\n", $linhas);
