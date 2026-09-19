@@ -61,7 +61,7 @@ class InsatisfacaoChart extends ChartWidget
         return [
             'labels' => $labels,
             'datasets' => [
-                ['label' => 'Insatisfação (risco %)', 'data' => $real, 'borderColor' => $primaria, 'backgroundColor' => $primaria, 'tension' => .3, 'pointRadius' => 3, 'spanGaps' => false],
+                ['label' => 'Insatisfação (atenção 0–100)', 'data' => $real, 'borderColor' => $primaria, 'backgroundColor' => $primaria, 'tension' => .3, 'pointRadius' => 3, 'spanGaps' => false],
                 ['label' => 'Previsão do próximo mês', 'data' => $prev, 'borderColor' => '#f59e0b', 'backgroundColor' => '#f59e0b', 'borderDash' => [6, 5], 'pointRadius' => 5, 'tension' => 0, 'spanGaps' => true],
             ],
         ];

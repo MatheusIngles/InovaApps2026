@@ -10,9 +10,9 @@ class SegmentosChart extends ChartWidget
 {
     protected static ?int $sort = 3;
 
-    protected ?string $heading = 'Risco médio por segmento';
+    protected ?string $heading = 'Atenção média por segmento';
 
-    protected ?string $description = 'Média aritmética dos riscos por regras (0–100) dos clientes ativos de cada segmento.';
+    protected ?string $description = 'Média aritmética da atenção por regras (0–100) dos clientes ativos de cada segmento.';
 
     protected ?string $maxHeight = '260px';
 
@@ -27,7 +27,7 @@ class SegmentosChart extends ChartWidget
 
         return [
             'labels' => $s->keys()->all(),
-            'datasets' => [['label' => 'Risco médio (%)', 'data' => $s->map(fn ($v) => round($v))->values()->all(), 'backgroundColor' => app(CompanyContext::class)->current()->tema()['primary']]],
+            'datasets' => [['label' => 'Atenção média', 'data' => $s->map(fn ($v) => round($v))->values()->all(), 'backgroundColor' => app(CompanyContext::class)->current()->tema()['primary']]],
         ];
     }
 

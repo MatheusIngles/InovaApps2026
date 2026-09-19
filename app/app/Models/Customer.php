@@ -62,11 +62,16 @@ class Customer extends Model
 
     public static function ordenar(Builder $query): Builder
     {
-        // canceladas por último. Entre as ativas: regra de três (risco × valor do contrato) com um reforço para risco alto:
-        // risco × (risco + K) × valor, com K configurável por empresa (Configurações).
-        $k = app(CompanyContext::class)->current()?->prioridadeK() ?? Company::PRIORIDADE_PADRAO;
+        // Canceladas por último. Duas camadas entre as ativas: primeiro quem já está em alerta (nível Médio ou acima),
+        // depois os demais; em cada camada, risco × (risco + K) × valor do contrato, com K configurável (Configurações).
+        // Assim um contrato grande desempata entre clientes que precisam de atenção, mas nunca põe um cliente sem alerta
+        // na frente de um em alerta.
+        $company = app(CompanyContext::class)->current();
+        $k = $company?->prioridadeK() ?? Company::PRIORIDADE_PADRAO;
+        $emAlerta = $company?->limiares()['medio'] ?? Risco::LIMIARES['medio'];
 
         return $query->orderByRaw("customers.status = 'Cancelado'")
+            ->orderByRaw('(assessment.health_score >= ?) DESC', [$emAlerta])
             ->orderByRaw('assessment.health_score * (assessment.health_score + ?) * customers.monthly_value DESC', [$k]);
     }
 
@@ -190,13 +195,13 @@ class Customer extends Model
     public function resumoScore(): string
     {
         if (! $this->currentAssessment) {
-            return 'Sem avaliação: faltam métricas mensais para calcular o risco.';
+            return 'Sem avaliação: faltam métricas mensais para calcular a atenção.';
         }
 
         $principais = collect($this->contribuicoesScore())->sortByDesc('pontos')->take(3)
             ->map(fn ($item) => "{$item['rotulo']} +{$item['pontos']}")->join('; ');
 
-        return "Risco por regras (índice em %): soma ponderada de 8 sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
+        return "Atenção por regras (índice de 0 a 100): soma ponderada de 8 sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
     }
 
     public function getSimilaresAttribute(): array

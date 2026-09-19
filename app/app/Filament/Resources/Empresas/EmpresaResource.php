@@ -72,7 +72,7 @@ class EmpresaResource extends Resource
                     ]),
                     Split::make([
                         TextColumn::make('score')->size(TextSize::Large)->weight(FontWeight::Bold)
-                            ->formatStateUsing(fn ($state) => "Risco {$state}%")
+                            ->formatStateUsing(fn ($state) => "Atenção {$state}/100")
                             ->description('8 sinais com pesos ajustáveis; veja as parcelas no cliente.')
                             ->tooltip(fn (Customer $e) => $e->resumoScore()),
                         TextColumn::make('valor')->alignEnd()
@@ -84,7 +84,7 @@ class EmpresaResource extends Resource
                 ])->space(3),
             ])
             ->filters([
-                SelectFilter::make('nivel')->label('Nível de risco')->multiple()
+                SelectFilter::make('nivel')->label('Nível de atenção')->multiple()
                     ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelado' => 'Cancelado'])
                     ->query(function (Builder $query, array $data) {
                         $niveis = array_filter($data['values'] ?? []);
@@ -121,11 +121,11 @@ class EmpresaResource extends Resource
                         filled($data['value'] ?? null),
                         fn (Builder $query) => $query->where('customers.plan', $data['value'])
                     )),
-                Filter::make('score_range')->label('Faixa de risco')
-                    ->indicateUsing(fn (array $data) => self::indicadorFaixa('Risco', $data))
+                Filter::make('score_range')->label('Faixa de atenção')
+                    ->indicateUsing(fn (array $data) => self::indicadorFaixa('Atenção', $data))
                     ->schema([
-                        TextInput::make('min')->label('Risco mínimo (%)')->numeric()->minValue(0)->maxValue(100),
-                        TextInput::make('max')->label('Risco máximo (%)')->numeric()->minValue(0)->maxValue(100),
+                        TextInput::make('min')->label('Atenção mínima')->numeric()->minValue(0)->maxValue(100),
+                        TextInput::make('max')->label('Atenção máxima')->numeric()->minValue(0)->maxValue(100),
                     ])->columns(2)
                     ->query(fn (Builder $query, array $data) => $query
                         ->when(filled($data['min'] ?? null), fn (Builder $query) => $query->where('assessment.health_score', '>=', $data['min']))

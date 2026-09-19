@@ -27,7 +27,7 @@
                         <p class="ui-headline">{{ $e->segmento }}, porte {{ $e->porte }}, plano {{ $e->plano }}. Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ', cancelou em '.$e->mes_cancel : '' }}.</p>
                     </div>
                     <div class="ui-actions">
-                        <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · risco {{ $e->score }}%{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
+                        <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · atenção {{ $e->score }}/100{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
                         <a class="ui-btn primary" href="{{ $chat }}">Conversar com a IA</a>
                         <livewire:relatorio-empresa :codigo="$e->codigo" :key="'relatorio-'.$e->codigo" />
                         <a class="ui-btn" href="{{ EmpresaResource::getUrl() }}">Todos os clientes</a>
@@ -50,21 +50,21 @@
                     <div><dt>Contrato/mês</dt><dd>{{ Customer::brl($e->valor) }}</dd></div>
                     <div><dt>Uso da plataforma</dt><dd>{{ $ultimo ? $ultimo['uso'].'%' : '—' }}</dd></div>
                     <div><dt>SLA cumprido</dt><dd>{{ $ultimo && is_numeric($ultimo['sla']) ? $ultimo['sla'].'%' : '—' }}</dd></div>
-                    <div><dt>Risco <details class="ui-tip"><summary aria-label="Como o risco é calculado">?</summary><span class="ui-tip-content">Soma das parcelas dos oito sinais avaliados. É um índice de risco em %, não a chance de cancelamento.</span></details></dt><dd>{{ $e->score }}%</dd></div>
-                    <div><dt>Exposição <details class="ui-tip"><summary aria-label="Como a exposição é calculada">?</summary><span class="ui-tip-content">{{ $e->score }}% × {{ Customer::brl($e->valor) }}/mês. É um indicador para priorização, não uma perda prevista.</span></details></dt><dd>{{ Customer::brl($e->exposicao) }}</dd></div>
+                    <div><dt>Atenção <details class="ui-tip"><summary aria-label="Como a atenção é calculada">?</summary><span class="ui-tip-content">Soma das parcelas dos oito sinais avaliados. É um índice de 0 a 100 dos sinais de alerta (quanto maior, antes o cliente merece contato), não a chance de cancelamento.</span></details></dt><dd>{{ $e->score }}/100</dd></div>
+                    <div><dt>Exposição <details class="ui-tip"><summary aria-label="Como a exposição é calculada">?</summary><span class="ui-tip-content">{{ $e->score }}/100 × {{ Customer::brl($e->valor) }}/mês. É um indicador para priorização, não uma perda prevista.</span></details></dt><dd>{{ Customer::brl($e->exposicao) }}</dd></div>
                 </dl>
             </section>
 
-            {{-- Previsão do risco --}}
+            {{-- Previsão da atenção --}}
             @if ($serie['scores'])
             <section class="ui-card ui-pad">
-                <h2>Previsão do risco</h2>
+                <h2>Previsão da atenção</h2>
                     <p>
                         @if ($prev)
                             A reta dos últimos {{ $prev['pontos'] }} meses ({{ $prev['tendencia'] > 0 ? '+' : '' }}{{ number_format($prev['tendencia'], 1, ',', '.') }} pts por mês) aponta para <b>{{ $prev['valor'] }}</b> no próximo mês (faixa provável de {{ $prev['minimo'] }} a {{ $prev['maximo'] }}). O último mês fechou em {{ $ultimoScore }}.
-                            @if ($prev['tendencia'] >= 1) O risco está <b>subindo</b>: vale agir antes do próximo mês. @elseif ($prev['tendencia'] <= -1) O risco está <b>caindo</b>. @else A direção é <b>estável</b>. @endif
+                            @if ($prev['tendencia'] >= 1) A atenção necessária está <b>subindo</b>: vale agir antes do próximo mês. @elseif ($prev['tendencia'] <= -1) A atenção necessária está <b>caindo</b>. @else A direção é <b>estável</b>. @endif
                             @if (abs($ultimoScore - $prev['ajuste_ultimo']) > max(3, $prev['maximo'] - $prev['valor'])) O último mês ficou fora da tendência; a previsão suaviza esse desvio. @endif
-                            <details class="ui-tip"><summary aria-label="Como a previsão foi calculada">?</summary><span class="ui-tip-content">Pegamos o risco (índice de sinais) de cada um dos últimos {{ $prev['pontos'] }} meses e traçamos a reta que melhor se ajusta a eles (mínimos quadrados). A inclinação da reta é a tendência, em pontos por mês; o ponto seguinte da reta é a previsão. A faixa provável é a previsão mais ou menos o desvio típico dos meses em torno da reta, sempre entre 0 e 100. "Subindo" = tendência de +1 ponto por mês ou mais; "caindo" = -1 ou menos; no meio, estável. Se o último mês fica longe da reta (mais que a faixa), avisamos que fugiu da tendência. Não é probabilidade de cancelamento: só indica a direção.</span></details>
+                            <details class="ui-tip"><summary aria-label="Como a previsão foi calculada">?</summary><span class="ui-tip-content">Pegamos a atenção (índice de sinais) de cada um dos últimos {{ $prev['pontos'] }} meses e traçamos a reta que melhor se ajusta a eles (mínimos quadrados). A inclinação da reta é a tendência, em pontos por mês; o ponto seguinte da reta é a previsão. A faixa provável é a previsão mais ou menos o desvio típico dos meses em torno da reta, sempre entre 0 e 100. "Subindo" = tendência de +1 ponto por mês ou mais; "caindo" = -1 ou menos; no meio, estável. Se o último mês fica longe da reta (mais que a faixa), avisamos que fugiu da tendência. Não é probabilidade de cancelamento: só indica a direção.</span></details>
                         @elseif ($e->cancelada())
                             Cliente cancelado: o gráfico mostra os meses até a saída.
                         @else
@@ -87,7 +87,7 @@
                             <strong>{{ $s['label'] }}</strong>
                             @if ($parcela)
                                 <details class="ui-tip ui-tip-valor">
-                                    <summary aria-label="Como {{ $s['label'] }} contribuiu para o risco">+{{ $s['pts'] }} pts</summary>
+                                    <summary aria-label="Como {{ $s['label'] }} contribuiu para a atenção">+{{ $s['pts'] }} pts</summary>
                                     <span class="ui-tip-content">Parcela da métrica: {{ number_format($parcela['base'], 1, ',', '.') }} pt (intensidade × 12,5). Ajuste da prioridade: {{ $parcela['ajuste_prioridade'] < 0 ? '−' : '+' }}{{ number_format(abs($parcela['ajuste_prioridade']), 1, ',', '.') }} pt (peso {{ number_format($parcela['peso'], 1, ',', '.') }}). Total: {{ number_format($parcela['pontos'], 1, ',', '.') }} pt.</span>
                                 </details>
                             @else
@@ -156,7 +156,7 @@
                 <h2>Insatisfação ao longo dos meses</h2>
                 @if ($serie['scores'])
                     @livewire(\App\Filament\Widgets\InsatisfacaoChart::class, ['codigo' => $e->codigo], key('insatisfacao-'.$e->codigo))
-                    <p class="ui-muted">A previsão é a reta da tendência recente do índice de risco (uso, SLA, reclamações, NPS e outros). Não é probabilidade de cancelamento; serve para antecipar a direção.</p>
+                    <p class="ui-muted">A previsão é a reta da tendência recente do índice de atenção (uso, SLA, reclamações, NPS e outros). Não é probabilidade de cancelamento; serve para antecipar a direção.</p>
                 @else
                     <p class="ui-muted">Faltam meses de histórico para montar a série.</p>
                 @endif

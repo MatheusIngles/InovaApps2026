@@ -40,7 +40,7 @@
             <h3 class="ev-h3">O que estava elevado nos que cancelaram (último mês antes da saída)</h3>
             @forelse ($atual['elevados'] as $i)
                 <article class="ui-sinal">
-                    <div class="ui-sinal-top"><strong>{{ $i['rotulo'] }}</strong>@if ($i['extra'])<span class="ui-muted">fora do risco <details class="ui-tip"><summary aria-label="Por que está fora do risco">?</summary><span class="ui-tip-content">O risco usa só os oito sinais configurados. Esta variável é guardada, mas não soma pontos. Aqui ela só aparece se a média dos cancelados for pelo menos 50% acima da dos que ficaram.</span></details></span>@endif</div>
+                    <div class="ui-sinal-top"><strong>{{ $i['rotulo'] }}</strong>@if ($i['extra'])<span class="ui-muted">fora do risco <details class="ui-tip"><summary aria-label="Por que está fora do risco">?</summary><span class="ui-tip-content">A atenção usa só os oito sinais configurados. Esta variável é guardada, mas não soma pontos. Aqui ela só aparece se a média dos cancelados for pelo menos 50% acima da dos que ficaram.</span></details></span>@endif</div>
                     <p>{{ ucfirst($i['texto']) }}.</p>
                     @if (! $i['extra'] && Risco::acao($i['k']))<p class="ui-acao">{{ Risco::acao($i['k']) }}</p>@endif
                 </article>
@@ -53,12 +53,12 @@
                 <p class="ui-muted">{{ count($atual['expostos']) }} clientes ativos de {{ $atual['segmento'] }} repetem hoje uma ou mais dessas variáveis, somando {{ $brl($atual['receita_exposta']) }} por mês. Se seguirem o caminho dos que saíram, é essa receita que está em jogo.</p>
                 <div class="ui-table-wrap">
                     <table class="ui-table">
-                        <thead><tr><th>Cliente</th><th>Risco</th><th>Contrato/mês</th><th>Variáveis elevadas</th></tr></thead>
+                        <thead><tr><th>Cliente</th><th>Atenção</th><th>Contrato/mês</th><th>Variáveis elevadas</th></tr></thead>
                         <tbody>
                             @foreach ($atual['expostos'] as $e)
                                 <tr>
                                     <td><a href="{{ EmpresaResource::getUrl('view', ['record' => $e['codigo']]) }}">{{ $e['nome'] }}</a></td>
-                                    <td>{{ $e['score'] }}%</td>
+                                    <td>{{ $e['score'] }}</td>
                                     <td>{{ $brl($e['valor']) }}</td>
                                     <td>{{ implode(', ', $e['variaveis']) }}</td>
                                 </tr>
@@ -76,8 +76,8 @@
         <h2 id="seg-evid" class="ui-h2">Evidências da carteira</h2>
         <p class="ui-muted">O resumo completo, com todos os números explicados, está no botão "Gerar relatório de evidências" no topo do painel (chega por notificação).</p>
 
-        <h3 class="ev-h3">Variáveis que o risco ainda não usa</h3>
-        <p class="ui-muted">Colunas da planilha que não somam pontos no risco. As que separam bem podem valer a pena entrar nele.</p>
+        <h3 class="ev-h3">Variáveis que a atenção ainda não usa</h3>
+        <p class="ui-muted">Colunas da planilha que não somam pontos na atenção. As que separam bem podem valer a pena entrar nele.</p>
         <div class="ui-table-wrap">
             <table class="ui-table">
                 <thead><tr><th>Variável</th><th>Separação <details class="ui-tip"><summary aria-label="Como a separação foi calculada">?</summary><span class="ui-tip-content">Para cada variável, usamos a média dos 3 últimos meses de cada cliente. Comparamos, par a par, cada cliente que cancelou com cada um que ficou. A separação é a fração dos pares em que o cancelado tem o valor maior (empate conta meio ponto): 0,50 = não distingue; 1,00 = sempre distingue (AUC). Mostra correlação com o cancelamento, não causa.</span></details></th><th>Média nos cancelados</th><th>Média nos retidos</th></tr></thead>
@@ -114,7 +114,7 @@
                 <li><b>Cortes de alerta:</b> Médio ≥ {{ $recomendada['limiares']['medio'] }}, Alto ≥ {{ $recomendada['limiares']['alto'] }}, Crítico ≥ {{ $recomendada['limiares']['critico'] }}.</li>
             </ul>
             <div class="ui-actions">
-                <button type="button" class="ui-btn primary" wire:click="aplicarConfiguracaoRecomendada" wire:confirm="Aplica a ordem das métricas e os cortes recomendados e recalcula o risco de todos os clientes. Dá para voltar em Configurações. Continuar?">Aplicar configuração recomendada</button>
+                <button type="button" class="ui-btn primary" wire:click="aplicarConfiguracaoRecomendada" wire:confirm="Aplica a ordem das métricas e os cortes recomendados e recalcula a atenção de todos os clientes. Dá para voltar em Configurações. Continuar?">Aplicar configuração recomendada</button>
             </div>
         @endif
     </section>

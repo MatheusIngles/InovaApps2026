@@ -65,21 +65,21 @@ class Configuracoes extends Page implements HasSchemas
                         ->schema([
                             Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()
                                 ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
-                                ->schema([Hidden::make('k'), Hidden::make('peso'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
+                                ->schema([Hidden::make('k'), Hidden::make('peso'), Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)]),
                             View::make('filament.components.salvar-configuracao'),
                         ]),
                 ]),
                 Tab::make('Fila de prioridade')->schema([
                     Section::make('Ordem da lista de clientes')
-                        ->description('A fila ordena os clientes ativos por risco × (risco + K) × valor mensal do contrato. K baixo reforça a diferença entre riscos; K alto aproxima a ordem de risco × contrato.')
+                        ->description('A fila mostra primeiro os clientes já em alerta (nível Médio ou acima) e depois os demais; em cada grupo, ordena por atenção × (atenção + K) × valor mensal do contrato. K baixo reforça a diferença de atenção; K alto aproxima a ordem de atenção × contrato.')
                         ->schema([
                             TextInput::make('prioridade')->label('Equilíbrio da fila (K)')->numeric()->integer()->minValue(0)->maxValue(500)->step(5)->required()
                                 ->helperText('De 0 a 500. O padrão é 50; o valor do contrato participa da ordem em toda a faixa.'),
                         ]),
                     View::make('filament.components.salvar-configuracao'),
                 ]),
-                Tab::make('Níveis de risco')->schema([
-                    Section::make('Limites dos níveis')->description('Risco mínimo (0 a 100%) de cada nível.')->columns(3)->schema([
+                Tab::make('Níveis de atenção')->schema([
+                    Section::make('Limites dos níveis')->description('Atenção mínima (0 a 100) de cada nível.')->columns(3)->schema([
                         TextInput::make('limiares.critico')->label('Crítico a partir de')->numeric()->required(),
                         TextInput::make('limiares.alto')->label('Alto a partir de')->numeric()->required(),
                         TextInput::make('limiares.medio')->label('Médio a partir de')->numeric()->required(),
