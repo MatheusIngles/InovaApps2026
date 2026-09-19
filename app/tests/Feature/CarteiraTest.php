@@ -14,6 +14,7 @@ use App\Models\RiskAssessment;
 use App\Models\User;
 use App\Support\Assistente;
 use App\Support\Llm\Llm;
+use App\Support\Risco;
 use App\Support\Tenancy\CompanyContext;
 use Database\Seeders\CustomerDataSeeder;
 use Database\Seeders\RiskAssessmentSeeder;
@@ -135,6 +136,33 @@ class CarteiraTest extends TestCase
         Livewire::test(AssistenteChat::class)->set('codigo', $top->codigo)->call('enviar', 'Por que está em risco?')
             ->assertSee('Resposta local')->assertSee('Modelo local');
         Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
+    }
+
+    public function test_chat_conhece_prioridades_personalizadas_da_empresa_e_as_respostas_por_regras(): void
+    {
+        $this->entrar();
+        $company = app(CompanyContext::class)->current();
+        $company->update([
+            'metric_weights' => [
+                ['k' => 'sla', 'peso' => 70],
+                ['k' => 'uso', 'peso' => 30],
+                ...collect(Risco::PESOS)->except(['sla', 'uso'])->map(fn ($peso, $chave) => ['k' => $chave, 'peso' => 0])->values()->all(),
+            ],
+            'level_thresholds' => ['medio' => 20, 'alto' => 50, 'critico' => 75],
+        ]);
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Prioridades consideradas']])]);
+
+        Livewire::test(AssistenteChat::class)->call('enviar', 'Quais são minhas prioridades métricas?')
+            ->assertSee('Prioridades consideradas');
+
+        Http::assertSent(fn ($request) => str_contains($request['messages'][0]['content'], 'SLA cumprido: peso 70')
+            && str_contains($request['messages'][0]['content'], 'Uso da plataforma: peso 30')
+            && str_contains($request['messages'][0]['content'], 'desativada (peso 0)')
+            && str_contains($request['messages'][0]['content'], 'alto a partir de 50'));
+
+        $resposta = Assistente::responder('Quais são minhas prioridades métricas?');
+        $this->assertStringContainsString('SLA cumprido: peso 70', $resposta);
+        $this->assertStringContainsString('alto a partir de 50', $resposta);
     }
 
     public function test_pergunta_complexa_escala_para_api_externa(): void

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Customer;
+use App\Support\Llm\Contexto;
 use Illuminate\Support\Str;
 
 /**
@@ -17,6 +18,18 @@ class Assistente
             $id = $m[0];
         }
         $c = $id ? Customer::dashboard()->where('customers.external_code', strtoupper($id))->first() : null;
+
+        if (Str::contains($q, ['metrica', 'peso', 'limiar', 'criterio de risco', 'prioridades configuradas', 'minhas prioridades'])) {
+            $resposta = Contexto::prioridades();
+
+            if ($c) {
+                $resposta .= "\n\n{$c->nome}: score {$c->score}/100 ({$c->nivel}).";
+                $resposta .= "\nSinais que mais contribuíram nesta avaliação: ".
+                    (collect($c->sinais)->map(fn ($s) => "{$s['label']} (+{$s['pts']} pts)")->join(', ') ?: 'nenhum sinal em destaque').'.';
+            }
+
+            return $resposta;
+        }
 
         return $c ? self::sobreEmpresa($c, $q) : self::sobreCarteira($q);
     }
