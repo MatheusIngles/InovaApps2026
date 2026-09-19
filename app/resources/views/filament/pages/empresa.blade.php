@@ -17,11 +17,11 @@
             <section class="li-card">
                 <div class="li-banner" role="img" aria-label="Banner da empresa"></div>
                 <div class="li-head">
-                    <div class="li-logo" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->segmento, 0, 2)) }}</div>
+                    <div class="li-logo" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->segmento, 0, 1)).ltrim(substr($e->codigo, 1), '0') }}</div>
                     <div class="li-title">
                         <h1>{{ $e->nome }}</h1>
                         <p class="li-headline">{{ $e->segmento }} · porte {{ $e->porte }} · plano {{ $e->plano }}</p>
-                        <p class="li-meta">{{ $e->codigo }} · cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ' · cancelou em '.$e->mes_cancel : '' }}</p>
+                        <p class="li-meta">Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ' · cancelou em '.$e->mes_cancel : '' }}</p>
                     </div>
                     <div class="li-actions">
                         <span class="li-badge {{ $nivelCss }}">{{ $rotulo }}{{ $e->cancelada() ? '' : ' · '.$e->score.'/100' }}</span>
@@ -89,7 +89,7 @@
                     @foreach ($e->similares as $s)
                         <li>
                             <a href="{{ EmpresaResource::getUrl('view', ['record' => $s['codigo']]) }}">
-                                <span class="li-mini" aria-hidden="true">{{ mb_strtoupper(mb_substr($s['nome'], 0, 2)) }}</span>
+                                <span class="li-mini" aria-hidden="true">{{ mb_strtoupper(mb_substr($s['nome'], 0, 1)).ltrim(substr($s['codigo'], 1), '0') }}</span>
                                 <span><strong>{{ $s['nome'] }}</strong><small>Cancelou em {{ $s['mes_cancel'] }} · {{ $s['sim'] }}% de semelhança</small></span>
                             </a>
                         </li>
