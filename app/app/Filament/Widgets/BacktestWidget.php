@@ -10,6 +10,8 @@ class BacktestWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 5;
 
+    protected int|array|null $columns = ['default' => 1, 'md' => 3];
+
     protected ?string $heading = 'Comparação exploratória do score';
 
     protected ?string $description = 'Score por regras; esta comparação não valida uma previsão de churn.';
@@ -23,7 +25,7 @@ class BacktestWidget extends StatsOverviewWidget
         $na = $ativ->count();
 
         return [
-            Stat::make('Score médio dos cancelados', round($canc->avg('score')))->description('vs '.round($ativ->avg('score')).' nos ativos'),
+            Stat::make('Score médio dos cancelados', round($canc->avg('score') ?? 0))->description('vs '.round($ativ->avg('score') ?? 0).' nos ativos'),
             Stat::make('Cancelados com score ≥ 40', $canc->where('score', '>=', 40)->count()." de $nc")->color('success')
                 ->description('na última avaliação anterior ao cancelamento'),
             Stat::make('Ativos com score ≥ 40', $ativ->where('score', '>=', 40)->count()." de $na")->color('warning')

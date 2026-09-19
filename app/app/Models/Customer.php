@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use App\Support\Risco;
+use App\Support\Tenancy\CompanyContext;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,11 +15,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['external_code', 'segment', 'size', 'plan', 'monthly_value', 'contracted_sla_hours', 'contract_started_at', 'status', 'cancelled_at'])]
+#[Fillable(['company_id', 'external_code', 'segment', 'size', 'plan', 'monthly_value', 'contracted_sla_hours', 'contract_started_at', 'status', 'cancelled_at'])]
 class Customer extends Model
 {
     /** @use HasFactory<CustomerFactory> */
-    use HasFactory;
+    use BelongsToCompany, HasFactory;
 
     public function metrics(): HasMany
     {
@@ -145,7 +147,7 @@ class Customer extends Model
 
     public function getNivelAttribute(): string
     {
-        return Risco::nivel($this->score);
+        return Risco::nivel($this->score, app(CompanyContext::class)->current()?->limiares());
     }
 
     public function getSinaisAttribute(): array

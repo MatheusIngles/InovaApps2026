@@ -2,14 +2,19 @@
 
 namespace App\Livewire;
 
+use App\Models\ChatMessage;
 use App\Models\Customer;
 use App\Support\Assistente;
 use App\Support\Llm\Contexto;
 use App\Support\Llm\Llm;
+use App\Support\Tenancy\CompanyContext;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-/** Chat em tela cheia. Com uma empresa em foco a IA recebe o contexto dela; sem foco, o resumo da carteira. */
+/**
+ * Chat em tela cheia. Com uma empresa em foco a IA recebe o contexto dela; sem foco, o resumo da carteira.
+ * O histórico é persistido por (empresa/tenant, usuário, foco) e o escopo do tenant impede qualquer vazamento entre empresas.
+ */
 class AssistenteChat extends Component
 {
     #[Url(as: 'empresa')]
@@ -20,6 +25,16 @@ class AssistenteChat extends Component
     /** @var array<int, array{eu: bool, texto: string, fonte?: string}> */
     public array $mensagens = [];
 
+    public function mount(): void
+    {
+        $this->carregar();
+    }
+
+    public function updatedCodigo(): void
+    {
+        $this->carregar();
+    }
+
     public function enviar(?string $texto = null): void
     {
         $texto = mb_substr(trim($texto ?? $this->pergunta), 0, 500);
@@ -29,20 +44,48 @@ class AssistenteChat extends Component
         $this->pergunta = '';
 
         $empresa = $this->empresa($texto);
+        $config = app(CompanyContext::class)->current()->chat();
         $historico = array_map(fn ($m) => ['role' => $m['eu'] ? 'user' : 'assistant', 'content' => $m['texto']], array_slice($this->mensagens, -8));
-        $this->mensagens[] = ['eu' => true, 'texto' => $texto];
+        $this->guardar('user', $texto);
 
         try {
-            $r = Llm::responder(Contexto::sistema($empresa), [...$historico, ['role' => 'user', 'content' => $texto]]);
-            $this->mensagens[] = ['eu' => false, 'texto' => $r['texto'], 'fonte' => $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)'];
+            if (! $config['enabled']) {
+                throw new \RuntimeException('IA desativada para esta empresa.');
+            }
+            $r = Llm::responder(Contexto::sistema($empresa), [...$historico, ['role' => 'user', 'content' => $texto]], $config['ollama_model']);
+            $this->guardar('assistant', $r['texto'], $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)');
         } catch (\Throwable) {
-            $this->mensagens[] = ['eu' => false, 'texto' => Assistente::responder($texto, $empresa?->codigo), 'fonte' => 'Respostas por regras (IA indisponível)'];
+            $this->guardar('assistant', Assistente::responder($texto, $empresa?->codigo), 'Respostas por regras (IA indisponível)');
         }
+
+        $this->carregar();
     }
 
     public function limpar(): void
     {
+        $this->consulta()->delete();
         $this->mensagens = [];
+    }
+
+    private function escopo(): ?string
+    {
+        return $this->codigo ? strtoupper($this->codigo) : null;
+    }
+
+    private function consulta()
+    {
+        return ChatMessage::where('user_id', auth()->id())->where('customer_code', $this->escopo());
+    }
+
+    private function guardar(string $papel, string $texto, ?string $fonte = null): void
+    {
+        ChatMessage::create(['user_id' => auth()->id(), 'customer_code' => $this->escopo(), 'role' => $papel, 'content' => $texto, 'provider' => $fonte]);
+    }
+
+    private function carregar(): void
+    {
+        $this->mensagens = $this->consulta()->orderByDesc('id')->limit(30)->get()->reverse()
+            ->map(fn (ChatMessage $m) => ['eu' => $m->role === 'user', 'texto' => $m->content] + ($m->provider ? ['fonte' => $m->provider] : []))->values()->all();
     }
 
     /** Empresa selecionada ou citada na pergunta (ex.: C012). */

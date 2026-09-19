@@ -1,7 +1,6 @@
 <div class="chatbot">
     <header class="chatbot-head">
         <div class="chatbot-id">
-            <span class="chatbot-avatar" aria-hidden="true">IA</span>
             <div>
                 <strong>Assistente de carteira</strong>
                 <small>{{ $foco ? 'Especialista em '.$foco->nome : 'Visão geral da carteira' }}</small>
@@ -16,14 +15,13 @@
                     @endforeach
                 </x-filament::input.select>
             </x-filament::input.wrapper>
-            <button type="button" class="chatbot-clear" wire:click="limpar" title="Nova conversa">Nova conversa</button>
+            <button type="button" class="chatbot-clear" wire:click="limpar" title="Nova conversa"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nova conversa</button>
         </div>
     </header>
 
-    <div class="chatbot-log" aria-live="polite" x-data x-effect="if ($wire.mensagens.length) $nextTick(() => $el.scrollTop = $el.scrollHeight)">
+    <div class="chatbot-log" role="log" aria-live="polite" aria-label="Conversa" x-data x-effect="if ($wire.mensagens.length) $nextTick(() => $el.scrollTop = $el.scrollHeight)">
         @forelse ($mensagens as $m)
             <div class="chatbot-row {{ $m['eu'] ? 'eu' : '' }}">
-                @unless ($m['eu'])<span class="chatbot-avatar sm" aria-hidden="true">IA</span>@endunless
                 <div class="chatbot-msg">
                     {{ $m['texto'] }}
                     @isset($m['fonte'])<small>{{ $m['fonte'] }}</small>@endisset
@@ -31,7 +29,6 @@
             </div>
         @empty
             <div class="chatbot-vazio">
-                <span class="chatbot-avatar lg" aria-hidden="true">IA</span>
                 <h2>{{ $foco ? 'Pergunte sobre '.$foco->nome : 'Como posso ajudar com a carteira?' }}</h2>
                 <p>{{ $foco ? 'Tenho o contexto completo desta empresa: contrato, sinais de risco, NPS, histórico e cancelados parecidos.' : 'Escolha uma empresa acima ou cite o código dela (ex.: C012) para uma resposta específica.' }}</p>
                 <div class="chatbot-sug">
@@ -43,7 +40,6 @@
         @endforelse
 
         <div class="chatbot-row" wire:loading wire:target="enviar">
-            <span class="chatbot-avatar sm" aria-hidden="true">IA</span>
             <div class="chatbot-msg chatbot-typing"><i></i><i></i><i></i></div>
         </div>
     </div>
@@ -51,6 +47,6 @@
     <form class="chatbot-form" wire:submit="enviar">
         <input type="text" wire:model="pergunta" maxlength="500" autocomplete="off" autofocus
                placeholder="{{ $foco ? 'Pergunte algo sobre '.$foco->nome.'…' : 'Pergunte sobre a carteira…' }}" aria-label="Sua pergunta">
-        <button type="submit" wire:loading.attr="disabled" wire:target="enviar">Enviar</button>
+        <button type="submit" wire:loading.attr="disabled" wire:target="enviar"><span>Enviar</span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
     </form>
 </div>

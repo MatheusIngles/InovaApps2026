@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Empresas;
 use App\Filament\Resources\Empresas\Pages\ListEmpresas;
 use App\Filament\Resources\Empresas\Pages\ViewEmpresa;
 use App\Models\Customer;
+use App\Support\Tenancy\CompanyContext;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
@@ -53,7 +54,7 @@ class EmpresaResource extends Resource
             ->paginated([12, 24, 48, 'all'])
             ->defaultPaginationPageOption(24)
             ->searchPlaceholder('Buscar por nome, código ou segmento…')
-            ->recordClasses(fn (Customer $e) => $e->cancelada() ? 'opacity-60' : null)
+            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Cancelada' => 'canc'][$e->rotulo()])
             ->columns([
                 Stack::make([
                     Split::make([
@@ -76,13 +77,17 @@ class EmpresaResource extends Resource
             ->filters([
                 SelectFilter::make('nivel')->label('Nível')
                     ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelada' => 'Cancelada'])
-                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
-                        null, '' => $query,
-                        'Cancelada' => $query->where('customers.status', 'Cancelado'),
-                        'Crítico' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', 55),
-                        'Alto' => $query->where('customers.status', 'Ativo')->whereBetween('assessment.health_score', [40, 54]),
-                        'Médio' => $query->where('customers.status', 'Ativo')->whereBetween('assessment.health_score', [25, 39]),
-                        default => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '<', 25),
+                    ->query(function (Builder $query, array $data) {
+                        $l = app(CompanyContext::class)->current()->limiares(); // limiares da empresa
+
+                        return match ($data['value'] ?? null) {
+                            null, '' => $query,
+                            'Cancelada' => $query->where('customers.status', 'Cancelado'),
+                            'Crítico' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['critico']),
+                            'Alto' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
+                            'Médio' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),
+                            default => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '<', $l['medio']),
+                        };
                     }),
                 SelectFilter::make('segment')->label('Segmento')->options(fn () => Customer::distinct()->orderBy('segment')->pluck('segment', 'segment')->all()),
             ])

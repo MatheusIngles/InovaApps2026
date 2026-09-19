@@ -11,7 +11,7 @@ class Risco
 {
     public const PESOS = ['uso' => 20, 'sla' => 15, 'reinc' => 10, 'recl' => 10, 'atraso' => 10, 'reun' => 12, 'nps' => 15, 'tend' => 8];
 
-    private const ROTULOS = [
+    public const ROTULOS = [
         'uso' => 'Uso da plataforma', 'sla' => 'SLA cumprido', 'reinc' => 'Reincidência de chamados',
         'recl' => 'Reclamações formais', 'atraso' => 'Atraso de pagamento', 'reun' => 'Reuniões realizadas',
         'nps' => 'Satisfação (NPS)', 'tend' => 'Tendência de queda',
@@ -28,33 +28,51 @@ class Risco
         'tend' => 'Revisão de saúde da conta: piora consistente frente ao início do histórico.',
     ];
 
+    public const LIMIARES = ['critico' => 55, 'alto' => 40, 'medio' => 25];
+
     /**
      * @param  array<int, array<string, mixed>>  $hist  linhas de atendimento_mensal (ordenadas por mês)
      * @param  array<int, array<string, mixed>>  $nps  linhas de pesquisas_nps (ordenadas por mês)
+     * @param  array<string, float|int>|null  $pesos  pesos da empresa, na ordem de prioridade (padrão: PESOS)
      * @return array{score:int, nivel:string, sinais:array, sev:array}
+     *
+     * O score é a média ponderada das severidades: soma(severidade × peso) / soma(pesos) × 100.
+     * Normalizar pela soma dos pesos mantém a escala 0-100 quando a empresa usa pesos que não somam 100;
+     * soma zero (todos os pesos 0) resulta em score 0 em vez de divisão por zero.
      */
-    public static function calcular(array $hist, array $nps): array
+    public static function calcular(array $hist, array $nps, ?array $pesos = null, ?array $limiares = null): array
     {
+        $pesos ??= self::PESOS;
         $f = self::sinais($hist, $nps);
         $sev = self::severidades($f);
-        $pts = array_map(fn ($k) => round($sev[$k] * self::PESOS[$k], 1), array_combine(array_keys(self::PESOS), array_keys(self::PESOS)));
-        $score = (int) round(array_sum($pts));
+        $total = array_sum($pesos);
+        $pts = [];
 
+        foreach ($pesos as $k => $peso) {
+            $pts[$k] = $total > 0 ? round($sev[$k] * $peso / $total * 100, 1) : 0.0;
+        }
+
+        $score = (int) round(array_sum($pts));
         $sinais = [];
-        foreach (self::PESOS as $k => $peso) {
-            if ($pts[$k] >= $peso * 0.35) {
-                $sinais[] = ['k' => $k, 'label' => self::ROTULOS[$k], 'pts' => $pts[$k], 'max' => $peso, 'texto' => self::texto($k, $f), 'acao' => self::ACOES[$k]];
+
+        foreach ($pesos as $k => $peso) { // a ordem dos pesos é a prioridade: desempata sinais com a mesma pontuação
+            $max = $total > 0 ? round($peso / $total * 100, 1) : 0;
+
+            if ($max > 0 && $pts[$k] >= $max * 0.35) {
+                $sinais[] = ['k' => $k, 'label' => self::ROTULOS[$k], 'pts' => $pts[$k], 'max' => $max, 'texto' => self::texto($k, $f), 'acao' => self::ACOES[$k]];
             }
         }
         usort($sinais, fn ($a, $b) => $b['pts'] <=> $a['pts']);
 
-        return ['score' => $score, 'nivel' => self::nivel($score), 'sinais' => $sinais, 'sev' => array_values($sev)];
+        return ['score' => $score, 'nivel' => self::nivel($score, $limiares), 'sinais' => $sinais, 'sev' => array_values($sev)];
     }
 
-    /** Limiares calibrados no backtest: cancelados ≈ 58 de score médio, ativos ≈ 20. */
-    public static function nivel(int $score): string
+    /** Limiares padrão calibrados no backtest: cancelados ≈ 58 de score médio, ativos ≈ 20. */
+    public static function nivel(int $score, ?array $limiares = null): string
     {
-        return $score >= 55 ? 'Crítico' : ($score >= 40 ? 'Alto' : ($score >= 25 ? 'Médio' : 'Baixo'));
+        $l = $limiares ?? self::LIMIARES;
+
+        return $score >= $l['critico'] ? 'Crítico' : ($score >= $l['alto'] ? 'Alto' : ($score >= $l['medio'] ? 'Médio' : 'Baixo'));
     }
 
     /** Semelhança (0-100) entre dois vetores de severidade. */
@@ -62,7 +80,7 @@ class Risco
     {
         $d = sqrt(array_sum(array_map(fn ($x, $y) => ($x - $y) ** 2, $a, $b)));
 
-        return (int) round(100 * (1 - $d / sqrt(count(self::PESOS))));
+        return (int) round(100 * (1 - $d / sqrt(count($a))));
     }
 
     private static function sinais(array $hist, array $nps): array
