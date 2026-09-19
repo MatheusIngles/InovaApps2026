@@ -28,3 +28,6 @@ Thumbs.db
 /public/js/filament
 /public/css/filament
 /public/fonts/filament
+
+# Configuração local do Claude Code
+/.claude/
