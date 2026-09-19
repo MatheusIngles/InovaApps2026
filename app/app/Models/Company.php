@@ -18,6 +18,9 @@ class Company extends Model
 
     public const TEMA_PADRAO = ['primary' => '#2563eb', 'secondary' => '#1d4ed8', 'font' => 'Plus Jakarta Sans', 'logo' => null, 'brand' => 'Seer'];
 
+    /** K da fila: score × (score + K) × valor. Menor reforça o score; maior aproxima score × valor. */
+    public const PRIORIDADE_PADRAO = 50;
+
     public const CHAT_PADRAO = ['enabled' => true, 'ollama_model' => null, 'instrucoes' => null];
 
     protected function casts(): array
@@ -56,6 +59,11 @@ class Company extends Model
     public function limiares(): array
     {
         return array_map('intval', array_merge(Risco::LIMIARES, $this->level_thresholds ?? []));
+    }
+
+    public function prioridadeK(): int
+    {
+        return $this->priority_balance ?? self::PRIORIDADE_PADRAO;
     }
 
     public function tema(): array

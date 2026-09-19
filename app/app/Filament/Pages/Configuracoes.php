@@ -35,6 +35,8 @@ class Configuracoes extends Page implements HasSchemas
 {
     use InteractsWithSchemas;
 
+    protected static ?string $title = 'Configurações';
+
     protected static ?int $navigationSort = 4;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
@@ -61,6 +63,15 @@ class Configuracoes extends Page implements HasSchemas
                                 ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
                             View::make('filament.components.salvar-configuracao'),
                         ]),
+                ]),
+                Tab::make('Fila de prioridade')->schema([
+                    Section::make('Ordem da lista de clientes')
+                        ->description('A fila ordena as empresas ativas por score × (score + K) × valor mensal do contrato. K baixo reforça a diferença entre scores; K alto aproxima a ordem de score × contrato.')
+                        ->schema([
+                            TextInput::make('prioridade')->label('Equilíbrio da fila (K)')->numeric()->integer()->minValue(0)->maxValue(500)->step(5)->required()
+                                ->helperText('De 0 a 500. O padrão é 50; o valor do contrato participa da ordem em toda a faixa.'),
+                        ]),
+                    View::make('filament.components.salvar-configuracao'),
                 ]),
                 Tab::make('Níveis de risco')->schema([
                     Section::make('Limites dos níveis')->description('Score mínimo (0 a 100) de cada nível.')->columns(3)->schema([

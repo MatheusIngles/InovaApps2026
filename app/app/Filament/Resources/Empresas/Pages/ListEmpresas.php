@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Ativas primeiro, por exposição mensal indicativa. Abra um cliente para ver as parcelas do score.';
+        return 'Ativas primeiro, pela combinação de score e valor do contrato ajustada em Configurações. Abra um cliente para ver a origem do score.';
     }
 }

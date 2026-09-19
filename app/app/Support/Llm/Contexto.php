@@ -88,7 +88,7 @@ INSTRUÇÕES DA EMPRESA:
         $linhas = [
             'CONTEXTO: visão geral da carteira (sem empresa específica em foco).',
             "Clientes ativos: {$ativas->count()} | Receita mensal ativa: ".Customer::brl($ativas->sum('valor')).' | Exposição mensal total: '.Customer::brl($ativas->sum('exposicao')),
-            'FILA DE ATENDIMENTO (top 10 por exposição):',
+            'FILA DE ATENDIMENTO (top 10 por prioridade = risco × valor do contrato):',
             ...$ativas->take(10)->map(fn ($c, $i) => ($i + 1).". {$c->nome} ({$c->codigo}) — {$c->nivel}, score {$c->score}, ".Customer::brl($c->valor).'/mês, principal motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->all(),
         ];
 

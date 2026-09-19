@@ -18,8 +18,8 @@ class FilaTable extends TableWidget
     {
         return $table
             ->heading('Fila de atendimento: com quem falar primeiro')
-            ->description('Exposição indicativa = score ÷ 100 × contrato mensal. Ordena a fila; não prevê cancelamento ou perda.')
-            ->query(Customer::dashboard()->where('customers.status', 'Ativo')->orderByDesc('exposicao')->limit(8))
+            ->description('Mesma ordem da lista de clientes: risco × valor do contrato (equilíbrio em Configurações). Ordena a fila; não prevê cancelamento ou perda.')
+            ->query(Customer::ordenar(Customer::dashboard()->where('customers.status', 'Ativo'))->limit(8))
             ->paginated(false)
             ->recordUrl(fn (Customer $e) => EmpresaResource::getUrl('view', ['record' => $e]))
             ->columns([

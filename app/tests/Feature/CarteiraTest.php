@@ -75,12 +75,18 @@ class CarteiraTest extends TestCase
         $this->assertLessThan(30, Customer::dashboard()->where('customers.status', 'Ativo')->get()->avg('score'));
     }
 
-    public function test_grid_ordena_ativas_por_exposicao_e_canceladas_por_ultimo(): void
+    public function test_grid_ordena_por_prioridade_e_canceladas_por_ultimo(): void
     {
         $status = Customer::ordenar(Customer::dashboard())->pluck('status');
         $this->assertSame($status->sortBy(fn ($s) => $s === 'Cancelado')->values()->all(), $status->all());
-        $exp = Customer::ordenar(Customer::dashboard())->where('customers.status', 'Ativo')->pluck('exposicao');
-        $this->assertSame($exp->sortDesc()->values()->all(), $exp->all());
+        $ativas = Customer::ordenar(Customer::dashboard())->where('customers.status', 'Ativo')->get();
+        $prioridade = fn ($c) => $c->score * ($c->score + 50) * $c->monthly_value;
+        $this->assertSame($ativas->sortByDesc($prioridade)->values()->pluck('codigo')->all(), $ativas->pluck('codigo')->all());
+
+        // exemplos do produto: 60% de R$ 12 mil > 40% de R$ 15 mil; médio (30) de R$ 33,9 mil > crítico (68) de R$ 8,7 mil > baixo (20) de R$ 32 mil
+        $p = fn ($score, $valor) => $score * ($score + 50) * $valor;
+        $this->assertTrue($p(60, 12000) > $p(40, 15000));
+        $this->assertTrue($p(30, 33881) > $p(68, 8672) && $p(68, 8672) > $p(20, 32299));
     }
 
     public function test_telas_do_painel_renderizam(): void

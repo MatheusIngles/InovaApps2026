@@ -33,6 +33,7 @@ class CompanyConfig
             'metricas' => collect($company->pesos())->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso, 'ativa' => $peso > 0])->values()->all(),
             'limiares' => $company->limiares(),
             'tema' => $company->tema(),
+            'prioridade' => $company->prioridadeK(),
         ];
     }
 
@@ -50,6 +51,7 @@ class CompanyConfig
             'limiares.critico' => 'required|integer|between:1,100',
             'limiares.alto' => 'required|integer|between:1,100|lt:limiares.critico',
             'limiares.medio' => 'required|integer|between:1,100|lt:limiares.alto',
+            'prioridade' => 'required|integer|between:0,500',
             'tema.primary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'tema.secondary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'tema.font' => 'sometimes|in:'.implode(',', self::FONTES),
@@ -75,7 +77,7 @@ class CompanyConfig
         // != (não !==): 100 e 100.0 são o mesmo peso; a ordem da lista continua contando (desempate de sinais)
         $recalcular = $pesos != ($company->metric_weights ?? self::padrao()) || $limiares != $company->limiares();
 
-        $company->update(['metric_weights' => $pesos, 'level_thresholds' => $limiares, 'theme' => $d['tema']]);
+        $company->update(['metric_weights' => $pesos, 'level_thresholds' => $limiares, 'theme' => $d['tema'], 'priority_balance' => (int) $d['prioridade']]);
 
         if ($recalcular) {
             RiskService::recalcular($company);
@@ -87,7 +89,7 @@ class CompanyConfig
     /** Delete: remove as personalizações e volta ao padrão do sistema. */
     public static function restaurar(Company $company): void
     {
-        $company->update(['metric_weights' => null, 'level_thresholds' => null, 'theme' => null]);
+        $company->update(['metric_weights' => null, 'level_thresholds' => null, 'theme' => null, 'priority_balance' => null]);
         RiskService::recalcular($company);
     }
 
