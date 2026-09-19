@@ -157,7 +157,7 @@ input, textarea { caret-color: var(--primary-600); }
 .chatbot-markdown :not(pre) > code { padding: .1rem .3rem; border-radius: .3rem; background: var(--panel-raised); font-size: .9em; }
 .chatbot-markdown pre { overflow-x: auto; padding: .75rem; border-radius: .5rem; background: var(--panel-raised); }
 .chatbot-markdown pre code { white-space: pre; font-size: .85em; }
-.chatbot-markdown blockquote { padding-left: .75rem; border-left: 3px solid var(--primary-400); color: var(--panel-muted); }
+.chatbot-markdown blockquote { margin-inline: 0; padding: .5rem .85rem; border-radius: .5rem; background: var(--panel-raised); color: var(--panel-muted); }
 .chatbot-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .chatbot-markdown th, .chatbot-markdown td { padding: .35rem .6rem; border: 1px solid var(--panel-border); text-align: left; }
 .chatbot-msg small { display: block; margin-top: .4rem; font-size: .7rem; color: var(--panel-muted); }
@@ -268,3 +268,15 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 /* busca centralizada */
 .fi-ta-header-toolbar { justify-content: center; }
 .fi-ta-header-toolbar > div:has(.fi-ta-search-field) { flex: 0 1 44rem; margin-inline: auto; }
+
+/* Lista de empresas: a busca vem primeiro; filtros logo abaixo, em faixa compacta; breadcrumb é redundante com o menu */
+.fi-breadcrumbs { display: none; }
+.fi-ta-header-ctn { display: flex; flex-direction: column-reverse; }
+.fi-ta-header-toolbar { padding-block: .75rem; }
+.fi-ta-filters-above-content-ctn { padding: .75rem 1.5rem 1rem; }
+.fi-ta-filters-heading { font-size: .8rem; font-weight: 700; color: var(--panel-muted); }
+.fi-ta-filters .fi-fo-field { gap: .25rem; }
+
+/* Configurações: itens da prioridade em uma linha compacta */
+.fi-fo-repeater-item .fi-fo-field-wrp, .fi-fo-repeater-item .fi-fo-toggle { margin: 0; }
+.fi-fo-repeater-item-content { padding-block: .5rem; }

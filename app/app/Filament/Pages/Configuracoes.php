@@ -33,6 +33,8 @@ class Configuracoes extends Page implements HasSchemas
 {
     use InteractsWithSchemas;
 
+    protected static ?string $title = 'Configurações';
+
     protected static ?int $navigationSort = 4;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
@@ -54,7 +56,7 @@ class Configuracoes extends Page implements HasSchemas
                 ->schema([
                     Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()->reorderableWithButtons()
                         ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
-                        ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
+                        ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Usar no cálculo')->inline()->default(true)]),
                 ]),
             Section::make('Fila de prioridade')
                 ->description('A fila ordena por score × (score + K) × valor do contrato. K controla o que pesa mais: menor, o score manda; maior, o valor do contrato manda.')
