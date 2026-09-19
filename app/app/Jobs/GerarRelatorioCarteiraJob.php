@@ -25,6 +25,7 @@ class GerarRelatorioCarteiraJob implements ShouldQueue
 
     public function handle(): void
     {
+        set_time_limit($this->timeout); // roda após a resposta, sem worker: o limite padrão de 30 s do PHP não basta
         $user = User::find($this->userId);
 
         if (! $user || $user->company_id !== $this->companyId) {
@@ -39,17 +40,23 @@ class GerarRelatorioCarteiraJob implements ShouldQueue
                 throw new \RuntimeException('Não foi possível salvar o PDF.');
             }
 
-            Notification::make()->title('Relatório de evidências pronto')
+            $this->avisar($user, Notification::make()->title('Relatório de evidências pronto')
                 ->body('O relatório geral está disponível para download.')
                 ->success()->actions([
                     Action::make('baixar')->label('Baixar PDF')
                         ->url(route('relatorios.download', ['arquivo' => $this->arquivoId]))->markAsRead(),
-                ])->sendToDatabase($user);
+                ]));
         } catch (Throwable $e) {
             Log::error('Falha ao gerar relatório de evidências.', ['company_id' => $this->companyId, 'exception' => $e]);
-            Notification::make()->title('Relatório não concluído')
+            $this->avisar($user, Notification::make()->title('Relatório não concluído')
                 ->body('Não foi possível gerar o PDF. Tente novamente mais tarde.')
-                ->danger()->sendToDatabase($user);
+                ->danger());
         }
+    }
+
+    /** Síncrono (sendNow): a notificação de banco do Filament é enfileirada e, sem worker, o aviso nunca chegaria. */
+    private function avisar(User $user, Notification $notificacao): void
+    {
+        \Illuminate\Support\Facades\Notification::sendNow($user, $notificacao->toDatabase());
     }
 }

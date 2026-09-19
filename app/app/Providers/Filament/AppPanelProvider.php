@@ -59,7 +59,7 @@ class AppPanelProvider extends PanelProvider
             ->pages([Painel::class])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('tema'))
-            ->renderHook(PanelsRenderHook::BODY_END, fn () => view('vlibras').view('titulo-topo').view('dicas').view('audio-contexto'))
+            ->renderHook(PanelsRenderHook::BODY_END, fn () => view('vlibras').view('titulo-topo').view('dicas').view('audio-contexto').view('animacoes'))
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

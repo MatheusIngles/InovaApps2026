@@ -64,7 +64,7 @@ class RelatorioEmpresa extends Component implements HasSchemas
         $indices = array_map('intval', $dados['sinais'] ?? []);
         $empresa = $this->empresa();
 
-        GerarRelatorioEmpresaJob::dispatch(
+        GerarRelatorioEmpresaJob::dispatchAfterResponse(
             app(CompanyContext::class)->id(), auth()->id(), $empresa->id,
             (string) Str::uuid(), $indices, $dados['observacoes'] ?? null,
         );

@@ -28,7 +28,7 @@ class Painel extends Dashboard
         return [
             Action::make('relatorioCarteira')->label('Gerar relatório de evidências')->icon('heroicon-o-document-arrow-down')
                 ->action(function (): void {
-                    GerarRelatorioCarteiraJob::dispatch(app(CompanyContext::class)->id(), auth()->id(), (string) Str::uuid());
+                    GerarRelatorioCarteiraJob::dispatchAfterResponse(app(CompanyContext::class)->id(), auth()->id(), (string) Str::uuid());
                     Notification::make()->title('Relatório em preparação')
                         ->body('Você receberá uma notificação com o link do PDF quando ele estiver pronto.')->success()->send();
                 }),
