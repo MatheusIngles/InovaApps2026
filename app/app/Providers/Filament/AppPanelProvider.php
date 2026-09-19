@@ -39,7 +39,7 @@ class AppPanelProvider extends PanelProvider
             ->defaultAvatarProvider(AvatarIniciais::class)
             ->homeUrl(fn () => url('/'))
             ->font('Plus Jakarta Sans')
-            ->darkMode(true) // identidade azul e branco
+            ->darkMode(true)
             ->colors(['primary' => Color::Blue, 'gray' => Color::Slate])
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
