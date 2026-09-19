@@ -2,6 +2,12 @@
 <style>
     :root { --card-shadow: 0 1px 2px rgb(15 41 107 / .08), 0 0 0 1px var(--primary-100); }
 
+    ::selection { background: var(--primary-200); color: var(--primary-950); }
+    input, textarea { caret-color: var(--primary-600); }
+    .chatbot-log, .li-table-wrap { scrollbar-width: thin; scrollbar-color: var(--primary-300) transparent; }
+    .li-btn:focus-visible, .chatbot-sug button:focus-visible, .chatbot-form button:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 2px; }
+    .chatbot-clear:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
     /* Fundo azulado em vez de branco chapado */
     .fi-body, .fi-layout { background: var(--primary-50); }
     .fi-main { background: transparent; }
@@ -11,7 +17,10 @@
     .fi-topbar { background: transparent; box-shadow: none; --tw-ring-shadow: 0 0 #0000; }
     .fi-topbar, .fi-topbar a, .fi-topbar button, .fi-topbar .fi-logo, .fi-topbar-item-label, .fi-topbar-item-icon { color: #fff; }
     .fi-topbar .fi-logo { font-weight: 800; letter-spacing: -.01em; }
+    .fi-topbar .fi-dropdown-panel :is(a, button, span, svg, p) { color: var(--gray-700); }
+    .fi-topbar .fi-dropdown-panel .fi-dropdown-list-item:hover { background: var(--primary-50); }
     .fi-topbar-item-btn { border-radius: .5rem; }
+    .fi-topbar :is(a, button):focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     .fi-topbar-item-btn:hover { background: rgb(255 255 255 / .14); }
     .fi-topbar-item.fi-active .fi-topbar-item-btn { background: rgb(255 255 255 / .22); }
     .fi-topbar-item.fi-active .fi-topbar-item-label { font-weight: 700; }
@@ -29,13 +38,14 @@
     /* ---------- Perfil da empresa (estilo LinkedIn) ---------- */
     .li { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: 1.25rem; align-items: start; }
     .li-main, .li-rail { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
-    @media (max-width: 1024px) { .li { grid-template-columns: 1fr; } }
+    @media (max-width: 1024px) { .li { grid-template-columns: 1fr; padding-bottom: 5rem; } }
+    @media (max-width: 640px) { .li-fab { right: 1rem; bottom: 1rem; padding: .85rem 1.1rem; } .li-actions { align-self: stretch; } .li-title h1 { font-size: 1.35rem; } }
     .li-card { background: #fff; border-radius: .75rem; box-shadow: var(--card-shadow); overflow: hidden; }
     .li-pad { padding: 1.25rem 1.5rem; }
     .li-card h2 { font-size: 1.05rem; font-weight: 700; color: var(--primary-900); margin: 0 0 .75rem; }
     .li-banner { height: 11rem; background: radial-gradient(circle at 85% 20%, rgb(255 255 255 / .22), transparent 42%), radial-gradient(circle at 10% 110%, var(--primary-400), transparent 50%), linear-gradient(120deg, var(--primary-900), var(--primary-600) 65%, var(--primary-500)); }
     .li-head { position: relative; display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; justify-content: space-between; padding: 0 1.5rem 1.5rem; }
-    .li-logo { width: 7.5rem; height: 7.5rem; margin-top: -3.75rem; flex: none; display: grid; place-items: center; border-radius: .75rem; background: #fff; border: 4px solid #fff; box-shadow: 0 2px 8px rgb(15 41 107 / .2); font-size: 2.4rem; font-weight: 800; color: var(--primary-700); background-image: linear-gradient(135deg, var(--primary-50), #fff); }
+    .li-logo { width: 7.5rem; height: 7.5rem; margin-top: -3.75rem; flex: none; display: grid; place-items: center; border-radius: .75rem; background: #fff; border: 4px solid #fff; box-shadow: 0 2px 8px rgb(15 41 107 / .2); font-size: 2rem; font-weight: 800; letter-spacing: -.02em; color: var(--primary-700); background-image: linear-gradient(135deg, var(--primary-50), #fff); }
     .li-title { flex: 1 1 16rem; padding-top: .25rem; }
     .li-title h1 { font-size: 1.6rem; font-weight: 800; color: var(--primary-950); line-height: 1.2; margin: 0; }
     .li-headline { margin: .25rem 0 0; color: var(--gray-700); font-size: 1rem; }
@@ -50,8 +60,9 @@
     .li-badge.med { background: var(--primary-100); color: var(--primary-800); } .li-badge.baixo { background: #dcfce7; color: #15803d; }
     .li-badge.canc { background: var(--gray-200); color: var(--gray-700); }
     .li-about { color: var(--gray-700); line-height: 1.6; margin: 0 0 1rem; }
-    .li-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; margin: 0; }
-    .li-stats div { background: var(--primary-50); border-radius: .6rem; padding: .75rem 1rem; }
+    .li-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); margin: 0; border-top: 1px solid var(--primary-100); padding-top: 1rem; }
+    .li-stats div { padding: 0 1rem; border-left: 1px solid var(--primary-100); }
+    .li-stats div:first-child { padding-left: 0; border-left: 0; }
     .li-stats dt { font-size: .75rem; color: var(--primary-800); font-weight: 600; }
     .li-stats dd { margin: .15rem 0 0; font-size: 1.25rem; font-weight: 800; color: var(--primary-950); }
     .li-sinal { padding: .85rem 0; border-top: 1px solid var(--primary-100); }
@@ -84,7 +95,7 @@
     .chatbot-head { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; padding: .9rem 1.25rem; background: linear-gradient(120deg, var(--primary-800), var(--primary-600)); color: #fff; }
     .chatbot-id { display: flex; align-items: center; gap: .75rem; } .chatbot-id small { display: block; opacity: .85; }
     .chatbot-tools { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-    .chatbot-tools .fi-input-wrp { min-width: 16rem; }
+    .chatbot-tools { flex: 1 1 14rem; justify-content: flex-end; } .chatbot-tools .fi-input-wrp { min-width: 0; flex: 1 1 12rem; }
     .chatbot-clear { padding: .45rem .9rem; border-radius: 999px; border: 1.5px solid rgb(255 255 255 / .6); color: #fff; font-size: .85rem; font-weight: 600; }
     .chatbot-clear:hover { background: rgb(255 255 255 / .16); }
     .chatbot-avatar { flex: none; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #fff; color: var(--primary-700); font-weight: 800; font-size: .85rem; }

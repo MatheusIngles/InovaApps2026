@@ -20,7 +20,7 @@
         </div>
     </header>
 
-    <div class="chatbot-log" aria-live="polite" x-data x-effect="$wire.mensagens.length; $nextTick(() => $el.scrollTop = $el.scrollHeight)">
+    <div class="chatbot-log" aria-live="polite" x-data x-effect="if ($wire.mensagens.length) $nextTick(() => $el.scrollTop = $el.scrollHeight)">
         @forelse ($mensagens as $m)
             <div class="chatbot-row {{ $m['eu'] ? 'eu' : '' }}">
                 @unless ($m['eu'])<span class="chatbot-avatar sm" aria-hidden="true">IA</span>@endunless
