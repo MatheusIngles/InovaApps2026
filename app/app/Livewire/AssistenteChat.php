@@ -45,14 +45,14 @@ class AssistenteChat extends Component
 
         $empresa = $this->empresa($texto);
         $config = app(CompanyContext::class)->current()->chat();
-        $historico = array_map(fn ($m) => ['role' => $m['eu'] ? 'user' : 'assistant', 'content' => $m['texto']], array_slice($this->mensagens, -8));
         $this->guardar('user', $texto);
 
         try {
             if (! $config['enabled']) {
                 throw new \RuntimeException('IA desativada para esta empresa.');
             }
-            $r = Llm::responder(Contexto::sistema($empresa), [...$historico, ['role' => 'user', 'content' => $texto]], $config['ollama_model']);
+            // Sem histórico: cada pergunta é respondida só com a carteira/empresa atual, sempre atualizada.
+            $r = Llm::responder(Contexto::sistema($empresa), [['role' => 'user', 'content' => $texto]], $config['ollama_model']);
             $this->guardar('assistant', $r['texto'], $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)');
         } catch (\Throwable) {
             $this->guardar('assistant', Assistente::responder($texto, $empresa?->codigo), 'Respostas por regras (IA indisponível)');
