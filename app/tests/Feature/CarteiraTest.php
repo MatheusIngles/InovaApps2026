@@ -139,7 +139,7 @@ class CarteiraTest extends TestCase
 
     public function test_pergunta_complexa_escala_para_api_externa(): void
     {
-        config(['llm.api.key' => 'k']);
+        config(['llm.api.key' => 'k', 'llm.api.url' => 'https://api.openai.com/v1']);
         Http::fake([
             'api.openai.com/*' => Http::response(['choices' => [['message' => ['content' => 'Resposta da API']]]]),
             'localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local']]),
