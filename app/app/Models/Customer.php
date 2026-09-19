@@ -62,7 +62,12 @@ class Customer extends Model
 
     public static function ordenar(Builder $query): Builder
     {
-        return $query->orderByRaw("customers.status = 'Cancelado'")->orderByDesc('exposicao');
+        // canceladas por último. Entre as ativas: regra de três (risco × valor do contrato) com um reforço para risco alto:
+        // score × (score + K) × valor, com K configurável por empresa (Configurações).
+        $k = app(CompanyContext::class)->current()?->prioridadeK() ?? Company::PRIORIDADE_PADRAO;
+
+        return $query->orderByRaw("customers.status = 'Cancelado'")
+            ->orderByRaw('assessment.health_score * (assessment.health_score + ?) * customers.monthly_value DESC', [$k]);
     }
 
     public static function ativas(): Collection

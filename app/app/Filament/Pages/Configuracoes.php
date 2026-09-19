@@ -56,6 +56,12 @@ class Configuracoes extends Page implements HasSchemas
                         ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
                         ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
                 ]),
+            Section::make('Fila de prioridade')
+                ->description('A fila ordena por score × (score + K) × valor do contrato. K controla o que pesa mais: menor, o score manda; maior, o valor do contrato manda.')
+                ->schema([
+                    TextInput::make('prioridade')->label('Constante K (0 a 500)')->numeric()->integer()->minValue(0)->maxValue(500)->step(5)->required()
+                        ->helperText('0: só o risco decide. 50 (padrão): equilíbrio. 200 ou mais: quase só o valor do contrato decide.'),
+                ]),
             Section::make('Níveis de risco')->description('Score mínimo (0 a 100) de cada nível.')->columns(3)->schema([
                 TextInput::make('limiares.critico')->label('Crítico a partir de')->numeric()->required(),
                 TextInput::make('limiares.alto')->label('Alto a partir de')->numeric()->required(),

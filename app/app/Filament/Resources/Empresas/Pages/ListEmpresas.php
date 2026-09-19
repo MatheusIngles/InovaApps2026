@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Ordenada por exposição mensal indicativa (score de sinais × valor mensal). Canceladas ao final.';
+        return 'Prioridade = risco × valor do contrato (regra de três, com reforço para risco alto): quem mais pode custar à carteira vem primeiro. Canceladas ao final.';
     }
 }

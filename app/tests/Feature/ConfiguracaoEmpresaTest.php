@@ -6,6 +6,7 @@ use App\Filament\Pages\Configuracoes;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
+use App\Models\RiskAssessment;
 use App\Models\User;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyConfig;
@@ -161,5 +162,28 @@ class ConfiguracaoEmpresaTest extends TestCase
         imagefill($img, 0, 0, imagecolorallocate($img, 128, 128, 128)); // logo só em cinza: mantém o padrão
         imagepng($img, $arquivo);
         $this->assertNull(Tema::corDoLogo($arquivo));
+    }
+
+    public function test_constante_de_prioridade_muda_a_ordem_da_fila_por_empresa(): void
+    {
+        $company = Company::factory()->create();
+        app(CompanyContext::class)->within($company, function () use ($company) {
+            foreach ([['ALTO', 80, 3500], ['GRANDE', 30, 20000]] as [$codigo, $score, $valor]) {
+                $c = Customer::factory()->create(['company_id' => $company->id, 'external_code' => $codigo, 'monthly_value' => $valor, 'status' => 'Ativo']);
+                RiskAssessment::factory()->create(['customer_id' => $c->id, 'health_score' => $score, 'model_version' => 'rules-v1']);
+            }
+        });
+        $fila = fn () => app(CompanyContext::class)->within($company, fn () => Customer::ordenar(Customer::dashboard())->pluck('external_code')->all());
+
+        $this->assertSame(['GRANDE', 'ALTO'], $fila()); // K = 50: o contrato grande pesa mais
+
+        $d = CompanyConfig::ler($company);
+        $d['prioridade'] = 0; // só o risco decide
+        CompanyConfig::salvar($company, $d);
+        $this->assertSame(['ALTO', 'GRANDE'], $fila());
+
+        $d['prioridade'] = 600; // fora do limite
+        $this->expectException(ValidationException::class);
+        CompanyConfig::salvar($company, $d);
     }
 }
