@@ -207,6 +207,30 @@ class CarteiraTest extends TestCase
         Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
     }
 
+    public function test_chat_usa_historico_na_conversa_atual_e_descarta_ao_voltar(): void
+    {
+        $this->entrar();
+        Http::fake(['localhost:11434/*' => Http::sequence()
+            ->push(['message' => ['content' => 'Primeira resposta']])
+            ->push(['message' => ['content' => 'Segunda resposta']])]);
+
+        Livewire::test(AssistenteChat::class)
+            ->call('enviar', 'Primeira pergunta')
+            ->call('enviar', 'Continue a análise')
+            ->assertSee('Primeira resposta')
+            ->assertSee('Segunda resposta');
+
+        $requisicoes = Http::recorded()->map(fn (array $par): array => $par[0]['messages'])->values();
+        $this->assertCount(2, $requisicoes);
+        $this->assertSame([
+            ['role' => 'user', 'content' => 'Primeira pergunta'],
+            ['role' => 'assistant', 'content' => 'Primeira resposta'],
+            ['role' => 'user', 'content' => 'Continue a análise'],
+        ], array_slice($requisicoes[1], 1));
+
+        Livewire::test(AssistenteChat::class)->assertSet('mensagens', [])->assertDontSee('Primeira pergunta');
+    }
+
     public function test_chat_renderiza_markdown_da_resposta_sem_executar_html_do_modelo(): void
     {
         $this->entrar();
