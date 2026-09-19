@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\RiskAssessment;
+use App\Support\Notificacoes\NotificacaoService;
 use App\Support\Tenancy\CompanyContext;
 use Illuminate\Support\Facades\DB;
 
@@ -65,6 +66,11 @@ class RiskService
 
                     usort($similar, fn (array $a, array $b): int => $b['sim'] <=> $a['sim']);
 
+                    // capturado antes do upsert: é o estado anterior real quando o mês é novo, e o próprio mês
+                    // atual (ainda não atualizado) quando o recálculo é só por mudança de peso/limiar.
+                    $anterior = RiskAssessment::where('customer_id', $customerId)->where('model_version', 'rules-v1')
+                        ->orderByDesc('reference_month')->first();
+
                     RiskAssessment::updateOrCreate(
                         ['customer_id' => $customerId, 'reference_month' => $result['reference_month'], 'model_version' => 'rules-v1'],
                         [
@@ -78,6 +84,8 @@ class RiskService
                             'calculated_at' => now(),
                         ],
                     );
+
+                    NotificacaoService::avaliar($company, $customer, $anterior, $result, $limiares);
                 }
 
                 return count($results);
