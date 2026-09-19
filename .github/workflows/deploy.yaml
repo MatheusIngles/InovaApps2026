@@ -33,9 +33,16 @@ jobs:
               --prefer-dist \
               --optimize-autoloader
 
-            npm ci
+            # Builds anteriores rodavam com sudo e podem ter deixado estes diretórios como root.
+            # Recupera somente os arquivos gerados; npm ci e Vite rodam como o usuário SSH.
+            for generated_path in node_modules public/build; do
+              if [ -e "$generated_path" ]; then
+                printf '%s\n' "${{ secrets.SUDO_PASSWORD }}" | sudo -S chown -R "$(id -u):$(id -g)" "$generated_path"
+              fi
+            done
 
-            echo "${{ secrets.SUDO_PASSWORD }}" | sudo -S npm run build
+            npm ci
+            npm run build
 
             php artisan migrate --force
 
