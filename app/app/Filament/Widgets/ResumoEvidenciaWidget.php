@@ -11,5 +11,5 @@ class ResumoEvidenciaWidget extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected string $view = 'filament.components.painel-resumo-evidencia';
+    protected string $view = 'filament.widgets.resumo-evidencia';
 }

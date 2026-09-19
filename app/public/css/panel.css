@@ -318,7 +318,10 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .ev-seg-multi { display: flex; flex-wrap: wrap; gap: .25rem; border-radius: 1.25rem; margin: .5rem 0 1rem; }
 .ev-linha { cursor: pointer; }
 .ev-seg button:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 2px; }
-.ev-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; }
+.ev:has(> .ev-kpis) { container-type: inline-size; }
+.ev-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; } /* 4 em largo, 2 em médio, 1 em estreito: sem cartão sozinho na última linha */
+@container (min-width: 52rem) { .ev-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container (max-width: 24rem) { .ev-kpis { grid-template-columns: minmax(0, 1fr); } }
 .ev-kpi { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .35rem; }
 .ev-kpi span { font-size: .85rem; color: var(--panel-muted); }
 .ev-kpi strong { font-size: 1.7rem; font-weight: 800; color: var(--panel-text); line-height: 1.1; }
