@@ -25,7 +25,9 @@ class EmpresaResource extends Resource
 {
     protected static ?string $model = Customer::class;
 
-    protected static ?string $modelLabel = 'empresa';
+    protected static ?string $modelLabel = 'cliente';
+
+    protected static ?string $pluralModelLabel = 'clientes';
 
     protected static ?string $navigationLabel = 'Clientes';
 
@@ -59,7 +61,7 @@ class EmpresaResource extends Resource
             ->paginated([12, 24, 48, 'all'])
             ->defaultPaginationPageOption(24)
             ->searchPlaceholder('Buscar por nome, código ou segmento…')
-            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Cancelada' => 'canc'][$e->rotulo()])
+            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Cancelado' => 'canc'][$e->rotulo()])
             ->columns([
                 Stack::make([
                     Split::make([
@@ -83,7 +85,7 @@ class EmpresaResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('nivel')->label('Nível de risco')->multiple()
-                    ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelada' => 'Cancelada'])
+                    ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelado' => 'Cancelado'])
                     ->query(function (Builder $query, array $data) {
                         $niveis = array_filter($data['values'] ?? []);
                         $l = app(CompanyContext::class)->current()->limiares(); // limiares da empresa
@@ -91,7 +93,7 @@ class EmpresaResource extends Resource
                         return $query->when($niveis, fn (Builder $query) => $query->where(function (Builder $query) use ($niveis, $l) {
                             foreach ($niveis as $nivel) {
                                 $query->orWhere(fn (Builder $q) => match ($nivel) {
-                                    'Cancelada' => $q->where('customers.status', 'Cancelado'),
+                                    'Cancelado' => $q->where('customers.status', 'Cancelado'),
                                     'Crítico' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['critico']),
                                     'Alto' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
                                     'Médio' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),

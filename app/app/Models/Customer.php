@@ -87,7 +87,7 @@ class Customer extends Model
 
     public function rotulo(): string
     {
-        return $this->cancelada() ? 'Cancelada' : $this->nivel;
+        return $this->cancelada() ? 'Cancelado' : $this->nivel;
     }
 
     public static function brl(float|int $value): string

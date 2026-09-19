@@ -95,7 +95,7 @@
                 </div>
             </div>
             <p class="footer">
-                Situação: {{ $empresa->cancelada() ? 'Cancelada em '.$empresa->mes_cancel : 'Ativa' }}.
+                Situação: {{ $empresa->cancelada() ? 'Cancelado em '.$empresa->mes_cancel : 'Ativo' }}.
                 Risco: soma das parcelas dos sinais, ponderadas pelos pesos configurados. Exposição: risco (%) × valor mensal do contrato.
                 São indicadores para priorização; não representam probabilidade de cancelamento nem perda financeira prevista.
             </p>

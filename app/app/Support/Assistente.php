@@ -92,6 +92,6 @@ class Assistente
                 Customer::brl($c->valor).'/mês, motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->join("\n");
         }
 
-        return 'Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre uma empresa: cite o código, ex.: "por que C012 está em risco?" ou "o que fazer com C012?".';
+        return 'Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre um cliente: cite o código, ex.: "por que C012 está em risco?" ou "o que fazer com C012?".';
     }
 }

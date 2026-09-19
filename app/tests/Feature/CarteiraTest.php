@@ -153,7 +153,7 @@ class CarteiraTest extends TestCase
         $conta = fn (callable $f) => $todos->filter($f)->count();
 
         // nível: cada opção e combinações (o rótulo vem dos limiares da empresa)
-        foreach (['Crítico', 'Alto', 'Médio', 'Baixo', 'Cancelada'] as $nivel) {
+        foreach (['Crítico', 'Alto', 'Médio', 'Baixo', 'Cancelado'] as $nivel) {
             Livewire::test(ListEmpresas::class)->filterTable('nivel', [$nivel])
                 ->assertCountTableRecords($conta(fn ($c) => $c->rotulo() === $nivel));
         }
@@ -310,7 +310,7 @@ class CarteiraTest extends TestCase
 
         // 1) empresa escolhida no seletor: só ela está em foco, com os dados dela
         Livewire::test(AssistenteChat::class)->set('codigo', $x->codigo)->call('enviar', 'Por que está em risco?');
-        $this->assertStringContainsString("EMPRESA EM FOCO: {$x->nome} (código {$x->codigo})", $sistema());
+        $this->assertStringContainsString("CLIENTE EM FOCO: {$x->nome} (código {$x->codigo})", $sistema());
         $this->assertStringContainsString("Risco: {$x->score}%", $sistema());
         $this->assertStringNotContainsString("código {$y->codigo})", $sistema());
         $this->assertStringContainsString('SINAIS DE ALERTA', $sistema());
@@ -318,12 +318,12 @@ class CarteiraTest extends TestCase
 
         // 2) sem seletor, mas citando o código na pergunta: passa a ser especialista nela
         Livewire::test(AssistenteChat::class)->call('enviar', "o que fazer com {$y->codigo}?");
-        $this->assertStringContainsString("EMPRESA EM FOCO: {$y->nome} (código {$y->codigo})", $sistema());
+        $this->assertStringContainsString("CLIENTE EM FOCO: {$y->nome} (código {$y->codigo})", $sistema());
 
         // 3) sem seletor e sem código: visão geral, nenhuma empresa em foco
         Livewire::test(AssistenteChat::class)->call('enviar', 'Quem devo ligar primeiro?');
         $this->assertStringContainsString('visão geral da carteira', $sistema());
-        $this->assertStringNotContainsString('EMPRESA EM FOCO', $sistema());
+        $this->assertStringNotContainsString('CLIENTE EM FOCO', $sistema());
 
         // 4) empresa cancelada vem marcada como cancelada
         Livewire::test(AssistenteChat::class)->set('codigo', $cancelada->codigo)->call('enviar', 'Por que saiu?');

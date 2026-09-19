@@ -19,7 +19,7 @@
     <div class="empresa-abas" x-data="{ aba: 'visao' }">
         {{-- Banner, logo e identificação --}}
         <section class="ui-card">
-                <div class="ui-banner" role="img" aria-label="Banner da empresa"></div>
+                <div class="ui-banner" role="img" aria-label="Banner do cliente"></div>
                 <div class="ui-head">
                     <div class="ui-logo" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->segmento, 0, 1)).ltrim(substr($e->codigo, 1), '0') }}</div>
                     <div class="ui-title">
@@ -30,12 +30,12 @@
                         <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · risco {{ $e->score }}%{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
                         <a class="ui-btn primary" href="{{ $chat }}">Conversar com a IA</a>
                         <livewire:relatorio-empresa :codigo="$e->codigo" :key="'relatorio-'.$e->codigo" />
-                        <a class="ui-btn" href="{{ EmpresaResource::getUrl() }}">Todas as empresas</a>
+                        <a class="ui-btn" href="{{ EmpresaResource::getUrl() }}">Todos os clientes</a>
                     </div>
                 </div>
         </section>
 
-        <nav class="empresa-abas-nav fi-tabs" role="tablist" aria-label="Informações da empresa">
+        <nav class="empresa-abas-nav fi-tabs" role="tablist" aria-label="Informações do cliente">
             <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-visao" x-ref="visao" aria-controls="empresa-painel-visao" :aria-selected="aba === 'visao'" :tabindex="aba === 'visao' ? 0 : -1" :class="{ 'fi-active': aba === 'visao' }" @click="aba = 'visao'" @keydown.arrow-right.prevent="aba = 'historico'; $refs.historico.focus()">Visão geral</button>
             <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-historico" x-ref="historico" aria-controls="empresa-painel-historico" :aria-selected="aba === 'historico'" :tabindex="aba === 'historico' ? 0 : -1" :class="{ 'fi-active': aba === 'historico' }" @click="aba = 'historico'" @keydown.arrow-right.prevent="aba = 'tendencia'; $refs.tendencia.focus()" @keydown.arrow-left.prevent="aba = 'visao'; $refs.visao.focus()">Histórico mensal</button>
             <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-tendencia" x-ref="tendencia" aria-controls="empresa-painel-tendencia" :aria-selected="aba === 'tendencia'" :tabindex="aba === 'tendencia' ? 0 : -1" :class="{ 'fi-active': aba === 'tendencia' }" @click="aba = 'tendencia'" @keydown.arrow-left.prevent="aba = 'historico'; $refs.historico.focus()">Tendência e previsão</button>
@@ -78,7 +78,7 @@
             <section class="ui-card ui-pad">
                 <h2>{{ $e->cancelada() ? 'Sinais antes do cancelamento' : 'Em destaque: sinais de alerta e próximos passos' }}</h2>
                 @unless ($e->currentAssessment)
-                    <p class="ui-muted">Sem avaliação calculada: faltam métricas mensais para esta empresa.</p>
+                    <p class="ui-muted">Sem avaliação calculada: faltam métricas mensais para este cliente.</p>
                 @endunless
                 @forelse ($e->sinais as $s)
                     @php($parcela = $parcelasPorRotulo->get($s['label']))
@@ -106,7 +106,7 @@
 
         <aside class="ui-rail">
             <section class="ui-card ui-pad">
-                <h2>Empresas parecidas que cancelaram</h2>
+                <h2>Clientes parecidos que cancelaram</h2>
                 <p class="ui-muted">Perfil dos últimos 3 meses comparado ao de quem já saiu. 100% indica sinais iguais, não chance de cancelamento.</p>
                 <ul class="ui-list">
                     @foreach ($e->similares as $s)
@@ -164,11 +164,11 @@
 
             @if ($comparacao && $sev)
                 <section class="ui-card ui-pad">
-                    <h2>Esta empresa comparada a quem cancelou e a quem ficou</h2>
+                    <h2>Este cliente comparado a quem cancelou e a quem ficou</h2>
                     <p class="ui-muted">Gravidade de cada sinal hoje (0 a 100%). Quanto mais perto do valor dos cancelados, mais o padrão se parece com o de quem saiu.</p>
                     <div class="ui-table-wrap">
                         <table class="ui-table">
-                            <thead><tr><th>Sinal</th><th>Esta empresa</th><th>Média dos que ficaram</th><th>Média dos que cancelaram</th></tr></thead>
+                            <thead><tr><th>Sinal</th><th>Este cliente</th><th>Média dos que ficaram</th><th>Média dos que cancelaram</th></tr></thead>
                             <tbody>
                                 @foreach (collect($comparacao)->sortByDesc('auc') as $k => $v)
                                     @php($minha = $sev[$k] ?? 0)

@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Ativas primeiro, pela combinação de risco e valor do contrato ajustada em Configurações. Abra um cliente para ver a origem do score.';
+        return 'Ativos primeiro, pela combinação de risco e valor do contrato ajustada em Configurações. Abra um cliente para ver a origem do score.';
     }
 }
