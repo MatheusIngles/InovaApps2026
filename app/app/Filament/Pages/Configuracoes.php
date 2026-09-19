@@ -71,7 +71,7 @@ class Configuracoes extends Page implements HasSchemas
                 ]),
                 Tab::make('Fila de prioridade')->schema([
                     Section::make('Ordem da lista de clientes')
-                        ->description('A fila ordena os clientes ativos por risco × (risco + K) × valor mensal do contrato. K baixo reforça a diferença entre scores; K alto aproxima a ordem de score × contrato.')
+                        ->description('A fila ordena os clientes ativos por risco × (risco + K) × valor mensal do contrato. K baixo reforça a diferença entre riscos; K alto aproxima a ordem de risco × contrato.')
                         ->schema([
                             TextInput::make('prioridade')->label('Equilíbrio da fila (K)')->numeric()->integer()->minValue(0)->maxValue(500)->step(5)->required()
                                 ->helperText('De 0 a 500. O padrão é 50; o valor do contrato participa da ordem em toda a faixa.'),

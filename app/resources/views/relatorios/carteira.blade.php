@@ -78,7 +78,7 @@
     </table>
     <p>Risco completo (todos os sinais juntos): separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais e <b>{{ $n($r['auc_sugerido'], 3) }}</b> com os sugeridos.</p>
 
-    <h2>4. Variáveis que o score ainda não usa</h2>
+    <h2>4. Variáveis que o risco ainda não usa</h2>
     <p>São colunas da planilha que não entram no cálculo do risco hoje. Testadas na mesma régua: as que separam bem podem valer a pena entrar nele.</p>
     <table>
         <tr><th>Variável</th><th>Separação</th><th>Média nos cancelados</th><th>Média nos retidos</th></tr>
@@ -86,6 +86,23 @@
             <tr><td>{{ $v['rotulo'] }}</td><td>{{ $n($v['auc'], 2) }} ({{ $forca($v['auc']) }})</td><td>{{ $n($v['media_cancelados'], 1) }}</td><td>{{ $n($v['media_retidos'], 1) }}</td></tr>
         @endforeach
     </table>
+
+    <h2>4b. Isso vale para o futuro? (validação em período separado)</h2>
+    @php($vt = $r['validacao_temporal'])
+    @if ($vt['suficiente'])
+        <p>Para não avaliar nos mesmos dados usados para calibrar, refizemos o teste como se estivéssemos em {{ substr($vt['corte'], 5, 2) }}/{{ substr($vt['corte'], 0, 4) }}: pesos e corte foram calibrados só com os {{ $vt['treino']['cancelados'] }} cancelamentos até essa data (contra {{ $vt['treino']['ativos'] }} clientes ativos na época) e depois testados nos {{ $vt['teste']['cancelados'] }} cancelamentos seguintes, que o cálculo nunca viu.</p>
+        <table>
+            <tr><th>Medida</th><th>Resultado</th></tr>
+            <tr><td>Separação nos dados de calibração (referência)</td><td>{{ $n($vt['auc']['treino'], 2) }}</td></tr>
+            <tr><td>Separação no período de teste, com pesos calibrados antes do corte</td><td><b>{{ $n($vt['auc']['teste_pesos_treino'], 2) }}</b></td></tr>
+            <tr><td>Separação no período de teste, com os pesos padrão</td><td>{{ $n($vt['auc']['teste_pesos_padrao'], 2) }}</td></tr>
+            <tr><td>Cancelados do teste alertados (corte calibrado antes: risco ≥ {{ $vt['corte_alto'] ?? '—' }}%)</td><td><b>{{ $vt['detectados'] }} de {{ $vt['teste']['cancelados'] }}</b></td></tr>
+            <tr><td>Alarme falso entre os que nunca cancelaram</td><td>{{ $n($vt['alarme_falso_pct'], 1) }}%</td></tr>
+        </table>
+        <p class="muted">Quanto mais perto a separação do teste estiver da de calibração, menos o resultado depende de ter sido ajustado aos mesmos casos. Com poucos cancelamentos por período, os números são indicativos.</p>
+    @else
+        <p>Não há cancelamentos suficientes antes e depois de um ponto de corte para validar em período separado.</p>
+    @endif
 
     <h3>Perfil de quem cancelou (% da carteira que cancelou)</h3>
     <table>
@@ -150,7 +167,7 @@
             <p><b>Elevado nos que cancelaram (último mês antes da saída):</b></p>
             <ul>
                 @foreach ($s['elevados'] as $i)
-                    <li><b>{{ $i['rotulo'] }}</b>{{ $i['extra'] ? ' (fora do score)' : '' }}: {{ $i['texto'] }}.</li>
+                    <li><b>{{ $i['rotulo'] }}</b>{{ $i['extra'] ? ' (fora do risco)' : '' }}: {{ $i['texto'] }}.</li>
                 @endforeach
             </ul>
         @else

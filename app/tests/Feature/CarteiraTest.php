@@ -118,15 +118,15 @@ class CarteiraTest extends TestCase
             ->assertOk()
             ->assertSee('empresa-tab-visao')
             ->assertSee('empresa-tab-historico')
-            ->assertDontSee('Parcelas do score')
+            ->assertDontSee('Parcelas do risco')
             ->assertSee('Parcela da métrica:')
             ->assertSee('Ajuste da prioridade:')
-            ->assertSee('Como o score é calculado')
+            ->assertSee('Como o risco é calculado')
             ->assertSee('Como a exposição é calculada')
             ->assertSee('não uma perda prevista');
 
         $this->assertCount(8, $parcelas);
-        $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'contribuiu para o score'));
+        $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'contribuiu para o risco'));
         $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'class="ui-tip ui-tip-valor"'));
 
         Livewire::test(KpisWidget::class)->assertSee('Soma dos contratos mensais dos ativos');

@@ -19,7 +19,7 @@ class Contexto
 ".$prompt.'
 
 '.self::prioridades().'
-Use a ordem e os pesos dessas métricas para explicar o score e priorizar as recomendações. Métricas desativadas não contribuem para o score. Não confunda o peso configurado com a pontuação efetiva do cliente; para explicar o risco atual, cite os sinais e os pontos da avaliação.
+Use a ordem e os pesos dessas métricas para explicar o risco e priorizar as recomendações. Métricas desativadas não contribuem para o risco. Não confunda o peso configurado com a pontuação efetiva do cliente; para explicar o risco atual, cite os sinais e os pontos da avaliação.
 '.($company->chat()['instrucoes'] ? '
 
 INSTRUÇÕES DA EMPRESA:
@@ -36,7 +36,7 @@ INSTRUÇÕES DA EMPRESA:
 
         $pesos = $company->pesos();
         $total = array_sum($pesos);
-        $linhas = ['PRIORIDADES DAS MÉTRICAS DESTA EMPRESA (ordem configurada; participação no score):'];
+        $linhas = ['PRIORIDADES DAS MÉTRICAS DESTA EMPRESA (ordem configurada; participação no risco):'];
         $posicao = 0;
 
         foreach ($pesos as $chave => $peso) {

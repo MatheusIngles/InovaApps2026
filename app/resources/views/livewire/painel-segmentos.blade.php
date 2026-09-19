@@ -40,7 +40,7 @@
             <h3 class="ev-h3">O que estava elevado nos que cancelaram (último mês antes da saída)</h3>
             @forelse ($atual['elevados'] as $i)
                 <article class="ui-sinal">
-                    <div class="ui-sinal-top"><strong>{{ $i['rotulo'] }}</strong>@if ($i['extra'])<span class="ui-muted">fora do score <details class="ui-tip"><summary aria-label="Por que está fora do score">?</summary><span class="ui-tip-content">O score usa só os oito sinais configurados. Esta variável é guardada, mas não soma pontos. Aqui ela só aparece se a média dos cancelados for pelo menos 50% acima da dos que ficaram.</span></details></span>@endif</div>
+                    <div class="ui-sinal-top"><strong>{{ $i['rotulo'] }}</strong>@if ($i['extra'])<span class="ui-muted">fora do risco <details class="ui-tip"><summary aria-label="Por que está fora do risco">?</summary><span class="ui-tip-content">O risco usa só os oito sinais configurados. Esta variável é guardada, mas não soma pontos. Aqui ela só aparece se a média dos cancelados for pelo menos 50% acima da dos que ficaram.</span></details></span>@endif</div>
                     <p>{{ ucfirst($i['texto']) }}.</p>
                     @if (! $i['extra'] && Risco::acao($i['k']))<p class="ui-acao">{{ Risco::acao($i['k']) }}</p>@endif
                 </article>
@@ -76,8 +76,8 @@
         <h2 id="seg-evid" class="ui-h2">Evidências da carteira</h2>
         <p class="ui-muted">O resumo completo, com todos os números explicados, está no botão "Gerar relatório de evidências" no topo do painel (chega por notificação).</p>
 
-        <h3 class="ev-h3">Variáveis que o score ainda não usa</h3>
-        <p class="ui-muted">Colunas da planilha que não somam pontos no score. As que separam bem podem valer a pena entrar nele.</p>
+        <h3 class="ev-h3">Variáveis que o risco ainda não usa</h3>
+        <p class="ui-muted">Colunas da planilha que não somam pontos no risco. As que separam bem podem valer a pena entrar nele.</p>
         <div class="ui-table-wrap">
             <table class="ui-table">
                 <thead><tr><th>Variável</th><th>Separação <details class="ui-tip"><summary aria-label="Como a separação foi calculada">?</summary><span class="ui-tip-content">Para cada variável, usamos a média dos 3 últimos meses de cada cliente. Comparamos, par a par, cada cliente que cancelou com cada um que ficou. A separação é a fração dos pares em que o cancelado tem o valor maior (empate conta meio ponto): 0,50 = não distingue; 1,00 = sempre distingue (AUC). Mostra correlação com o cancelamento, não causa.</span></details></th><th>Média nos cancelados</th><th>Média nos retidos</th></tr></thead>
@@ -100,6 +100,11 @@
                 </div>
             @endforeach
         </div>
+
+        @if ($validacao_temporal['suficiente'])
+            <h3 class="ev-h3">Isso vale para o futuro?</h3>
+            <p class="ui-muted">Calibrando só com os {{ $validacao_temporal['treino']['cancelados'] }} cancelamentos até {{ substr($validacao_temporal['corte'], 5, 2) }}/{{ substr($validacao_temporal['corte'], 0, 4) }} e testando nos {{ $validacao_temporal['teste']['cancelados'] }} seguintes, o alerta pegou <b>{{ $validacao_temporal['detectados'] }} de {{ $validacao_temporal['teste']['cancelados'] }}</b> com {{ $n($validacao_temporal['alarme_falso_pct'], 1) }}% de alarme falso (separação {{ $n($validacao_temporal['auc']['teste_pesos_treino'], 2) }} no teste contra {{ $n($validacao_temporal['auc']['treino'], 2) }} na calibração). Detalhes no relatório de evidências.</p>
+        @endif
 
         @if ($evidencia_suficiente)
             <h3 class="ev-h3">Configuração recomendada</h3>

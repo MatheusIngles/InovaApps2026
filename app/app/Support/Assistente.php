@@ -80,7 +80,7 @@ class Assistente
         if (Str::contains($q, ['cancel', 'churn', 'saiu', 'sairam'])) {
             $x = Customer::dashboard()->where('customers.status', 'Cancelado')->get();
 
-            return "{$x->count()} clientes cancelaram (".Customer::brl($x->sum('valor')).'/mês). Na última avaliação anterior à saída, tinham score médio '.round($x->avg('score')).
+            return "{$x->count()} clientes cancelaram (".Customer::brl($x->sum('valor')).'/mês). Na última avaliação anterior à saída, tinham risco médio '.round($x->avg('score')).
                 ' vs '.round($a->avg('score')).' dos ativos na avaliação mais recente; comparação exploratória.';
         }
         if (Str::contains($q, ['resumo', 'quantos', 'carteira', 'geral'])) {

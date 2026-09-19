@@ -63,7 +63,7 @@ class Customer extends Model
     public static function ordenar(Builder $query): Builder
     {
         // canceladas por último. Entre as ativas: regra de três (risco × valor do contrato) com um reforço para risco alto:
-        // score × (score + K) × valor, com K configurável por empresa (Configurações).
+        // risco × (risco + K) × valor, com K configurável por empresa (Configurações).
         $k = app(CompanyContext::class)->current()?->prioridadeK() ?? Company::PRIORIDADE_PADRAO;
 
         return $query->orderByRaw("customers.status = 'Cancelado'")
@@ -190,7 +190,7 @@ class Customer extends Model
     public function resumoScore(): string
     {
         if (! $this->currentAssessment) {
-            return 'Sem avaliação: faltam métricas mensais para calcular o score.';
+            return 'Sem avaliação: faltam métricas mensais para calcular o risco.';
         }
 
         $principais = collect($this->contribuicoesScore())->sortByDesc('pontos')->take(3)

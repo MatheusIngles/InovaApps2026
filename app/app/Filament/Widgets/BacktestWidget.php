@@ -14,7 +14,7 @@ class BacktestWidget extends StatsOverviewWidget
 
     protected ?string $heading = 'Comparação exploratória do score';
 
-    protected ?string $description = 'Médias aritméticas dos scores por regras (0–100). Cancelados: avaliação anterior à saída; ativos: última avaliação. Não valida previsão de churn.';
+    protected ?string $description = 'Médias aritméticas dos riscos por regras (0–100). Cancelados: avaliação anterior à saída; ativos: última avaliação. Não valida previsão de churn.';
 
     protected function getStats(): array
     {

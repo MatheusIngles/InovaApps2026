@@ -50,7 +50,7 @@
                     <div><dt>Contrato/mês</dt><dd>{{ Customer::brl($e->valor) }}</dd></div>
                     <div><dt>Uso da plataforma</dt><dd>{{ $ultimo ? $ultimo['uso'].'%' : '—' }}</dd></div>
                     <div><dt>SLA cumprido</dt><dd>{{ $ultimo && is_numeric($ultimo['sla']) ? $ultimo['sla'].'%' : '—' }}</dd></div>
-                    <div><dt>Risco <details class="ui-tip"><summary aria-label="Como o score é calculado">?</summary><span class="ui-tip-content">Soma das parcelas dos oito sinais avaliados. É um índice de risco em %, não a chance de cancelamento.</span></details></dt><dd>{{ $e->score }}%</dd></div>
+                    <div><dt>Risco <details class="ui-tip"><summary aria-label="Como o risco é calculado">?</summary><span class="ui-tip-content">Soma das parcelas dos oito sinais avaliados. É um índice de risco em %, não a chance de cancelamento.</span></details></dt><dd>{{ $e->score }}%</dd></div>
                     <div><dt>Exposição <details class="ui-tip"><summary aria-label="Como a exposição é calculada">?</summary><span class="ui-tip-content">{{ $e->score }}% × {{ Customer::brl($e->valor) }}/mês. É um indicador para priorização, não uma perda prevista.</span></details></dt><dd>{{ Customer::brl($e->exposicao) }}</dd></div>
                 </dl>
             </section>
@@ -87,7 +87,7 @@
                             <strong>{{ $s['label'] }}</strong>
                             @if ($parcela)
                                 <details class="ui-tip ui-tip-valor">
-                                    <summary aria-label="Como {{ $s['label'] }} contribuiu para o score">+{{ $s['pts'] }} pts</summary>
+                                    <summary aria-label="Como {{ $s['label'] }} contribuiu para o risco">+{{ $s['pts'] }} pts</summary>
                                     <span class="ui-tip-content">Parcela da métrica: {{ number_format($parcela['base'], 1, ',', '.') }} pt (intensidade × 12,5). Ajuste da prioridade: {{ $parcela['ajuste_prioridade'] < 0 ? '−' : '+' }}{{ number_format(abs($parcela['ajuste_prioridade']), 1, ',', '.') }} pt (peso {{ number_format($parcela['peso'], 1, ',', '.') }}). Total: {{ number_format($parcela['pontos'], 1, ',', '.') }} pt.</span>
                                 </details>
                             @else
@@ -156,7 +156,7 @@
                 <h2>Insatisfação ao longo dos meses</h2>
                 @if ($serie['scores'])
                     @livewire(\App\Filament\Widgets\InsatisfacaoChart::class, ['codigo' => $e->codigo], key('insatisfacao-'.$e->codigo))
-                    <p class="ui-muted">A previsão é a reta da tendência recente do score de sinais (uso, SLA, reclamações, NPS e outros). Não é probabilidade de cancelamento; serve para antecipar a direção.</p>
+                    <p class="ui-muted">A previsão é a reta da tendência recente do índice de risco (uso, SLA, reclamações, NPS e outros). Não é probabilidade de cancelamento; serve para antecipar a direção.</p>
                 @else
                     <p class="ui-muted">Faltam meses de histórico para montar a série.</p>
                 @endif
