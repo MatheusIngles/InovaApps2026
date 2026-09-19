@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Support\Tenancy;
+
+use App\Models\Company;
+use App\Support\Risco;
+use App\Support\RiskService;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+
+/** CRUD da configuração de uma empresa: pesos/prioridade das métricas, limiares, tema e chat. */
+class CompanyConfig
+{
+    public const FONTES = ['Plus Jakarta Sans', 'Inter', 'Poppins', 'Roboto', 'Nunito', 'Lora'];
+
+    /** Create: cria uma empresa (tenant) com a configuração padrão. */
+    public static function criar(string $nome, ?string $slug = null): Company
+    {
+        $base = Str::slug($slug ?: $nome) ?: 'empresa';
+        $slug = $base;
+
+        for ($i = 2; Company::where('slug', $slug)->exists(); $i++) {
+            $slug = "$base-$i";
+        }
+
+        return Company::create(['name' => $nome, 'slug' => $slug]);
+    }
+
+    /** Read: configuração efetiva (padrões + personalizações) no formato do formulário. */
+    public static function ler(Company $company): array
+    {
+        return [
+            'metricas' => collect($company->pesos())->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso])->values()->all(),
+            'limiares' => $company->limiares(),
+            'tema' => $company->tema(),
+            'chat' => $company->chat(),
+        ];
+    }
+
+    /**
+     * Update: valida e grava. Pesos ou limiares novos disparam o recálculo do risco da empresa.
+     *
+     * @return bool se o risco foi recalculado
+     */
+    public static function salvar(Company $company, array $dados): bool
+    {
+        $v = Validator::make($dados, [
+            'metricas' => 'required|array|size:'.count(Risco::PESOS),
+            'metricas.*.k' => 'required|in:'.implode(',', array_keys(Risco::PESOS)),
+            'metricas.*.peso' => 'required|numeric|min:0|max:100',
+            'limiares.critico' => 'required|integer|between:1,100',
+            'limiares.alto' => 'required|integer|between:1,100|lt:limiares.critico',
+            'limiares.medio' => 'required|integer|between:1,100|lt:limiares.alto',
+            'tema.primary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'tema.secondary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'tema.font' => 'required|in:'.implode(',', self::FONTES),
+            'tema.logo' => 'nullable|string|max:255',
+            'chat.enabled' => 'boolean',
+            'chat.ollama_model' => ['nullable', 'max:100', 'regex:/^[\w.:\-\/]+$/'],
+            'chat.instrucoes' => 'nullable|string|max:1000',
+        ]);
+        $v->after(function ($v) use ($dados) {
+            if (array_sum(array_column($dados['metricas'] ?? [], 'peso')) <= 0) {
+                $v->errors()->add('metricas', 'Pelo menos uma métrica precisa ter peso maior que zero.');
+            }
+        });
+        $d = $v->validate();
+
+        $pesos = array_map(fn ($m) => ['k' => $m['k'], 'peso' => (float) $m['peso']], array_values($d['metricas']));
+        $limiares = array_map('intval', $d['limiares']);
+        // != (não !==): 100 e 100.0 são o mesmo peso; a ordem da lista continua contando (desempate de sinais)
+        $recalcular = $pesos != ($company->metric_weights ?? self::padrao()) || $limiares != $company->limiares();
+
+        $company->update(['metric_weights' => $pesos, 'level_thresholds' => $limiares, 'theme' => $d['tema'], 'chat_settings' => $d['chat']]);
+
+        if ($recalcular) {
+            RiskService::recalcular($company);
+        }
+
+        return $recalcular;
+    }
+
+    /** Delete: remove as personalizações e volta ao padrão do sistema. */
+    public static function restaurar(Company $company): void
+    {
+        $company->update(['metric_weights' => null, 'level_thresholds' => null, 'theme' => null, 'chat_settings' => null]);
+        RiskService::recalcular($company);
+    }
+
+    private static function padrao(): array
+    {
+        return collect(Risco::PESOS)->map(fn ($p, $k) => ['k' => $k, 'peso' => (float) $p])->values()->all();
+    }
+}

@@ -2,14 +2,15 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Painel;
+use App\Http\Middleware\SetCompanyContext;
+use App\Support\AvatarIniciais;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use App\Filament\Pages\Painel;
-use App\Filament\Resources\Empresas\EmpresaResource;
-use App\Models\Customer;
-use App\Support\AvatarIniciais;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -29,14 +30,14 @@ class AppPanelProvider extends PanelProvider
             ->default()
             ->id('app')
             ->path('')
-            ->login()
-            ->registration()
+            ->login(Login::class)
+            ->registration(Register::class) // cadastro cria a empresa (tenant) e o primeiro usuário
             ->passwordReset()
             ->globalSearch(false)
             ->brandName('Radar de Retenção')
             ->topNavigation()
             ->defaultAvatarProvider(AvatarIniciais::class)
-            ->homeUrl(fn () => ($c = Customer::ativas()->first()) ? EmpresaResource::getUrl('view', ['record' => $c]) : Painel::getUrl())
+            ->homeUrl(fn () => url('/'))
             ->font('Plus Jakarta Sans')
             ->darkMode(true)
             ->colors(['primary' => Color::Blue, 'gray' => Color::Slate])
@@ -52,6 +53,7 @@ class AppPanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 AuthenticateSession::class,
+                SetCompanyContext::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,

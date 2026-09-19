@@ -2,18 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\Planilha;
 use App\Filament\Resources\Empresas\EmpresaResource;
 use App\Livewire\AssistenteChat;
+use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
 use App\Models\CustomerNps;
 use App\Models\RiskAssessment;
 use App\Models\User;
 use App\Support\Assistente;
+use App\Support\Llm\Llm;
+use App\Support\Tenancy\CompanyContext;
 use Database\Seeders\CustomerDataSeeder;
 use Database\Seeders\RiskAssessmentSeeder;
+use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Support\Llm\Llm;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -26,15 +30,27 @@ class CarteiraTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(UserSeeder::class);
         $this->seed(CustomerDataSeeder::class);
         $this->seed(RiskAssessmentSeeder::class);
+        app(CompanyContext::class)->set(Company::firstWhere('slug', 'demo'));
+    }
+
+    /** Usuário da empresa demo (a que tem a base do desafio) autenticado. */
+    private function entrar(): User
+    {
+        $user = User::factory()->for(Company::firstWhere('slug', 'demo'))->create();
+        $this->actingAs($user);
+
+        return $user;
     }
 
     public function test_visitante_vai_para_login_e_login_tem_vlibras_no_painel(): void
     {
         $this->get('/')->assertRedirect('/login');
         $this->get('/empresas')->assertRedirect('/login');
-        $this->actingAs(User::factory()->create())->get('/painel')->assertOk()->assertSee('vlibras', false);
+        $this->entrar();
+        $this->get('/painel')->assertOk()->assertSee('vlibras', false);
     }
 
     public function test_base_importada_e_score_separa_cancelados_de_ativos(): void
@@ -66,7 +82,7 @@ class CarteiraTest extends TestCase
 
     public function test_telas_do_painel_renderizam(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->entrar();
         $top = Customer::ordenar(Customer::dashboard())->first();
 
         $this->get('/empresas')->assertOk()->assertSee($top->nome);
@@ -84,15 +100,20 @@ class CarteiraTest extends TestCase
         $this->assertStringContainsString($top->nome, Assistente::responder('por que '.$top->codigo.' está em risco?'));
     }
 
-    public function test_raiz_redireciona_para_a_empresa_prioritaria(): void
+    public function test_raiz_leva_a_empresa_prioritaria_ou_a_planilha_se_nao_ha_dados(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->entrar();
         $this->get('/')->assertRedirect(EmpresaResource::getUrl('view', ['record' => Customer::ativas()->first()]));
+
+        $this->flushSession(); // outra pessoa, outra sessão
+        $this->actingAs(User::factory()->create()); // empresa nova, sem dados
+        $this->get('/')->assertRedirect(Planilha::getUrl());
+        $this->get('/planilha')->assertOk()->assertSee('Enviar planilha');
     }
 
     public function test_chat_usa_ollama_com_contexto_da_empresa(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->entrar();
         $top = Customer::ativas()->first();
         Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local']])]);
 
@@ -116,7 +137,7 @@ class CarteiraTest extends TestCase
 
     public function test_sem_llm_o_chat_cai_para_as_regras(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->entrar();
         Http::fake(fn () => throw new ConnectionException('offline'));
 
         Livewire::test(AssistenteChat::class)->call('enviar', 'Resumo da carteira')->assertSee('Respostas por regras');

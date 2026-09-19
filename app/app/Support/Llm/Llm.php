@@ -18,7 +18,7 @@ class Llm
      *
      * @throws RuntimeException quando nenhum provedor responde (o chamador cai para as regras locais)
      */
-    public static function responder(string $sistema, array $mensagens): array
+    public static function responder(string $sistema, array $mensagens, ?string $modeloLocal = null): array
     {
         if (! config('llm.habilitado')) {
             throw new RuntimeException('LLM desabilitado.');
@@ -33,7 +33,7 @@ class Llm
                 continue; // sem chave, a API externa não está disponível
             }
             try {
-                return ['texto' => $provedor === 'api' ? self::api($todas) : self::ollama($todas), 'provedor' => $provedor];
+                return ['texto' => $provedor === 'api' ? self::api($todas) : self::ollama($todas, $modeloLocal), 'provedor' => $provedor];
             } catch (\Throwable $e) {
                 $erro = $e;
             }
@@ -51,10 +51,10 @@ class Llm
         return $tokens > config('llm.limite_tokens_local') || Str::contains($pergunta, config('llm.palavras_complexas'));
     }
 
-    private static function ollama(array $mensagens): string
+    private static function ollama(array $mensagens, ?string $modelo = null): string
     {
         $r = Http::timeout(config('llm.timeout'))->post(rtrim(config('llm.ollama.url'), '/').'/api/chat', [
-            'model' => config('llm.ollama.model'), 'messages' => $mensagens, 'stream' => false,
+            'model' => $modelo ?: config('llm.ollama.model'), 'messages' => $mensagens, 'stream' => false,
         ])->throw();
 
         return trim($r->json('message.content') ?? throw new RuntimeException('Resposta vazia do Ollama.'));
