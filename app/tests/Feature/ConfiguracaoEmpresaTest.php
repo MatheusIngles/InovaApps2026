@@ -56,6 +56,36 @@ class ConfiguracaoEmpresaTest extends TestCase
         $this->assertFalse(CompanyConfig::salvar($company, $this->dados($company, ['sla' => 100]))); // nada mudou: sem recálculo
     }
 
+    public function test_reordenar_metricas_na_tela_altera_score_e_exposicao_do_cliente(): void
+    {
+        $company = $this->empresaComCliente();
+        $this->actingAs(User::factory()->for($company)->create());
+        $avaliacao = fn () => app(CompanyContext::class)->within($company, fn () => Customer::dashboard()->first());
+
+        Livewire::test(Configuracoes::class)->call('salvar')->assertHasNoErrors();
+        $this->assertSame(20, $avaliacao()->score);
+
+        $metricas = CompanyConfig::ler($company->fresh())['metricas'];
+        $uso = collect($metricas)->firstWhere('k', 'uso');
+        $reordenadas = collect($metricas)->reject(fn ($metrica) => $metrica['k'] === 'uso')->push($uso)->values()->all();
+
+        Livewire::test(Configuracoes::class)->set('data.metricas', $reordenadas)->call('salvar')->assertHasNoErrors();
+
+        $this->assertSame('uso', $company->fresh()->metric_weights[7]['k']);
+        $this->assertSame(8, $avaliacao()->score);
+        $this->assertEqualsWithDelta($avaliacao()->valor * 0.08, $avaliacao()->exposicao, 0.01);
+
+        $metricasSemUso = collect(CompanyConfig::ler($company->fresh())['metricas'])
+            ->map(fn ($metrica) => $metrica['k'] === 'uso' ? [...$metrica, 'ativa' => false] : $metrica)
+            ->all();
+
+        Livewire::test(Configuracoes::class)->set('data.metricas', $metricasSemUso)->call('salvar')->assertHasNoErrors();
+
+        $this->assertSame(0.0, $company->fresh()->pesos()['uso']);
+        $this->assertSame(0, $avaliacao()->score);
+        $this->assertSame(0.0, $avaliacao()->exposicao);
+    }
+
     public function test_score_normaliza_pesos_e_soma_zero_e_rejeitada(): void
     {
         $historico = array_fill(0, 3, ['uso_plataforma_pct' => 30, 'pct_sla_cumprido' => 100, 'chamados_abertos' => 0, 'chamados_reabertos' => 0,

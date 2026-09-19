@@ -89,7 +89,16 @@ class Configuracoes extends Page implements HasSchemas
         // métricas desligadas ficam com peso 0 e não ocupam posição na escala
         $escala = collect(Risco::PESOS)->sortDesc()->values();
         $i = 0;
-        $dados['metricas'] = array_map(fn ($m) => ['k' => $m['k'], 'peso' => ($m['ativa'] ?? true) ? $escala[$i++] : 0], array_values($dados['metricas']));
+        $metricas = [];
+
+        foreach (array_values($dados['metricas']) as $metrica) {
+            $metricas[] = [
+                'k' => $metrica['k'],
+                'peso' => ($metrica['ativa'] ?? true) ? $escala[$i++] : 0,
+            ];
+        }
+
+        $dados['metricas'] = $metricas;
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {
