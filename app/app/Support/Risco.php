@@ -46,11 +46,7 @@ class Risco
         $f = self::sinais($hist, $nps);
         $sev = self::severidades($f);
         $total = array_sum($pesos);
-        $pts = [];
-
-        foreach ($pesos as $k => $peso) {
-            $pts[$k] = $total > 0 ? round($sev[$k] * $peso / $total * 100, 1) : 0.0;
-        }
+        $pts = self::pontos($sev, $pesos);
 
         $score = (int) round(array_sum($pts));
         $sinais = [];
@@ -65,6 +61,19 @@ class Risco
         usort($sinais, fn ($a, $b) => $b['pts'] <=> $a['pts']);
 
         return ['score' => $score, 'nivel' => self::nivel($score, $limiares), 'sinais' => $sinais, 'sev' => array_values($sev)];
+    }
+
+    /** @param array<string, float|int> $severidades @param array<string, float|int> $pesos */
+    public static function pontos(array $severidades, array $pesos): array
+    {
+        $total = array_sum($pesos);
+        $pontos = [];
+
+        foreach ($pesos as $chave => $peso) {
+            $pontos[$chave] = $total > 0 ? round(($severidades[$chave] ?? 0) * $peso / $total * 100, 1) : 0.0;
+        }
+
+        return $pontos;
     }
 
     /** Limiares padrão calibrados no backtest: cancelados ≈ 58 de score médio, ativos ≈ 20. */

@@ -40,6 +40,20 @@
             </tr>
         </tbody>
     </table>
+    <p class="meta">
+        Score: soma das oito parcelas dos sinais, ponderadas pelos pesos configurados e arredondada para inteiro.
+        Exposição: {{ $empresa->score }} ÷ 100 × {{ \App\Models\Customer::brl($empresa->valor) }}/mês.
+        São indicadores para priorização; não representam probabilidade de cancelamento nem perda financeira prevista.
+    </p>
+    <h2>Composição do score</h2>
+    <table>
+        <thead><tr><th>Sinal</th><th>Intensidade</th><th>Peso</th><th>Pontos</th></tr></thead>
+        <tbody>
+            @foreach ($empresa->contribuicoesScore() as $parcela)
+                <tr><td>{{ $parcela['rotulo'] }}</td><td>{{ number_format($parcela['intensidade'], 2, ',', '.') }}</td><td>{{ $parcela['peso'] }}</td><td>+{{ number_format($parcela['pontos'], 1, ',', '.') }}</td></tr>
+            @endforeach
+        </tbody>
+    </table>
 
     <h2>Análise</h2>
     <div class="analise">

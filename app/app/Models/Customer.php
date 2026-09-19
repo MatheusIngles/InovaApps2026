@@ -160,6 +160,39 @@ class Customer extends Model
         return $this->currentAssessment?->signals_json['evidence'] ?? [];
     }
 
+    /** Parcelas de todos os sinais, inclusive as menores que o limite dos destaques. */
+    public function contribuicoesScore(): array
+    {
+        $severidades = $this->currentAssessment?->signals_json['severity'] ?? null;
+
+        if (! is_array($severidades) || count($severidades) !== count(Risco::PESOS)) {
+            return [];
+        }
+
+        $severidades = array_combine(array_keys(Risco::PESOS), $severidades);
+        $pesos = app(CompanyContext::class)->current()?->pesos() ?? Risco::PESOS;
+        $pontos = Risco::pontos($severidades, $pesos);
+
+        return array_map(fn ($chave, $pontos) => [
+            'rotulo' => Risco::ROTULOS[$chave],
+            'intensidade' => $severidades[$chave],
+            'peso' => $pesos[$chave],
+            'pontos' => $pontos,
+        ], array_keys($pontos), array_values($pontos));
+    }
+
+    public function resumoScore(): string
+    {
+        if (! $this->currentAssessment) {
+            return 'Sem avaliação: faltam métricas mensais para calcular o score.';
+        }
+
+        $principais = collect($this->contribuicoesScore())->sortByDesc('pontos')->take(3)
+            ->map(fn ($item) => "{$item['rotulo']} +{$item['pontos']}")->join('; ');
+
+        return "Score por regras: soma ponderada de 8 sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
+    }
+
     public function getSimilaresAttribute(): array
     {
         return $this->currentAssessment?->signals_json['similar'] ?? [];

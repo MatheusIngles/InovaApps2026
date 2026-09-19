@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Prioridade = risco × valor do contrato (regra de três, com reforço para risco alto): quem mais pode custar à carteira vem primeiro. Canceladas ao final.';
+        return 'Prioridade = risco × valor do contrato (regra de três, com reforço para risco alto); o equilíbrio é ajustável em Configurações. O score soma 8 sinais ponderados e não é probabilidade de cancelamento. Canceladas ao final.';
     }
 }

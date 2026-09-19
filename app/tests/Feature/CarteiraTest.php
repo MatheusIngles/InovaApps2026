@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Pages\Planilha;
 use App\Filament\Resources\Empresas\EmpresaResource;
 use App\Filament\Resources\Empresas\Pages\ListEmpresas;
+use App\Filament\Widgets\KpisWidget;
 use App\Livewire\AssistenteChat;
 use App\Models\Company;
 use App\Models\Customer;
@@ -98,6 +99,25 @@ class CarteiraTest extends TestCase
             ->assertSee(EmpresaResource::getUrl('view', ['record' => $top->similares[0]['codigo']]));
         $this->get('/assistente')->assertOk()->assertSee('<h1 class="chatbot-title">', false);
         $this->get('/empresas/X999')->assertNotFound();
+    }
+
+    public function test_score_exibe_origem_das_parcelas_e_formula_da_exposicao(): void
+    {
+        $this->entrar();
+        $cliente = Customer::ordenar(Customer::dashboard())->first();
+        $parcelas = $cliente->contribuicoesScore();
+
+        $this->assertCount(8, $parcelas);
+        $this->assertSame($cliente->score, (int) round(array_sum(array_column($parcelas, 'pontos'))));
+
+        $this->get('/empresas/'.$cliente->codigo)
+            ->assertOk()
+            ->assertSee('Ver as 8 parcelas do score')
+            ->assertSee($parcelas[0]['rotulo'])
+            ->assertSee('Exposição =')
+            ->assertSee('não é uma previsão de perda financeira');
+
+        Livewire::test(KpisWidget::class)->assertSee('Soma dos contratos mensais dos ativos');
     }
 
     public function test_lista_de_empresas_filtra_situacao_e_faixa_de_score(): void

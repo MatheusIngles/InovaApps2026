@@ -12,7 +12,7 @@ class TendenciaChart extends ChartWidget
 
     protected ?string $heading = 'Uso da plataforma × SLA cumprido';
 
-    protected ?string $description = 'Média mensal da carteira ativa (%)';
+    protected ?string $description = 'Média, por mês, dos percentuais informados para clientes atualmente ativos; SLA ausente não entra na média.';
 
     protected ?string $maxHeight = '260px';
 

@@ -12,7 +12,7 @@ class SegmentosChart extends ChartWidget
 
     protected ?string $heading = 'Risco médio por segmento';
 
-    protected ?string $description = 'Score de 0 a 100, clientes ativos';
+    protected ?string $description = 'Média aritmética dos scores por regras (0–100) dos clientes ativos de cada segmento.';
 
     protected ?string $maxHeight = '260px';
 

@@ -70,7 +70,9 @@ class EmpresaResource extends Resource
                     ]),
                     Split::make([
                         TextColumn::make('score')->size(TextSize::Large)->weight(FontWeight::Bold)
-                            ->formatStateUsing(fn ($state) => "Score {$state}/100"),
+                            ->formatStateUsing(fn ($state) => "Score {$state}/100")
+                            ->description('Soma ponderada de 8 sinais; não é chance de cancelamento.')
+                            ->tooltip(fn (Customer $e) => $e->resumoScore()),
                         TextColumn::make('valor')->alignEnd()
                             ->state(fn (Customer $e) => $e->cancelada() ? "Cancelou em {$e->mes_cancel}" : Customer::brl($e->valor).'/mês'),
                     ]),

@@ -14,7 +14,7 @@ class BacktestWidget extends StatsOverviewWidget
 
     protected ?string $heading = 'Comparação exploratória do score';
 
-    protected ?string $description = 'Score por regras; esta comparação não valida uma previsão de churn.';
+    protected ?string $description = 'Médias aritméticas dos scores por regras (0–100). Cancelados: avaliação anterior à saída; ativos: última avaliação. Não valida previsão de churn.';
 
     protected function getStats(): array
     {
@@ -25,11 +25,11 @@ class BacktestWidget extends StatsOverviewWidget
         $na = $ativ->count();
 
         return [
-            Stat::make('Score médio dos cancelados', round($canc->avg('score') ?? 0))->description('vs '.round($ativ->avg('score') ?? 0).' nos ativos'),
+            Stat::make('Score médio dos cancelados', round($canc->avg('score') ?? 0))->description('Média dos scores; vs '.round($ativ->avg('score') ?? 0).' nos ativos'),
             Stat::make('Cancelados com score ≥ 40', $canc->where('score', '>=', 40)->count()." de $nc")->color('success')
-                ->description('na última avaliação anterior ao cancelamento'),
+                ->description('Contagem com corte fixo de 40; última avaliação antes da saída'),
             Stat::make('Ativos com score ≥ 40', $ativ->where('score', '>=', 40)->count()." de $na")->color('warning')
-                ->description('na última avaliação disponível'),
+                ->description('Contagem com corte fixo de 40; última avaliação disponível'),
         ];
     }
 }

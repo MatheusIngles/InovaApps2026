@@ -9,6 +9,8 @@
     $nivelCss = ['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo'][$rotulo] ?? 'canc';
     $hist = $e->hist; // uma consulta só
     $ultimo = collect($hist)->last();
+    $parcelas = $e->contribuicoesScore();
+    $somaParcelas = array_sum(array_column($parcelas, 'pontos'));
 @endphp
 
 <x-filament-panels::page>
@@ -24,7 +26,7 @@
                         <p class="ui-headline">{{ $e->segmento }}, porte {{ $e->porte }}, plano {{ $e->plano }}. Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ', cancelou em '.$e->mes_cancel : '' }}.</p>
                     </div>
                     <div class="ui-actions">
-                        <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }}{{ $e->cancelada() ? '' : ' · '.$e->score.'/100' }}</span>
+                        <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · {{ $e->score }}/100{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
                         <a class="ui-btn primary" href="{{ $chat }}">Conversar com a IA</a>
                         <livewire:relatorio-empresa :codigo="$e->codigo" :key="'relatorio-'.$e->codigo" />
                         <a class="ui-btn" href="{{ EmpresaResource::getUrl() }}">Todas as empresas</a>
@@ -35,17 +37,42 @@
             {{-- Indicadores atuais --}}
             <section class="ui-card ui-pad">
                 <h2>Indicadores atuais</h2>
+                <p class="ui-muted">Score por regras: soma ponderada dos sinais de atendimento, uso, satisfação e relacionamento. É um indicador de atenção, não uma probabilidade de cancelamento. Uso e SLA são percentuais informados na planilha.</p>
                 <dl class="ui-stats">
                     <div><dt>Contrato/mês</dt><dd>{{ Customer::brl($e->valor) }}</dd></div>
                     <div><dt>Uso da plataforma</dt><dd>{{ $ultimo ? $ultimo['uso'].'%' : '—' }}</dd></div>
                     <div><dt>SLA cumprido</dt><dd>{{ $ultimo && is_numeric($ultimo['sla']) ? $ultimo['sla'].'%' : '—' }}</dd></div>
+                    <div><dt>Score de sinais</dt><dd>{{ $e->score }}/100</dd></div>
                     <div><dt>Exposição</dt><dd>{{ Customer::brl($e->exposicao) }}</dd></div>
                 </dl>
+                <p class="ui-muted">Exposição = {{ $e->score }} ÷ 100 × {{ Customer::brl($e->valor) }}/mês. Serve para ordenar o atendimento; não é uma previsão de perda financeira.</p>
             </section>
 
             {{-- Destaques: sinais e próximos passos --}}
             <section class="ui-card ui-pad">
                 <h2>{{ $e->cancelada() ? 'Sinais antes do cancelamento' : 'Em destaque: sinais de alerta e próximos passos' }}</h2>
+                <p class="ui-muted">Cada sinal recebe uma intensidade de 0 a 1. Parcela = intensidade × peso configurado ÷ soma dos pesos × 100. O score é a soma das oito parcelas, arredondada para inteiro. Os destaques abaixo mostram só as parcelas mais fortes.</p>
+                @if ($e->currentAssessment)
+                    <details class="ui-calculo">
+                        <summary>Ver as 8 parcelas do score de {{ $e->score }} pontos</summary>
+                        <ul>
+                            @foreach ($parcelas as $parcela)
+                                <li>
+                                    <span>{{ $parcela['rotulo'] }} <small>intensidade {{ number_format($parcela['intensidade'], 2, ',', '.') }} · peso {{ $parcela['peso'] }}</small></span>
+                                    <strong>+{{ number_format($parcela['pontos'], 1, ',', '.') }} pt</strong>
+                                </li>
+                            @endforeach
+                        </ul>
+                        @if ($parcelas && (int) round($somaParcelas) === $e->score)
+                            <p>Soma: {{ number_format($somaParcelas, 1, ',', '.') }} pontos → score {{ $e->score }}/100 após arredondamento.</p>
+                        @else
+                            <p>As parcelas disponíveis não reproduzem o score salvo. Recalcule a avaliação ao salvar as prioridades em Configurações.</p>
+                        @endif
+                        <p>Referência: {{ $e->currentAssessment->reference_month->format('m/Y') }}. Os pesos podem ser alterados em Configurações; a pontuação é recalculada ao salvar.</p>
+                    </details>
+                @else
+                    <p class="ui-muted">Sem avaliação calculada: faltam métricas mensais para esta empresa.</p>
+                @endif
                 @forelse ($e->sinais as $s)
                     <article class="ui-sinal">
                         <div class="ui-sinal-top"><strong>{{ $s['label'] }}</strong><span>+{{ $s['pts'] }} pts</span></div>
@@ -76,7 +103,7 @@
         <aside class="ui-rail">
             <section class="ui-card ui-pad">
                 <h2>Empresas parecidas que cancelaram</h2>
-                <p class="ui-muted">Perfil dos últimos 3 meses comparado ao de quem já saiu.</p>
+                <p class="ui-muted">Perfil dos últimos 3 meses comparado ao de quem já saiu. 100% indica sinais iguais, não chance de cancelamento.</p>
                 <ul class="ui-list">
                     @foreach ($e->similares as $s)
                         <li>
