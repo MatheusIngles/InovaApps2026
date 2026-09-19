@@ -3,7 +3,34 @@
     $meses = fn ($v) => $v === null ? '—' : $n($v, $v == floor($v) ? 0 : 1).($v == 1 ? ' mês' : ' meses');
     $rotulos = ['medio' => 'Médio', 'alto' => 'Alto', 'critico' => 'Crítico'];
 @endphp
-<x-filament-panels::page>
+<div class="ev-aba">
+    <section class="ui-card ui-pad ev" aria-labelledby="ev-rec">
+        <h2 id="ev-rec" class="ui-h2">Configuração recomendada para esta carteira</h2>
+        @if ($evidencia_suficiente)
+            <p class="ui-muted">Calculada com o que aconteceu com os clientes que cancelaram e os que ficaram. Depois da primeira carga de dados ela já é aplicada como base, se você ainda não tiver personalizado nada.</p>
+            <ul class="ev-lista">
+                <li><b>Ordem das métricas:</b> {{ collect($recomendada['ordem'])->pluck('rotulo')->implode(' › ') }}.</li>
+                <li><b>Desligar (não separam cancelados de retidos):</b> {{ $recomendada['desligadas'] ? implode(', ', $recomendada['desligadas']) : 'nenhuma' }}.</li>
+                <li><b>Cortes de alerta:</b> Médio ≥ {{ $recomendada['limiares']['medio'] }} (até 30% de alarme falso), Alto ≥ {{ $recomendada['limiares']['alto'] }} (até 8%), Crítico ≥ {{ $recomendada['limiares']['critico'] }} (até 2%).</li>
+                <li><b>Equilíbrio risco × valor (K):</b> segue o padrão {{ \App\Models\Company::PRIORIDADE_PADRAO }}; é uma decisão de negócio, ajustável em Configurações.</li>
+            </ul>
+            <div class="ui-actions">
+                <button type="button" class="ui-btn primary" wire:click="aplicarConfiguracaoRecomendada" wire:confirm="Aplica a ordem das métricas e os cortes recomendados e recalcula o risco de todos os clientes. Dá para voltar em Configurações. Continuar?">Aplicar configuração recomendada</button>
+                <button type="button" class="ui-btn" wire:click="sugerir" wire:loading.attr="disabled" wire:target="sugerir">
+                    <span wire:loading.remove wire:target="sugerir">Explicar com a IA</span><span wire:loading wire:target="sugerir">Analisando…</span>
+                </button>
+            </div>
+            @if ($sugestao)
+                <div class="ev-ia" role="region" aria-label="Explicação da IA">
+                    <div class="chatbot-markdown">{!! \Illuminate\Support\Str::markdown($sugestao, ['html_input' => 'escape', 'allow_unsafe_links' => false]) !!}</div>
+                    <small class="ui-muted">{{ $fonteSugestao }}</small>
+                </div>
+            @endif
+        @else
+            <p class="ui-muted">Ainda há poucos cancelamentos no histórico para calibrar pesos e cortes com segurança. Enquanto isso, vale a configuração padrão; ela pode ser ajustada em Configurações.</p>
+        @endif
+    </section>
+
     <section class="ev" aria-labelledby="ev-limiar">
         <div class="ev-topo">
             <div>
@@ -140,4 +167,4 @@
     </section>
 
     <p class="ui-muted ev-limite">Limites: são poucos eventos (os cancelamentos da base) e a análise usa os mesmos dados que calibraram os pesos, então os números são um indicativo, não uma garantia. O acerto do alerta considera só meses com 6 meses seguintes já observados.</p>
-</x-filament-panels::page>
+</div>

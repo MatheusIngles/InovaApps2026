@@ -108,16 +108,39 @@ class CompanyConfig
         return $out;
     }
 
-    /** Reordena as métricas pela evidência dos dados (backtest); as que não separam cancelados de retidos são desligadas. */
-    public static function aplicarOrdemDosDados(Company $company): bool
+    /**
+     * Configuração recomendada pelos dados da própria carteira: métricas ordenadas pelo quanto separam cancelados de
+     * retidos (as que não separam são desligadas) e cortes de nível calibrados para um alarme falso aceitável.
+     * Precisa de evidência suficiente (poucos cancelamentos não calibram nada).
+     */
+    public static function aplicarConfiguracaoDosDados(Company $company): bool
     {
-        $variaveis = Backtest::resumo($company)['variaveis'];
+        $resumo = Backtest::resumo($company);
+
+        if (! $resumo['evidencia_suficiente']) {
+            return false;
+        }
+
         $d = self::ler($company);
-        $metricas = collect($d['metricas'])->map(fn ($m) => $m + ['sug' => $variaveis[$m['k']]['peso_sugerido'] ?? 0])
+        $metricas = collect($d['metricas'])->map(fn ($m) => $m + ['sug' => $resumo['variaveis'][$m['k']]['peso_sugerido'] ?? 0])
             ->sortByDesc('sug')->values()->map(fn ($m) => ['k' => $m['k'], 'ativa' => $m['sug'] > 0])->all();
         $d['metricas'] = self::pesosPorPosicao($metricas);
 
+        // os cortes dependem dos pesos novos: recalcula o backtest com eles antes de escolher
+        $novos = collect($d['metricas'])->mapWithKeys(fn ($m) => [$m['k'] => $m['peso']])->all();
+        $d['limiares'] = (new Backtest($novos))->limiaresSugeridos();
+
         return self::salvar($company, $d);
+    }
+
+    /** Configuração base após a primeira carga de dados: só se a empresa ainda não personalizou pesos nem cortes. */
+    public static function aplicarBaseDosDados(Company $company): bool
+    {
+        if ($company->metric_weights !== null || $company->level_thresholds !== null) {
+            return false;
+        }
+
+        return self::aplicarConfiguracaoDosDados($company);
     }
 
     /** Delete: remove as personalizações e volta ao padrão do sistema. */

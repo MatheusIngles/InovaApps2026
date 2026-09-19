@@ -21,6 +21,8 @@ class Backtest
     /** Horizonte (meses) em que um alerta conta como "acertou" se o cliente cancelou depois dele. */
     public const HORIZONTE = 6;
 
+    public const MINIMO_CANCELADOS = 5;
+
     /** Variáveis candidatas que o score não usa (média dos 3 últimos meses, valor bruto). */
     public const EXTRAS = [
         'tickets_critical' => 'Chamados críticos',
@@ -47,35 +49,50 @@ class Backtest
 
         foreach ($clientes as $c) {
             $cancelado = $c->status === 'Cancelado';
-            $metricas = $c->metrics->filter(fn ($m) => ! $cancelado || $c->cancelled_at === null || $m->reference_month->lt($c->cancelled_at))->values();
-            $meses = [];
-
-            foreach ($metricas as $i => $m) {
-                if ($i < 2) {
-                    continue; // o score usa a janela dos 3 últimos meses
-                }
-                $janela = $metricas->slice(0, $i + 1)->map(fn ($x): array => [
-                    'chamados_abertos' => $x->tickets_opened, 'chamados_reabertos' => $x->tickets_reopened, 'pct_sla_cumprido' => $x->sla_percentage,
-                    'reclamacoes_formais' => $x->formal_complaints, 'uso_plataforma_pct' => $x->platform_usage_percentage,
-                    'dias_atraso_pagamento' => $x->payment_delay_days, 'reunioes_previstas' => $x->meetings_expected, 'reunioes_realizadas' => $x->meetings_completed,
-                ])->values()->all();
-                $nps = $c->npsResponses->filter(fn ($r) => $r->reference_month->lte($m->reference_month))
-                    ->map(fn ($r): array => ['respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
-                $r = Risco::calcular($janela, $nps, $this->pesos);
-                $ult3 = $metricas->slice($i - 2, 3);
-
-                $meses[] = [
-                    'mes' => $m->reference_month->format('Y-m'),
-                    'sev' => array_combine(array_keys(Risco::PESOS), $r['sev']),
-                    'score' => $r['score'],
-                    'extra' => array_map(fn (string $col): float => (float) $ult3->avg($col), array_combine(array_keys(self::EXTRAS), array_keys(self::EXTRAS))),
-                ];
-            }
+            $meses = self::mesesDoCliente($c, $this->pesos);
 
             if ($meses) {
                 $this->series[$c->id] = ['cancelado' => $cancelado, 'saida' => $c->cancelled_at?->format('Y-m'), 'valor' => (float) $c->monthly_value, 'cliente' => $c, 'meses' => $meses];
             }
         }
+    }
+
+    /**
+     * Severidades, score e variáveis extras de cada mês de um cliente (a partir do 3º mês, que fecha a janela do score).
+     * Para cancelados só entram os meses anteriores à saída.
+     *
+     * @param  array<string, float|int>  $pesos
+     * @return list<array{mes: string, sev: array<string, float>, score: int, extra: array<string, float>}>
+     */
+    public static function mesesDoCliente(Customer $c, array $pesos): array
+    {
+        $cancelado = $c->status === 'Cancelado';
+        $metricas = $c->metrics->filter(fn ($m) => ! $cancelado || $c->cancelled_at === null || $m->reference_month->lt($c->cancelled_at))->values();
+        $meses = [];
+
+        foreach ($metricas as $i => $m) {
+            if ($i < 2) {
+                continue; // o score usa a janela dos 3 últimos meses
+            }
+            $janela = $metricas->slice(0, $i + 1)->map(fn ($x): array => [
+                'chamados_abertos' => $x->tickets_opened, 'chamados_reabertos' => $x->tickets_reopened, 'pct_sla_cumprido' => $x->sla_percentage,
+                'reclamacoes_formais' => $x->formal_complaints, 'uso_plataforma_pct' => $x->platform_usage_percentage,
+                'dias_atraso_pagamento' => $x->payment_delay_days, 'reunioes_previstas' => $x->meetings_expected, 'reunioes_realizadas' => $x->meetings_completed,
+            ])->values()->all();
+            $nps = $c->npsResponses->filter(fn ($r) => $r->reference_month->lte($m->reference_month))
+                ->map(fn ($r): array => ['respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
+            $r = Risco::calcular($janela, $nps, $pesos);
+            $ult3 = $metricas->slice($i - 2, 3);
+
+            $meses[] = [
+                'mes' => $m->reference_month->format('Y-m'),
+                'sev' => array_combine(array_keys(Risco::PESOS), $r['sev']),
+                'score' => $r['score'],
+                'extra' => array_map(fn (string $col): float => (float) $ult3->avg($col), array_combine(array_keys(self::EXTRAS), array_keys(self::EXTRAS))),
+            ];
+        }
+
+        return $meses;
     }
 
     private function saidaEm(string $mes): int
@@ -119,6 +136,12 @@ class Backtest
         return array_filter($this->series, fn ($s) => ! $s['cancelado']);
     }
 
+    /** Chave de cache: muda quando mudam os pesos, a quantidade de clientes ou as métricas da empresa. */
+    public static function chave(Company $company, string $parte): string
+    {
+        return 'backtest:'.$parte.':'.$company->id.':'.md5(json_encode($company->pesos())).':'.Customer::count().':'.CustomerMetric::whereIn('customer_id', Customer::pluck('id'))->max('updated_at');
+    }
+
     /**
      * Tudo que a tela de evidências mostra, calculado uma vez e guardado em cache até mudarem dados ou pesos da empresa.
      *
@@ -127,9 +150,8 @@ class Backtest
     public static function resumo(Company $company): array
     {
         $pesos = $company->pesos();
-        $chave = 'backtest:'.$company->id.':'.md5(json_encode($pesos)).':'.Customer::count().':'.CustomerMetric::whereIn('customer_id', Customer::pluck('id'))->max('updated_at');
 
-        return Cache::remember($chave, now()->addHour(), function () use ($company, $pesos): array {
+        return Cache::remember(self::chave($company, 'resumo'), now()->addHour(), function () use ($company, $pesos): array {
             $b = new self($pesos);
             $l = $company->limiares();
             $niveis = ['medio' => $l['medio'], 'alto' => $l['alto'], 'critico' => $l['critico']];
@@ -140,6 +162,8 @@ class Backtest
                 'variaveis' => $b->porVariavel(),
                 'extras' => $b->extras(),
                 'perfis' => $b->perfis(),
+                'segmentos' => $b->porSegmento(),
+                'evidencia_suficiente' => $b->evidenciaSuficiente(),
                 'auc_atual' => $b->aucScore(),
                 'auc_sugerido' => $b->aucComPesosSugeridos(),
             ];
@@ -169,7 +193,7 @@ class Backtest
 
         // precisão: dos alertas de um mês (de qualquer cliente), quantos cancelaram nos próximos HORIZONTE meses.
         // Só entram meses cujo horizonte inteiro já foi observado.
-        $ultimoMes = max(array_map(fn ($s) => $this->saidaEm(end($s['meses'])['mes']), $this->series));
+        $ultimoMes = $this->series ? max(array_map(fn ($s) => $this->saidaEm(end($s['meses'])['mes']), $this->series)) : 0; // sem histórico, nada a medir
         $alertas = 0;
         $acertos = 0;
         foreach ($this->series as $s) {
@@ -271,6 +295,108 @@ class Backtest
         }
 
         return $out;
+    }
+
+    /**
+     * Por segmento: o que estava elevado nos cancelados (último mês antes da saída) em comparação com os retidos
+     * do mesmo segmento, e quais clientes ativos hoje mostram o mesmo padrão.
+     */
+    public function porSegmento(): array
+    {
+        $porSeg = [];
+        foreach ($this->series as $s) {
+            $porSeg[$s['cliente']->segment][] = $s;
+        }
+        ksort($porSeg);
+        $out = [];
+
+        foreach ($porSeg as $segmento => $grupo) {
+            $canc = array_values(array_filter($grupo, fn ($s) => $s['cancelado']));
+            $ret = array_values(array_filter($grupo, fn ($s) => ! $s['cancelado']));
+            $media = fn (array $lista, callable $f) => $lista ? array_sum(array_map($f, $lista)) / count($lista) : 0;
+            $itens = [];
+
+            foreach (Risco::ROTULOS as $k => $rotulo) {
+                $mc = $media($canc, fn ($s) => end($s['meses'])['sev'][$k]);
+                $mr = $media($ret, fn ($s) => end($s['meses'])['sev'][$k]);
+                $itens[] = ['k' => $k, 'rotulo' => $rotulo, 'extra' => false, 'cancelados' => $mc, 'retidos' => $mr, 'efeito' => $mc - $mr,
+                    'texto' => sprintf('gravidade %d%% nos cancelados contra %d%% nos que ficaram', round($mc * 100), round($mr * 100))];
+            }
+            foreach (self::EXTRAS as $col => $rotulo) {
+                $mc = $media($canc, fn ($s) => end($s['meses'])['extra'][$col]);
+                $mr = $media($ret, fn ($s) => end($s['meses'])['extra'][$col]);
+                $itens[] = ['k' => $col, 'rotulo' => $rotulo, 'extra' => true, 'cancelados' => $mc, 'retidos' => $mr,
+                    'efeito' => min(1.0, ($mc - $mr) / max(1.0, $mr)), 'texto' => sprintf('média de %s nos cancelados contra %s nos que ficaram', number_format($mc, 1, ',', '.'), number_format($mr, 1, ',', '.'))];
+            }
+            usort($itens, fn ($a, $b) => $b['efeito'] <=> $a['efeito']);
+            // variáveis do score: as 3 mais elevadas (a partir de 15 pontos acima dos retidos); extras (fora do score): só se 50% acima
+            $elevados = array_slice(array_filter($itens, fn ($i) => ! $i['extra'] && $i['efeito'] >= 0.15), 0, 3);
+            $elevados = array_merge($elevados, array_slice(array_filter($itens, fn ($i) => $i['extra'] && $i['efeito'] >= 0.5), 0, 2));
+
+            // ativos que hoje repetem o padrão: variável elevada acima do que os retidos mostram (severidade ≥ 50% ou 30% acima da média dos retidos)
+            $expostos = [];
+            foreach ($ret as $s) {
+                $ult = end($s['meses']);
+                $hits = [];
+                foreach ($elevados as $i) {
+                    $v = $i['extra'] ? $ult['extra'][$i['k']] : $ult['sev'][$i['k']];
+                    if ($i['extra'] ? $v >= $i['retidos'] * 1.3 : $v >= 0.5) {
+                        $hits[] = $i['rotulo'];
+                    }
+                }
+                if ($hits) {
+                    $expostos[] = ['codigo' => $s['cliente']->external_code, 'nome' => $s['cliente']->displayName(), 'valor' => $s['valor'], 'score' => $ult['score'], 'variaveis' => $hits];
+                }
+            }
+            usort($expostos, fn ($a, $b) => [count($b['variaveis']), $b['valor']] <=> [count($a['variaveis']), $a['valor']]);
+
+            $out[$segmento] = [
+                'segmento' => $segmento, 'total' => count($grupo), 'cancelados' => count($canc), 'retidos' => count($ret),
+                'pct_cancelou' => round(100 * count($canc) / max(1, count($grupo)), 1),
+                'receita_perdida' => array_sum(array_map(fn ($s) => $s['valor'], $canc)),
+                'elevados' => array_values($elevados), 'expostos' => $expostos,
+                'receita_exposta' => array_sum(array_map(fn ($e) => $e['valor'], $expostos)),
+            ];
+        }
+        uasort($out, fn ($a, $b) => $b['pct_cancelou'] <=> $a['pct_cancelou']);
+
+        return $out;
+    }
+
+    /** Poucos cancelamentos não sustentam calibrar pesos e cortes: abaixo disso a configuração padrão é mantida. */
+    public function evidenciaSuficiente(): bool
+    {
+        return count($this->cancelados()) >= self::MINIMO_CANCELADOS && count($this->retidos()) >= self::MINIMO_CANCELADOS;
+    }
+
+    /**
+     * Cortes de nível calibrados pela carteira: o menor score em que o alarme falso (meses de clientes retidos acima do corte)
+     * fica dentro do alvo: 30% para Médio, 8% para Alto e 2% para Crítico. Respeita a ordem e um espaço mínimo entre níveis.
+     *
+     * @return array{medio: int, alto: int, critico: int}
+     */
+    public function limiaresSugeridos(): array
+    {
+        $scores = [];
+        foreach ($this->retidos() as $s) {
+            foreach ($s['meses'] as $m) {
+                $scores[] = $m['score'];
+            }
+        }
+        $corte = function (float $alvo) use ($scores): int {
+            for ($c = 1; $c <= 100; $c++) {
+                if (count(array_filter($scores, fn ($x) => $x >= $c)) / max(1, count($scores)) <= $alvo) {
+                    return $c;
+                }
+            }
+
+            return 100;
+        };
+        $medio = max(1, min(90, $corte(0.30)));
+        $alto = max($medio + 5, min(95, $corte(0.08)));
+        $critico = max($alto + 5, min(100, $corte(0.02)));
+
+        return ['medio' => $medio, 'alto' => $alto, 'critico' => $critico];
     }
 
     /** Taxa de cancelamento por segmento, porte e plano. */

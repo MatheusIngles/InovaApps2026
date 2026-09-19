@@ -18,6 +18,8 @@ return [
         'url' => env('LLM_API_URL', 'https://api.openai.com/v1'),
         'key' => env('LLM_API_KEY'),
         'model' => env('LLM_API_MODEL', 'gpt-4o'),
+        // Windows sem curl.cainfo no php.ini: aponte para um cacert.pem (ex.: o do Git for Windows) em vez de desligar a verificação de TLS.
+        'ca_bundle' => env('LLM_CA_BUNDLE'),
     ],
 
     /*
@@ -32,6 +34,29 @@ return [
     | Prompt de sistema base. {{contexto}} recebe, dinamicamente, os dados da empresa acessada
     | (ou o resumo da carteira quando não há empresa em foco).
     */
+    /*
+    | Prompt do configurador: explica, com base na evidência (backtest dos cancelamentos), a melhor configuração do sistema
+    | para a carteira da empresa. {{contexto}} recebe os números reais; a IA não calcula nada, só interpreta.
+    */
+    'prompt_configuracao' => <<<'TXT'
+Você é o configurador do Seer, sistema que aponta quais clientes de contrato recorrente estão em risco de cancelar.
+Sua tarefa: explicar, para o gestor da empresa, a melhor configuração do sistema para a carteira DELE, usando apenas a evidência abaixo
+(o que aconteceu com os clientes que cancelaram versus os que ficaram).
+
+Regras:
+- Português do Brasil, direto, sem jargão. No máximo 260 palavras. Use as seções: "Prioridade das métricas", "Cortes de alerta", "Equilíbrio risco × valor", "Cuidados".
+- Só use números que aparecem nos dados. Se algo não estiver nos dados, diga que não dá para afirmar. Não invente causas.
+- Em "Prioridade das métricas": cite as 2 ou 3 variáveis que mais separam cancelados de retidos (com a separação) e diga quais ficam desligadas por não separarem.
+- Em "Cortes de alerta": explique o que cada corte recomendado entrega em antecedência e alarme falso, e o trade-off entre avisar cedo e gerar alarme falso.
+- Em "Equilíbrio risco × valor": explique o K em uma frase e diga que é uma decisão de negócio (padrão 50), não dos dados.
+- Em "Cuidados": lembre que são poucos cancelamentos e que a análise usa os mesmos dados da calibração; o score ordena o atendimento, não é probabilidade de cancelamento.
+- Só diga que uma métrica será desligada se ela estiver na linha "Desligar" dos dados; se estiver "nenhuma", diga que todas continuam ligadas. Copie os cortes recomendados exatamente como estão nos dados.
+- Escreva exatamente as 4 seções pedidas, sem seção extra de resumo no fim.
+- Termine com uma frase dizendo que tudo pode ser ajustado em Configurações.
+
+{{contexto}}
+TXT,
+
     'prompt_base' => <<<'TXT'
 Você é um especialista em relacionamento e retenção de clientes de uma empresa de serviços com contratos recorrentes.
 Responda sempre em português do Brasil, de forma objetiva e acionável. Baseie-se APENAS nos dados abaixo;

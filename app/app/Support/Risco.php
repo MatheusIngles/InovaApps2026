@@ -28,6 +28,11 @@ class Risco
         'tend' => 'Revisão de saúde da conta: piora consistente frente ao início do histórico.',
     ];
 
+    public static function acao(string $k): ?string
+    {
+        return self::ACOES[$k] ?? null;
+    }
+
     public const LIMIARES = ['critico' => 55, 'alto' => 40, 'medio' => 25];
 
     /**
