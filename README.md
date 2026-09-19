@@ -1,327 +1,163 @@
-# InovaApps2026
+# InovaApps 2026
 
-Projeto Laravel com **Tailwind CSS** e o widget de acessibilidade **VLibras** já configurados e funcionando.
+Plataforma **multi-tenant** de gestão de carteira de clientes, saúde da conta e priorização de atendimento, desenvolvida para o desafio **INOVAAPPS 2026** (enunciado em `Desafio - INOVAAPPS 2026.pdf`, base de dados de exemplo em `INOVAAPPS_base_de_dados.xlsx`).
 
-O código do projeto Laravel está na pasta [`app/`](app/).
+Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes, configura pesos e limites de risco e vê um painel com score, exposição financeira e fila de atendimento, com tema visual próprio e um assistente de IA isolado por empresa.
+
+---
+
+## ✨ Funcionalidades
+
+- **Multi-tenancy**: usuário vinculado a uma empresa (`company_id`); detecção opcional por subdomínio (`acme.app.com`). Dados, chat e configurações são isolados por empresa.
+- **Importação de planilhas** (XLSX/CSV) com mapeamento dinâmico de colunas. Arquivos grandes (> 2 MB) rodam em fila.
+- **Motor de risco** determinístico e explicável: score 0–100 a partir de sinais (uso da plataforma, SLA, NPS, chamados, reuniões, tendência etc.), níveis Baixo/Médio/Alto/Crítico.
+- **Prioridade da fila** por risco × valor do contrato, com constante `K` configurável.
+- **Configurações por empresa**: ordem/peso/ativação dos sinais, limites dos níveis, tema (cores, fonte, logo). Alterações recalculam a carteira.
+- **Painel**: KPIs, clientes por nível, risco por segmento, uso × SLA, comparação com cancelados e fila de atendimento.
+- **Assistente de chat com IA**: Ollama local por padrão ou API externa compatível com OpenAI; histórico filtrado por empresa.
+- **Relatório em PDF** por empresa (DomPDF) e **notificações**.
+- **Acessibilidade**: widget **VLibras** (Libras).
+
+## 🧱 Stack
+
+PHP 8.3+ · Laravel 13 · Filament 5 · Livewire 4 · Tailwind CSS 4 · Vite 8 · OpenSpout (XLSX) · DomPDF · SQLite (padrão) · PHPUnit 12
 
 ---
 
 ## 📋 Pré-requisitos
 
-Antes de instalar o Laravel, você precisa ter instalado na sua máquina:
-
-| Ferramenta | Versão mínima | Link |
-|---|---|---|
-| PHP | 8.2+ | https://www.php.net/downloads |
-| Composer | 2.x | https://getcomposer.org/download/ |
-| Node.js + npm | 18+ | https://nodejs.org/ |
-| Git | qualquer | https://git-scm.com/downloads |
-
-Verifique se estão corretamente instalados rodando:
-
-```bash
-php -v
-composer -V
-node -v
-npm -v
-```
-
-> 💡 Opcional: você também pode instalar um banco de dados como MySQL/PostgreSQL. Este projeto já vem pronto para usar **SQLite**, que não exige instalação de servidor de banco de dados.
+| Ferramenta | Versão |
+|---|---|
+| PHP | 8.3+ (extensões usuais do Laravel, `sqlite`, `zip`, `gd`) |
+| Composer | 2.x |
+| Node.js + npm | 18+ |
+| Ollama *(opcional, para o chat local)* | https://ollama.com |
 
 ---
 
-## 🚀 Passo a passo: como instalar o Laravel do zero
+## ▶️ Como rodar
 
-Caso queira criar um projeto Laravel novo (do zero) na sua máquina, o passo a passo é:
-
-### 1. Instalar o instalador do Laravel (opcional, mas recomendado)
+O código Laravel fica na pasta [`app/`](app/).
 
 ```bash
-composer global require laravel/installer
-```
-
-### 2. Criar um novo projeto Laravel
-
-Usando o instalador do Laravel:
-
-```bash
-laravel new nome-do-projeto
-```
-
-Ou diretamente via Composer (sem precisar do instalador):
-
-```bash
-composer create-project laravel/laravel nome-do-projeto
-```
-
-### 3. Entrar na pasta do projeto
-
-```bash
-cd nome-do-projeto
-```
-
-### 4. Configurar o arquivo de ambiente
-
-O Composer já cria o `.env` automaticamente a partir do `.env.example` e gera a `APP_KEY`. Caso precise fazer manualmente:
-
-```bash
-cp .env.example .env
-php artisan key:generate
-```
-
-### 5. Criar o banco de dados (SQLite, padrão do Laravel 12)
-
-```bash
-touch database/database.sqlite
-php artisan migrate
-```
-
-### 6. Instalar as dependências de front-end e subir o Tailwind/Vite
-
-```bash
-npm install
-npm run build
-```
-
-### 7. Subir o servidor local
-
-```bash
-php artisan serve
-```
-
-Acesse **http://localhost:8000** no navegador. 🎉
-
----
-
-## ▶️ Como rodar ESTE projeto (o que já está no repositório)
-
-Este repositório já contém um projeto Laravel pronto, configurado com Tailwind CSS e VLibras. Para rodá-lo na sua máquina:
-
-```bash
-# 1. Clone o repositório (se ainda não tiver feito)
-git clone https://github.com/<seu-usuario>/InovaApps2026.git
+git clone https://github.com/MatheusIngles/InovaApps2026.git
 cd InovaApps2026/app
 
-# 2. Instale as dependências PHP
-composer install
+# Atalho: instala dependências, cria .env, gera chave, migra e faz build
+composer setup
+```
 
-# 3. Configure o ambiente
+Ou manualmente:
+
+```bash
+composer install
 cp .env.example .env
 php artisan key:generate
-
-# 4. Crie o banco SQLite e rode as migrations
 touch database/database.sqlite
 php artisan migrate
-
-# 5. Instale as dependências JS
 npm install
-
-# 6. Suba o front-end (modo desenvolvimento, com hot-reload)
-npm run dev
+npm run build
+php artisan storage:link      # necessário para servir os logos enviados
 ```
 
-Em **outro terminal**, com o `npm run dev` rodando, suba o servidor PHP:
+### Popular com dados de demonstração
 
 ```bash
-php artisan serve
+php artisan db:seed
 ```
 
-Acesse **http://localhost:8000**. Você verá a página inicial com Tailwind CSS estilizando o layout e o ícone do **VLibras** (tradutor de Libras) no canto da tela.
+Cria as empresas **demo** (com a base do desafio já importada e riscos calculados) e **beta** (vazia, com tema próprio, ideal para testar o envio de planilha).
+
+| Usuário | Senha | Empresa |
+|---|---|---|
+| `admin@inova.com` | `senha123` | Demo |
+| `demo@inova.com` | `senha123` | Demo |
+| `admin@beta.com` | `senha123` | Beta |
+
+### Subir o ambiente de desenvolvimento
+
+```bash
+composer dev
+```
+
+Alternativa em terminais separados:
+
+```bash
+php artisan serve      # http://localhost:8000
+npm run dev            # Vite com hot-reload
+php artisan queue:work # obrigatório para importações grandes
+```
+
+Acesse **http://localhost:8000** e entre com um dos usuários acima. Empresa sem dados cai na tela de planilha; com dados, na lista de empresas/clientes.
 
 ---
 
-## 🎨 Tailwind CSS
+## ⚙️ Configuração (`.env`)
 
-O Laravel 12 já vem com Tailwind CSS v4 integrado via Vite (`@tailwindcss/vite`), sem necessidade de `tailwind.config.js`. A configuração fica em:
+| Variável | Descrição |
+|---|---|
+| `DB_CONNECTION` | `sqlite` por padrão; pode usar MySQL/PostgreSQL |
+| `TENANT_BASE_DOMAIN` | Domínio base para detectar a empresa pelo subdomínio. Vazio = desativado |
+| `LLM_ENABLED` | Liga/desliga o assistente de IA |
+| `OLLAMA_URL` / `OLLAMA_MODEL` | Modelo local (padrão `llama3.1` em `localhost:11434`) |
+| `LLM_API_URL` / `LLM_API_KEY` / `LLM_API_MODEL` | API externa (formato OpenAI) para perguntas/contextos maiores |
+| `LLM_LOCAL_MAX_TOKENS` | Limite de contexto enviado ao modelo local |
+| `QUEUE_CONNECTION` | `database` por padrão; mantenha um worker ativo |
 
-- [`app/resources/css/app.css`](app/resources/css/app.css) — importa o Tailwind (`@import 'tailwindcss';`)
-- [`app/vite.config.js`](app/vite.config.js) — plugin `tailwindcss()` do Vite
-
-Basta usar as classes utilitárias do Tailwind normalmente nos arquivos `.blade.php`, por exemplo:
-
-```html
-<div class="bg-white rounded-2xl shadow-lg p-10 text-center">
-    <h1 class="text-3xl font-bold text-red-600">Olá, Tailwind!</h1>
-</div>
-```
-
-Comandos úteis:
+Para usar o chat local:
 
 ```bash
-npm run dev     # modo desenvolvimento com hot-reload
-npm run build   # gera os assets otimizados para produção
+ollama pull llama3.1
+ollama serve
 ```
 
 ---
 
-## ♿ VLibras (acessibilidade em Libras)
+## 🧪 Testes e qualidade
 
-O [VLibras](https://www.gov.br/governodigital/pt-br/vlibras) é o plugin oficial do Governo Federal que traduz o conteúdo do site para Língua Brasileira de Sinais (Libras).
-
-Ele já está incluído em [`app/resources/views/welcome.blade.php`](app/resources/views/welcome.blade.php):
-
-```html
-<div vw class="enabled">
-    <div vw-access-button class="active"></div>
-    <div vw-plugin-wrapper>
-        <div class="vw-plugin-top-wrapper"></div>
-    </div>
-</div>
-<script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
-<script>
-    new window.VLibras.Widget('https://vlibras.gov.br/app');
-</script>
+```bash
+composer test                 # limpa config e roda a suíte
+php artisan test --filter=TenancyTest
+vendor/bin/pint               # formatação (Laravel Pint)
 ```
 
-Para usar o widget em **outras páginas/layouts**, basta copiar esse mesmo bloco de HTML para o final do `<body>` do layout desejado (ex: em um `layouts/app.blade.php`, se você criar um).
-
-> ⚠️ O VLibras carrega os assets do avatar direto do site `vlibras.gov.br`, então é necessário acesso à internet para o widget funcionar.
+Cobertura atual: isolamento de tenants, importação, configuração de empresa, carteira, relatório e notificações.
 
 ---
 
-## 📖 Tutorial básico do Laravel
-
-Um resumo dos conceitos e comandos essenciais para começar a desenvolver com Laravel.
-
-### Estrutura de pastas principais
+## 🗂️ Estrutura
 
 ```
-app/
-├── app/
-│   ├── Http/
-│   │   └── Controllers/   → Controllers da aplicação
-│   └── Models/             → Models (Eloquent ORM)
-├── database/
-│   └── migrations/         → Migrations do banco de dados
-├── resources/
-│   ├── views/               → Views Blade (.blade.php)
-│   ├── css/                 → Estilos (Tailwind)
-│   └── js/                  → JavaScript
-├── routes/
-│   └── web.php              → Rotas da aplicação
-└── public/                  → Ponto de entrada público (index.php)
+InovaApps/
+├── Desafio - INOVAAPPS 2026.pdf     # enunciado
+├── INOVAAPPS_base_de_dados.xlsx     # base de exemplo
+├── todo_checklist_inova.md          # checklist de requisitos
+├── .github/workflows/deploy.yaml    # deploy automático via SSH
+└── app/                             # projeto Laravel
+    ├── app/Filament/                # Painel, Planilha, Configurações, Assistente, Empresas
+    ├── app/Livewire/                # AssistenteChat, ImportarPlanilha, RelatorioEmpresa
+    ├── app/Jobs/                    # ImportarPlanilhaJob (fila)
+    ├── app/Models/                  # Company, Customer, CustomerMetric, CustomerNps, RiskAssessment...
+    ├── app/Support/                 # Risco, RiskService, Import, Llm, Tenancy, Relatorio, Notificacoes
+    ├── database/{migrations,seeders}
+    ├── docs/                        # documentação técnica e funcional
+    └── tests/
 ```
 
-### Rotas
+## 📚 Documentação
 
-As rotas ficam em `routes/web.php`. Exemplo básico:
+- [Arquitetura e funcionamento](app/docs/ARQUITETURA-E-FUNCIONAMENTO.md): camadas, modelo de dados, limitações conhecidas.
+- [Guia funcional do painel](app/docs/GUIA-FUNCIONAL-DO-PAINEL.md): como cada métrica, peso e nível é calculado.
+- [Checklist do desafio](todo_checklist_inova.md): requisitos e status.
 
-```php
-use Illuminate\Support\Facades\Route;
+## 🚢 Deploy
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Push na `main` dispara [`deploy.yaml`](.github/workflows/deploy.yaml): conecta ao servidor via SSH, faz `git pull`, `composer install --no-dev`, `npm ci && npm run build`, `php artisan migrate --force`, `optimize` e recarrega o serviço. Requer os secrets `SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY` e `SUDO_PASSWORD`.
 
-Route::get('/sobre', function () {
-    return 'Página sobre';
-});
-```
+## ♿ VLibras
 
-### Artisan (linha de comando do Laravel)
+O widget do [VLibras](https://www.gov.br/governodigital/pt-br/vlibras) (Governo Federal) traduz o conteúdo para Libras. Carrega os assets de `vlibras.gov.br`, portanto exige internet.
 
-O `artisan` é a CLI do Laravel, usada para gerar código e rodar tarefas:
+## 🔗 Links úteis
 
-```bash
-php artisan serve                     # sobe o servidor local
-php artisan make:controller NomeController   # cria um controller
-php artisan make:model NomeModelo -m         # cria um model + migration
-php artisan make:migration create_tabela_table  # cria uma migration
-php artisan migrate                   # roda as migrations pendentes
-php artisan migrate:fresh             # apaga tudo e recria o banco
-php artisan tinker                    # abre um console interativo do Laravel
-php artisan route:list                # lista todas as rotas
-```
-
-### Controllers
-
-```bash
-php artisan make:controller PostController
-```
-
-```php
-// app/Http/Controllers/PostController.php
-namespace App\Http\Controllers;
-
-class PostController extends Controller
-{
-    public function index()
-    {
-        return view('posts.index');
-    }
-}
-```
-
-E na rota:
-
-```php
-use App\Http\Controllers\PostController;
-
-Route::get('/posts', [PostController::class, 'index']);
-```
-
-### Models e Migrations (Eloquent ORM)
-
-```bash
-php artisan make:model Post -m
-```
-
-```php
-// database/migrations/xxxx_create_posts_table.php
-public function up(): void
-{
-    Schema::create('posts', function (Blueprint $table) {
-        $table->id();
-        $table->string('titulo');
-        $table->text('conteudo');
-        $table->timestamps();
-    });
-}
-```
-
-```bash
-php artisan migrate
-```
-
-Usando o Model:
-
-```php
-use App\Models\Post;
-
-Post::create([
-    'titulo' => 'Meu primeiro post',
-    'conteudo' => 'Conteúdo do post...',
-]);
-
-$posts = Post::all();
-```
-
-### Views (Blade)
-
-Arquivos `.blade.php` ficam em `resources/views`. O Blade permite lógica dentro do HTML:
-
-```blade
-{{-- resources/views/posts/index.blade.php --}}
-<ul>
-    @foreach ($posts as $post)
-        <li>{{ $post->titulo }}</li>
-    @endforeach
-</ul>
-```
-
-### Variáveis do controller para a view
-
-```php
-public function index()
-{
-    $posts = Post::all();
-    return view('posts.index', ['posts' => $posts]);
-}
-```
-
-### Mais recursos
-
-- Documentação oficial: https://laravel.com/docs
-- Laracasts (vídeo-aulas): https://laracasts.com
-- Documentação do VLibras: https://www.gov.br/governodigital/pt-br/vlibras
-- Documentação do Tailwind CSS: https://tailwindcss.com/docs
+[Laravel](https://laravel.com/docs) · [Filament](https://filamentphp.com/docs) · [Livewire](https://livewire.laravel.com) · [Tailwind CSS](https://tailwindcss.com/docs) · [Ollama](https://ollama.com)

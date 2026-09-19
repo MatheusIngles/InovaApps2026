@@ -34,7 +34,8 @@
 
         <nav class="empresa-abas-nav fi-tabs" role="tablist" aria-label="Informações da empresa">
             <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-visao" x-ref="visao" aria-controls="empresa-painel-visao" :aria-selected="aba === 'visao'" :tabindex="aba === 'visao' ? 0 : -1" :class="{ 'fi-active': aba === 'visao' }" @click="aba = 'visao'" @keydown.arrow-right.prevent="aba = 'historico'; $refs.historico.focus()">Visão geral</button>
-            <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-historico" x-ref="historico" aria-controls="empresa-painel-historico" :aria-selected="aba === 'historico'" :tabindex="aba === 'historico' ? 0 : -1" :class="{ 'fi-active': aba === 'historico' }" @click="aba = 'historico'" @keydown.arrow-left.prevent="aba = 'visao'; $refs.visao.focus()">Histórico mensal</button>
+            <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-historico" x-ref="historico" aria-controls="empresa-painel-historico" :aria-selected="aba === 'historico'" :tabindex="aba === 'historico' ? 0 : -1" :class="{ 'fi-active': aba === 'historico' }" @click="aba = 'historico'" @keydown.arrow-right.prevent="aba = 'tendencia'; $refs.tendencia.focus()" @keydown.arrow-left.prevent="aba = 'visao'; $refs.visao.focus()">Histórico mensal</button>
+            <button type="button" class="fi-tabs-item" role="tab" id="empresa-tab-tendencia" x-ref="tendencia" aria-controls="empresa-painel-tendencia" :aria-selected="aba === 'tendencia'" :tabindex="aba === 'tendencia' ? 0 : -1" :class="{ 'fi-active': aba === 'tendencia' }" @click="aba = 'tendencia'" @keydown.arrow-left.prevent="aba = 'historico'; $refs.historico.focus()">Tendência e previsão</button>
         </nav>
 
         <div id="empresa-painel-visao" role="tabpanel" aria-labelledby="empresa-tab-visao" x-show="aba === 'visao'" class="perfil">
@@ -121,6 +122,60 @@
                     </tbody>
                 </table>
             </div>
+        </section>
+
+        <section id="empresa-painel-tendencia" role="tabpanel" aria-labelledby="empresa-tab-tendencia" x-show="aba === 'tendencia'" x-cloak class="ui-main">
+            <?php
+                $serie = \App\Filament\Widgets\InsatisfacaoChart::serie($e);
+                $prev = $serie['previsao'];
+                $ultimoScore = $serie['scores'] ? end($serie['scores']) : null;
+                $comparacao = $e->cancelada() ? [] : \App\Support\Validacao\Backtest::resumo(app(\App\Support\Tenancy\CompanyContext::class)->current())['variaveis'];
+                $sev = $e->currentAssessment?->signals_json['severity'] ?? [];
+                $sev = count($sev) === count(\App\Support\Risco::ROTULOS) ? array_combine(array_keys(\App\Support\Risco::ROTULOS), $sev) : [];
+            ?>
+            <section class="ui-card ui-pad">
+                <h2>Insatisfação ao longo dos meses</h2>
+                @if ($serie['scores'])
+                    <p>
+                        @if ($prev)
+                            A reta dos últimos {{ $prev['pontos'] }} meses ({{ $prev['tendencia'] > 0 ? '+' : '' }}{{ number_format($prev['tendencia'], 1, ',', '.') }} pts por mês) aponta para <b>{{ $prev['valor'] }}</b> no próximo mês (faixa provável de {{ $prev['minimo'] }} a {{ $prev['maximo'] }}). O último mês fechou em {{ $ultimoScore }}.
+                            @if ($prev['tendencia'] >= 1) O risco está <b>subindo</b>: vale agir antes do próximo mês. @elseif ($prev['tendencia'] <= -1) O risco está <b>caindo</b>. @else A direção é <b>estável</b>. @endif
+                            @if (abs($ultimoScore - $prev['ajuste_ultimo']) > max(3, $prev['maximo'] - $prev['valor'])) O último mês ficou fora da tendência; a previsão suaviza esse desvio. @endif
+                        @elseif ($e->cancelada())
+                            Cliente cancelado: o gráfico mostra os meses até a saída.
+                        @else
+                            Poucos meses de histórico para projetar uma tendência.
+                        @endif
+                    </p>
+                    @livewire(\App\Filament\Widgets\InsatisfacaoChart::class, ['codigo' => $e->codigo], key('insatisfacao-'.$e->codigo))
+                    <p class="ui-muted">A previsão é a reta da tendência recente do score de sinais (uso, SLA, reclamações, NPS e outros). Não é probabilidade de cancelamento; serve para antecipar a direção.</p>
+                @else
+                    <p class="ui-muted">Faltam meses de histórico para montar a série.</p>
+                @endif
+            </section>
+
+            @if ($comparacao && $sev)
+                <section class="ui-card ui-pad">
+                    <h2>Esta empresa comparada a quem cancelou e a quem ficou</h2>
+                    <p class="ui-muted">Gravidade de cada sinal hoje (0 a 100%). Quanto mais perto do valor dos cancelados, mais o padrão se parece com o de quem saiu.</p>
+                    <div class="ui-table-wrap">
+                        <table class="ui-table">
+                            <thead><tr><th>Sinal</th><th>Esta empresa</th><th>Média dos que ficaram</th><th>Média dos que cancelaram</th></tr></thead>
+                            <tbody>
+                                @foreach (collect($comparacao)->sortByDesc('auc') as $k => $v)
+                                    @php($minha = $sev[$k] ?? 0)
+                                    <tr @if ($minha >= $v['media_cancelados'] * 0.8 && $v['media_cancelados'] >= 0.3) class="ev-atual" @endif>
+                                        <td>{{ $v['rotulo'] }}</td>
+                                        <td><b>{{ round($minha * 100) }}%</b></td>
+                                        <td>{{ round($v['media_retidos'] * 100) }}%</td>
+                                        <td>{{ round($v['media_cancelados'] * 100) }}%</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            @endif
         </section>
     </div>
 

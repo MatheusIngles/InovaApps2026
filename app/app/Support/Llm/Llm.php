@@ -62,7 +62,7 @@ class Llm
 
     private static function api(array $mensagens): string
     {
-        $r = Http::timeout(config('llm.timeout'))->withToken(config('llm.api.key'))
+        $r = Http::timeout(config('llm.timeout'))->withOptions(array_filter(['verify' => config('llm.api.ca_bundle')]))->withToken(config('llm.api.key'))
             ->post(rtrim(config('llm.api.url'), '/').'/chat/completions', ['model' => config('llm.api.model'), 'messages' => $mensagens])
             ->throw();
 
