@@ -3,15 +3,16 @@
 namespace App\Livewire;
 
 use App\Models\Customer;
-use App\Support\Relatorio\RelatorioService;
+use App\Jobs\GerarRelatorioEmpresaJob;
+use App\Support\Tenancy\CompanyContext;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
 use Livewire\Component;
-use Throwable;
 
 /** Modal na página da empresa: escolher quais pontos críticos entram no relatório em PDF (análise por IA). */
 class RelatorioEmpresa extends Component implements HasSchemas
@@ -57,24 +58,21 @@ class RelatorioEmpresa extends Component implements HasSchemas
         ]);
     }
 
-    public function gerar(): mixed
+    public function gerar(): void
     {
         $dados = $this->form->getState();
         $indices = array_map('intval', $dados['sinais'] ?? []);
-
         $empresa = $this->empresa();
 
-        try {
-            $pdf = RelatorioService::gerar($empresa, $indices, $dados['observacoes'] ?? null);
-        } catch (Throwable $e) {
-            Notification::make()->title('Não foi possível gerar o relatório')->body($e->getMessage())->danger()->send();
-
-            return null;
-        }
+        GerarRelatorioEmpresaJob::dispatch(
+            app(CompanyContext::class)->id(), auth()->id(), $empresa->id,
+            (string) Str::uuid(), $indices, $dados['observacoes'] ?? null,
+        );
 
         $this->dispatch('close-modal', id: 'relatorio-empresa');
-
-        return response()->streamDownload(fn () => print ($pdf), "relatorio-{$empresa->codigo}.pdf");
+        Notification::make()->title('Relatório em preparação')
+            ->body('Você receberá uma notificação com o link do PDF quando ele estiver pronto.')
+            ->success()->send();
     }
 
     public function render()

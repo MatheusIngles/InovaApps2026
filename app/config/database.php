@@ -38,9 +38,12 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
+            // Permite que o worker aguarde uma escrita concorrente em vez de
+            // falhar imediatamente com "database is locked".
+            'busy_timeout' => (int) env('DB_SQLITE_BUSY_TIMEOUT', 5000),
+            // WAL melhora a concorrência entre a aplicação e a fila SQLite.
+            'journal_mode' => env('DB_SQLITE_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_SQLITE_SYNCHRONOUS', 'NORMAL'),
             'transaction_mode' => 'DEFERRED',
         ],
 

@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // O login é fornecido pelo painel Filament em /login, mas a rota
+        // não possui o nome "login" esperado pelo middleware auth padrão.
+        $middleware->redirectGuestsTo('/login');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

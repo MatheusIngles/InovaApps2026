@@ -49,4 +49,5 @@ jobs:
             php artisan optimize:clear
             php artisan optimize
 
+            php artisan queue:restart
             php artisan reload || true

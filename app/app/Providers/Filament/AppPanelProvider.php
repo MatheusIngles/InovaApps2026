@@ -38,6 +38,8 @@ class AppPanelProvider extends PanelProvider
             ->globalSearch(false)
             ->databaseNotifications()
             ->brandName('Seer')
+            ->brandLogo(asset('images/seer-logo.png'))
+            ->brandLogoHeight('3rem')
             ->topNavigation()
             ->navigation(fn (): bool => auth()->check() && Customer::exists()) // sem dados, só a planilha inicial
             ->defaultAvatarProvider(AvatarIniciais::class)

@@ -100,8 +100,12 @@ class Tema
         FilamentColor::register(['primary' => Color::hex($t['primary'])]);
         $painel->brandName($t['brand'])->font($t['font']);
 
-        if ($t['logo'] && Storage::disk('public')->exists($t['logo'])) { // sem o arquivo, fica o nome em texto em vez de imagem quebrada
-            $painel->brandLogo(Storage::disk('public')->url($t['logo']))->brandLogoHeight('2rem');
-        }
+        // A logo da empresa tem prioridade; sem uma logo válida, mantém a logo
+        // padrão da aplicação também na tela de login e no painel.
+        $logo = $t['logo'] && Storage::disk('public')->exists($t['logo'])
+            ? Storage::disk('public')->url($t['logo'])
+            : asset('images/seer-logo.png');
+
+        $painel->brandLogo($logo)->brandLogoHeight('3rem');
     }
 }
