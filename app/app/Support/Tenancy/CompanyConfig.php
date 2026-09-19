@@ -5,6 +5,7 @@ namespace App\Support\Tenancy;
 use App\Models\Company;
 use App\Support\Risco;
 use App\Support\RiskService;
+use App\Support\Validacao\Backtest;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -84,6 +85,39 @@ class CompanyConfig
         }
 
         return $recalcular;
+    }
+
+    /**
+     * Pesos a partir da posição na lista de prioridade: a escala padrão (20, 15, 15, 12...) distribuída na ordem dada.
+     * Métricas desligadas ficam com peso 0 e não ocupam posição.
+     *
+     * @param  list<array{k: string, ativa?: bool}>  $metricas
+     * @return list<array{k: string, peso: float|int}>
+     */
+    public static function pesosPorPosicao(array $metricas): array
+    {
+        $escala = collect(Risco::PESOS)->sortDesc()->values();
+        $i = 0;
+
+        $out = [];
+
+        foreach (array_values($metricas) as $m) { // foreach (não array_map): o contador $i precisa avançar entre as métricas
+            $out[] = ['k' => $m['k'], 'peso' => ($m['ativa'] ?? true) ? $escala[$i++] : 0];
+        }
+
+        return $out;
+    }
+
+    /** Reordena as métricas pela evidência dos dados (backtest); as que não separam cancelados de retidos são desligadas. */
+    public static function aplicarOrdemDosDados(Company $company): bool
+    {
+        $variaveis = Backtest::resumo($company)['variaveis'];
+        $d = self::ler($company);
+        $metricas = collect($d['metricas'])->map(fn ($m) => $m + ['sug' => $variaveis[$m['k']]['peso_sugerido'] ?? 0])
+            ->sortByDesc('sug')->values()->map(fn ($m) => ['k' => $m['k'], 'ativa' => $m['sug'] > 0])->all();
+        $d['metricas'] = self::pesosPorPosicao($metricas);
+
+        return self::salvar($company, $d);
     }
 
     /** Delete: remove as personalizações e volta ao padrão do sistema. */

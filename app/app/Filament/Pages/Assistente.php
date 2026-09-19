@@ -9,7 +9,7 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class Assistente extends Page
 {
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
 

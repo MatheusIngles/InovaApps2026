@@ -35,7 +35,7 @@ class Configuracoes extends Page implements HasSchemas
 
     protected static ?string $title = 'Configurações';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
@@ -76,8 +76,7 @@ class Configuracoes extends Page implements HasSchemas
                     TextInput::make('tema.brand')->label('Nome exibido no painel')->placeholder('Seer')->maxLength(40)->helperText('Vazio = Seer.'),
                 ]),
                 FileUpload::make('tema.logo')->label('Logo')->image()->disk('public')->directory('logos')->maxSize(1024)
-                    ->helperText('Ao enviar, as cores do painel mudam para as do logo. Você pode ajustá-las.'),
-                View::make('filament.components.conta-gotas')
+                    ->helperText('Ao enviar, as cores do painel mudam para as do logo. Você pode ajustá-las.')
                     ->afterStateUpdated(function ($state, Livewire $livewire) {
                         $arquivo = is_array($state) ? Arr::first($state) : $state;
 
@@ -86,6 +85,7 @@ class Configuracoes extends Page implements HasSchemas
                             $livewire->js('window.corDoLogo($wire, '.json_encode($arquivo->temporaryUrl()).')');
                         }
                     }),
+                View::make('filament.components.conta-gotas'),
             ]),
         ]);
     }
@@ -93,20 +93,7 @@ class Configuracoes extends Page implements HasSchemas
     public function salvar(): void
     {
         $dados = $this->form->getState();
-        // o peso vem da posição: a escala padrão (20, 15, 15, 12...) distribuída na ordem escolhida
-        // métricas desligadas ficam com peso 0 e não ocupam posição na escala
-        $escala = collect(Risco::PESOS)->sortDesc()->values();
-        $i = 0;
-        $metricas = [];
-
-        foreach (array_values($dados['metricas']) as $metrica) {
-            $metricas[] = [
-                'k' => $metrica['k'],
-                'peso' => ($metrica['ativa'] ?? true) ? $escala[$i++] : 0,
-            ];
-        }
-
-        $dados['metricas'] = $metricas;
+        $dados['metricas'] = CompanyConfig::pesosPorPosicao($dados['metricas']); // o peso vem da posição na lista
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {
