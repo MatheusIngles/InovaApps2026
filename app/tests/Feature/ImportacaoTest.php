@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ImportarPlanilhaJob;
 use App\Livewire\ImportarPlanilha;
 use App\Models\ChatMessage;
 use App\Models\Company;
@@ -14,6 +15,8 @@ use App\Support\Import\PlanilhaReader;
 use App\Support\Tenancy\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -128,5 +131,51 @@ A,2026-02,Cancelado,2
         $this->actingAs(User::factory()->create());
 
         Livewire::test(ImportarPlanilha::class)->set('arquivo', UploadedFile::fake()->create('x.pdf', 10))->assertHasErrors('arquivo');
+    }
+
+    public function test_planilha_grande_vai_para_a_fila_e_o_job_importa_e_notifica(): void
+    {
+        Queue::fake();
+        $company = Company::factory()->create();
+        $user = User::factory()->for($company)->create();
+        $this->actingAs($user);
+        $obs = str_repeat('x', 700000); // 3 linhas de ~700 KB: passa do limite síncrono sem gastar memória no teste
+        $csv = UploadedFile::fake()->createWithContent('grande.csv', "cliente_id,mes_ref,chamados_abertos,obs
+A,2026-01,1,{$obs}
+B,2026-01,1,{$obs}
+C,2026-01,1,{$obs}
+");
+
+        $c = Livewire::test(ImportarPlanilha::class)->set('arquivo', $csv);
+        $caminho = $c->get('caminho');
+        $c->call('importar')->assertNoRedirect();
+
+        Queue::assertPushed(ImportarPlanilhaJob::class, fn ($job) => $job->companyId === $company->id && $job->caminho === $caminho);
+        $this->assertCount(0, $user->notifications); // ainda não rodou
+    }
+
+    public function test_job_importa_notifica_o_usuario_e_apaga_o_arquivo(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->for($company)->create();
+        Storage::put('imports/teste.csv', "cliente_id,mes_ref,chamados_abertos\nA,2026-01,3\n");
+
+        (new ImportarPlanilhaJob($company->id, $user->id, 'imports/teste.csv', 'csv', ['cliente_id' => 'cliente_id', 'mes_ref' => 'mes_ref', 'chamados_abertos' => 'chamados_abertos']))->handle();
+
+        $this->assertSame(1, $company->customers()->count());
+        $this->assertSame('Planilha importada', $user->notifications->first()->data['title']);
+        Storage::assertMissing('imports/teste.csv');
+    }
+
+    public function test_job_com_arquivo_invalido_notifica_o_erro(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->for($company)->create();
+        Storage::put('imports/ruim.csv', "x,y\n1,2\n");
+
+        (new ImportarPlanilhaJob($company->id, $user->id, 'imports/ruim.csv', 'csv', ['cliente_id' => null]))->handle();
+
+        $this->assertSame('Importação não concluída', $user->notifications->first()->data['title']);
+        Storage::assertMissing('imports/ruim.csv');
     }
 }

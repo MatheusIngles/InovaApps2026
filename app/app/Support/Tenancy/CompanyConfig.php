@@ -30,7 +30,7 @@ class CompanyConfig
     public static function ler(Company $company): array
     {
         return [
-            'metricas' => collect($company->pesos())->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso])->values()->all(),
+            'metricas' => collect($company->pesos())->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso, 'ativa' => $peso > 0])->values()->all(),
             'limiares' => $company->limiares(),
             'tema' => $company->tema(),
             'chat' => $company->chat(),
@@ -53,13 +53,21 @@ class CompanyConfig
             'limiares.medio' => 'required|integer|between:1,100|lt:limiares.alto',
             'tema.primary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'tema.secondary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'tema.font' => 'required|in:'.implode(',', self::FONTES),
+            'tema.font' => 'sometimes|in:'.implode(',', self::FONTES),
+            'tema.brand' => 'nullable|string|max:40',
             'tema.logo' => 'nullable|string|max:255',
             'chat.enabled' => 'boolean',
             'chat.ollama_model' => ['nullable', 'max:100', 'regex:/^[\w.:\-\/]+$/'],
             'chat.instrucoes' => 'nullable|string|max:1000',
         ]);
         $v->after(function ($v) use ($dados) {
+            $primaria = $dados['tema']['primary'] ?? '';
+
+            // botões primários levam texto branco: a cor precisa sustentar pelo menos 3:1 (componentes de interface)
+            if (preg_match('/^#[0-9a-fA-F]{6}$/', $primaria) && Tema::contrasteComBranco($primaria) < 3) {
+                $v->errors()->add('tema.primary', 'A cor primária é clara demais: o texto branco dos botões ficaria ilegível. Escolha uma cor mais escura.');
+            }
+
             if (array_sum(array_column($dados['metricas'] ?? [], 'peso')) <= 0) {
                 $v->errors()->add('metricas', 'Pelo menos uma métrica precisa ter peso maior que zero.');
             }

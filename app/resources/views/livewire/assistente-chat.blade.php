@@ -2,7 +2,7 @@
     <header class="chatbot-head">
         <div class="chatbot-id">
             <div>
-                <strong>Assistente de carteira</strong>
+                <h1 class="chatbot-title">Assistente de carteira</h1>
                 <small>{{ $foco ? 'Especialista em '.$foco->nome : 'Visão geral da carteira' }}</small>
             </div>
         </div>

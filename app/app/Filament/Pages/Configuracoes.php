@@ -5,13 +5,13 @@ namespace App\Filament\Pages;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
+use App\Support\Tenancy\Tema;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -19,12 +19,15 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component as Livewire;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /** Configuração da empresa: prioridade/peso das métricas, limiares dos níveis, tema e chat. */
 class Configuracoes extends Page implements HasSchemas
@@ -48,11 +51,11 @@ class Configuracoes extends Page implements HasSchemas
     {
         return $schema->statePath('data')->components([
             Section::make('Prioridade das métricas')
-                ->description('Arraste para ordenar (a ordem desempata sinais) e ajuste o peso de cada métrica no cálculo do risco. Os pesos são normalizados: não precisam somar 100.')
+                ->description('Ordene da mais para a menos importante: a que fica no topo pesa mais. Desligue uma métrica para ignorá-la no cálculo; ligue de novo quando quiser voltar a usá-la.')
                 ->schema([
                     Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()->reorderableWithButtons()
                         ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
-                        ->schema([Hidden::make('k'), TextInput::make('peso')->label('Peso (0 a 100)')->numeric()->minValue(0)->maxValue(100)->required()]),
+                        ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
                 ]),
             Section::make('Níveis de risco')->description('Score mínimo (0 a 100) de cada nível.')->columns(3)->schema([
                 TextInput::make('limiares.critico')->label('Crítico a partir de')->numeric()->required(),
@@ -60,12 +63,22 @@ class Configuracoes extends Page implements HasSchemas
                 TextInput::make('limiares.medio')->label('Médio a partir de')->numeric()->required(),
             ]),
             Section::make('Identidade visual')->description('Cores, fonte e logo aplicados a todo o painel desta empresa.')->schema([
-                Grid::make(['default' => 1, 'md' => 3])->schema([
+                Grid::make(['default' => 1, 'md' => 2])->schema([
                     ColorPicker::make('tema.primary')->label('Cor primária')->required(),
                     ColorPicker::make('tema.secondary')->label('Cor secundária')->required(),
-                    Select::make('tema.font')->label('Fonte')->options(array_combine(CompanyConfig::FONTES, CompanyConfig::FONTES))->required(),
+                    TextInput::make('tema.brand')->label('Nome exibido no painel')->placeholder('Seer')->maxLength(40)->helperText('Vazio = Seer.'),
                 ]),
-                FileUpload::make('tema.logo')->label('Logo')->image()->disk('public')->directory('logos')->maxSize(1024),
+                FileUpload::make('tema.logo')->label('Logo')->image()->disk('public')->directory('logos')->maxSize(1024)
+                    ->helperText('Ao enviar, as cores do painel mudam para as do logo. Você pode ajustá-las.'),
+                View::make('filament.components.conta-gotas')
+                    ->afterStateUpdated(function ($state, Livewire $livewire) {
+                        $arquivo = is_array($state) ? Arr::first($state) : $state;
+
+                        // a cor é lida no navegador (canvas): não depende de extensão do PHP
+                        if ($arquivo instanceof TemporaryUploadedFile) {
+                            $livewire->js('window.corDoLogo($wire, '.json_encode($arquivo->temporaryUrl()).')');
+                        }
+                    }),
             ]),
             Section::make('Chat com IA')->description('Configurações isoladas desta empresa.')->schema([
                 Toggle::make('chat.enabled')->label('Usar IA no chat (senão, respostas por regras)'),
@@ -79,6 +92,11 @@ class Configuracoes extends Page implements HasSchemas
     public function salvar(): void
     {
         $dados = $this->form->getState();
+        // o peso vem da posição: a escala padrão (20, 15, 15, 12...) distribuída na ordem escolhida
+        // métricas desligadas ficam com peso 0 e não ocupam posição na escala
+        $escala = collect(Risco::PESOS)->sortDesc()->values();
+        $i = 0;
+        $dados['metricas'] = array_map(fn ($m) => ['k' => $m['k'], 'peso' => ($m['ativa'] ?? true) ? $escala[$i++] : 0], array_values($dados['metricas']));
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {

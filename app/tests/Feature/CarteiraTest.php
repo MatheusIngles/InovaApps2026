@@ -89,7 +89,7 @@ class CarteiraTest extends TestCase
         $this->get('/empresas')->assertOk()->assertSee($top->nome);
         $this->get('/empresas/'.$top->codigo)->assertOk()->assertSee($top->sinais[0]['texto'])->assertSee('Chat com a IA')
             ->assertSee(EmpresaResource::getUrl('view', ['record' => $top->similares[0]['codigo']]));
-        $this->get('/assistente')->assertOk();
+        $this->get('/assistente')->assertOk()->assertSee('<h1 class="chatbot-title">', false);
         $this->get('/empresas/X999')->assertNotFound();
     }
 

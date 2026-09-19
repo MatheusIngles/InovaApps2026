@@ -16,7 +16,7 @@ class Company extends Model
 
     protected $guarded = [];
 
-    public const TEMA_PADRAO = ['primary' => '#2563eb', 'secondary' => '#1d4ed8', 'font' => 'Plus Jakarta Sans', 'logo' => null];
+    public const TEMA_PADRAO = ['primary' => '#2563eb', 'secondary' => '#1d4ed8', 'font' => 'Plus Jakarta Sans', 'logo' => null, 'brand' => 'Seer'];
 
     public const CHAT_PADRAO = ['enabled' => true, 'ollama_model' => null, 'instrucoes' => null];
 

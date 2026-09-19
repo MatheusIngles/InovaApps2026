@@ -58,7 +58,7 @@ class TenancyTest extends TestCase
         $this->b->update(['theme' => ['secondary' => '#115e59']]);
 
         $this->get('/login')->assertOk()->assertDontSee('Selecione uma opção');
-        $this->get('/login?empresa=beta')->assertOk()->assertSee('Beta')->assertSee('#115e59', false);
+        $this->get('/login?empresa=beta')->assertOk()->assertSee('Seer')->assertSee('#115e59', false);
     }
 
     public function test_cadastro_cria_empresa_e_primeiro_usuario_e_vai_para_a_planilha(): void

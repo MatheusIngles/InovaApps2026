@@ -28,11 +28,13 @@ class TendenciaChart extends ChartWidget
             ->selectRaw('reference_month, AVG(platform_usage_percentage) as uso, AVG(sla_percentage) as sla')
             ->groupBy('reference_month')->orderBy('reference_month')->get();
 
+        $tema = app(CompanyContext::class)->current()->tema();
+
         return [
             'labels' => $meses->pluck('reference_month')->map(fn ($date) => substr($date, 0, 7))->all(),
             'datasets' => [
-                ['label' => 'Uso', 'data' => $meses->map(fn ($row) => round($row->uso))->all(), 'borderColor' => '#2563eb', 'backgroundColor' => '#2563eb', 'tension' => .3],
-                ['label' => 'SLA', 'data' => $meses->map(fn ($row) => round($row->sla))->all(), 'borderColor' => '#93c5fd', 'backgroundColor' => '#93c5fd', 'tension' => .3],
+                ['label' => 'Uso', 'data' => $meses->map(fn ($row) => round($row->uso))->all(), 'borderColor' => $tema['primary'], 'backgroundColor' => $tema['primary'], 'tension' => .3],
+                ['label' => 'SLA', 'data' => $meses->map(fn ($row) => round($row->sla))->all(), 'borderColor' => $tema['secondary'], 'backgroundColor' => $tema['secondary'], 'tension' => .3],
             ],
         ];
     }

@@ -35,7 +35,8 @@ class AppPanelProvider extends PanelProvider
             ->registration(Register::class) // cadastro cria a empresa (tenant) e o primeiro usuário
             ->passwordReset()
             ->globalSearch(false)
-            ->brandName('Radar de Retenção')
+            ->databaseNotifications()
+            ->brandName('Seer')
             ->topNavigation()
             ->defaultAvatarProvider(AvatarIniciais::class)
             ->homeUrl(fn () => url('/'))
