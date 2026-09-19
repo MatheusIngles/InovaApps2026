@@ -9,6 +9,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Pages\Painel;
 use App\Filament\Resources\Empresas\EmpresaResource;
 use App\Models\Customer;
+use App\Support\AvatarIniciais;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -33,6 +34,7 @@ class AppPanelProvider extends PanelProvider
             ->passwordReset()
             ->brandName('Radar de Retenção')
             ->topNavigation()
+            ->defaultAvatarProvider(AvatarIniciais::class)
             ->homeUrl(fn () => ($c = Customer::ativas()->first()) ? EmpresaResource::getUrl('view', ['record' => $c]) : Painel::getUrl())
             ->font('Plus Jakarta Sans')
             ->darkMode(true) // identidade azul e branco
