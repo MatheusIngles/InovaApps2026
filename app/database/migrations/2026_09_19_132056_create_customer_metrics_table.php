@@ -19,7 +19,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('tickets_critical');
             $table->unsignedSmallInteger('tickets_reopened');
             $table->unsignedSmallInteger('tickets_within_sla');
-            $table->decimal('sla_percentage', 5, 2);
+            $table->decimal('sla_percentage', 5, 2)->nullable();
             $table->decimal('avg_resolution_hours', 8, 2);
             $table->unsignedSmallInteger('formal_complaints');
             $table->decimal('platform_usage_percentage', 5, 2);

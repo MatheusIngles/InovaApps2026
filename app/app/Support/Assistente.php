@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\Empresa;
+use App\Models\Customer;
 use Illuminate\Support\Str;
 
 /**
@@ -16,12 +16,12 @@ class Assistente
         if (! $id && preg_match('/c\d{3}/', $q, $m)) {
             $id = $m[0];
         }
-        $c = $id ? Empresa::firstWhere('codigo', strtoupper($id)) : null;
+        $c = $id ? Customer::dashboard()->where('customers.external_code', strtoupper($id))->first() : null;
 
         return $c ? self::sobreEmpresa($c, $q) : self::sobreCarteira($q);
     }
 
-    private static function sobreEmpresa(Empresa $c, string $q): string
+    private static function sobreEmpresa(Customer $c, string $q): string
     {
         $cab = "{$c['nome']} ({$c['codigo']}) — {$c['nivel']}, score {$c['score']}/100.";
         $sinais = collect($c['sinais']);
@@ -43,8 +43,9 @@ class Assistente
             return "$cab\nHistórico de pesquisas:\n$n";
         }
         if (Str::contains($q, ['valor', 'contrato', 'plano', 'quanto', 'receita'])) {
-            return "$cab\nPlano {$c['plano']}, ".Empresa::brl($c['valor'])."/mês, SLA {$c['sla_h']}h, cliente desde {$c['inicio']}. Receita em risco: ".Empresa::brl($c['exposicao']).'.';
+            return "$cab\nPlano {$c['plan']}, ".Customer::brl($c->valor)."/mês, SLA {$c->sla_h}h, cliente desde {$c->inicio}. Exposição mensal indicativa: ".Customer::brl($c->exposicao).'.';
         }
+
         // padrão / "por que": evidências
         return $sinais->isEmpty() ? "$cab\nNenhum sinal relevante nos últimos 3 meses."
             : "$cab\nEvidências (últimos 3 meses):\n".$sinais->map(fn ($s) => "• {$s['texto']} (+{$s['pts']} pts)")->join("\n");
@@ -52,22 +53,22 @@ class Assistente
 
     private static function sobreCarteira(string $q): string
     {
-        $a = Empresa::ativas();
+        $a = Customer::ativas();
         $risco = $a->where('score', '>=', 40);
 
         if (Str::contains($q, ['receita', 'exposi', 'dinheiro', 'financeir'])) {
-            return 'Receita mensal em risco (score × valor): '.Empresa::brl($a->sum('exposicao')).' de '.Empresa::brl($a->sum('valor')).
-                '. Clientes com risco alto/crítico somam '.Empresa::brl($risco->sum('valor')).'/mês.';
+            return 'Exposição mensal indicativa (score de sinais × valor): '.Customer::brl($a->sum('exposicao')).' de '.Customer::brl($a->sum('valor')).
+                '. Clientes com score alto/crítico somam '.Customer::brl($risco->sum('valor')).'/mês.';
         }
         if (Str::contains($q, ['segmento', 'setor'])) {
             return "Risco médio por segmento (ativos):\n".$a->groupBy('segmento')->map(fn ($g) => round($g->avg('score')))
                 ->sortDesc()->map(fn ($v, $k) => "• $k: $v")->join("\n");
         }
         if (Str::contains($q, ['cancel', 'churn', 'saiu', 'sairam'])) {
-            $x = Empresa::where('status', 'Cancelado')->get();
+            $x = Customer::dashboard()->where('customers.status', 'Cancelado')->get();
 
-            return "{$x->count()} clientes cancelaram (".Empresa::brl($x->sum('valor')).'/mês). Em média tinham score '.round($x->avg('score')).
-                ' vs '.round($a->avg('score')).' dos ativos — o score separa bem quem sai de quem fica.';
+            return "{$x->count()} clientes cancelaram (".Customer::brl($x->sum('valor')).'/mês). Na última avaliação anterior à saída, tinham score médio '.round($x->avg('score')).
+                ' vs '.round($a->avg('score')).' dos ativos na avaliação mais recente; comparação exploratória.';
         }
         if (Str::contains($q, ['resumo', 'quantos', 'carteira', 'geral'])) {
             return "{$a->count()} clientes ativos: ".collect(['Crítico', 'Alto', 'Médio', 'Baixo'])
@@ -75,9 +76,9 @@ class Assistente
         }
         if (Str::contains($q, ['prioridade', 'quem', 'primeiro', 'ligar', 'falar', 'ordem', 'critico'])) {
             return "Fale primeiro com (maior receita em risco):\n".$a->take(5)->map(fn ($c, $i) => ($i + 1).". {$c['nome']} ({$c['codigo']}) — {$c['nivel']}, ".
-                Empresa::brl($c['valor']).'/mês, motivo: '.($c['sinais'][0]['label'] ?? 'sem sinal forte'))->join("\n");
+                Customer::brl($c->valor).'/mês, motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->join("\n");
         }
 
-        return "Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre uma empresa: cite o código, ex.: \"por que C012 está em risco?\" ou \"o que fazer com C012?\".";
+        return 'Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre uma empresa: cite o código, ex.: "por que C012 está em risco?" ou "o que fazer com C012?".';
     }
 }

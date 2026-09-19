@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Empresa;
+use App\Models\Customer;
 use Filament\Widgets\ChartWidget;
 
 class NiveisChart extends ChartWidget
@@ -20,7 +20,7 @@ class NiveisChart extends ChartWidget
 
     protected function getData(): array
     {
-        $n = Empresa::where('status', 'Ativo')->selectRaw('nivel, count(*) total')->groupBy('nivel')->pluck('total', 'nivel');
+        $n = Customer::ativas()->countBy('nivel');
         $niveis = ['Crítico', 'Alto', 'Médio', 'Baixo'];
 
         return [

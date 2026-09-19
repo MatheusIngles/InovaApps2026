@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Ordenada por receita em risco (score × valor mensal). Canceladas ao final.';
+        return 'Ordenada por exposição mensal indicativa (score de sinais × valor mensal). Canceladas ao final.';
     }
 }

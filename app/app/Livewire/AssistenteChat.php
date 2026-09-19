@@ -2,7 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Models\Empresa;
+use App\Models\Customer;
 use App\Support\Assistente;
 use Livewire\Component;
 
@@ -42,7 +42,7 @@ class AssistenteChat extends Component
             'sugestoes' => $this->codigo || $this->seletor
                 ? ['Por que está em risco?', 'O que fazer?', 'Cancelados parecidos', 'NPS']
                 : ['Quem devo ligar primeiro?', 'Resumo da carteira', 'Receita em risco', 'Risco por segmento', 'Quem já cancelou?'],
-            'empresas' => $this->seletor ? Empresa::ordenar(Empresa::query())->get(['codigo', 'nome', 'status']) : [],
+            'empresas' => $this->seletor ? Customer::ordenar(Customer::dashboard())->get() : [],
         ]);
     }
 }
