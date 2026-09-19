@@ -100,7 +100,7 @@ class Tema
         FilamentColor::register(['primary' => Color::hex($t['primary'])]);
         $painel->brandName($t['brand'])->font($t['font']);
 
-        if ($t['logo']) {
+        if ($t['logo'] && Storage::disk('public')->exists($t['logo'])) { // sem o arquivo, fica o nome em texto em vez de imagem quebrada
             $painel->brandLogo(Storage::disk('public')->url($t['logo']))->brandLogoHeight('2rem');
         }
     }

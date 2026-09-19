@@ -6,6 +6,7 @@ use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\Painel;
 use App\Http\Middleware\SetCompanyContext;
+use App\Models\Customer;
 use App\Support\AvatarIniciais;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
@@ -38,6 +39,7 @@ class AppPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->brandName('Seer')
             ->topNavigation()
+            ->navigation(fn (): bool => auth()->check() && Customer::exists()) // sem dados, só a planilha inicial
             ->defaultAvatarProvider(AvatarIniciais::class)
             ->homeUrl(fn () => url('/'))
             ->font('Plus Jakarta Sans')
@@ -51,7 +53,7 @@ class AppPanelProvider extends PanelProvider
             ->pages([Painel::class])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('tema'))
-            ->renderHook(PanelsRenderHook::BODY_END, fn () => view('vlibras'))
+            ->renderHook(PanelsRenderHook::BODY_END, fn () => view('vlibras').view('titulo-topo').view('audio-contexto'))
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
