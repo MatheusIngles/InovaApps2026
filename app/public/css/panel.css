@@ -105,6 +105,13 @@ input, textarea { caret-color: var(--primary-600); }
 .ui-sinal-top span { color: #b91c1c; font-weight: 700; font-size: .85rem; }
 .ui-sinal p { margin: .2rem 0 0; color: var(--panel-muted); font-size: .9rem; }
 .ui-sinal .ui-acao { color: var(--panel-link); font-weight: 600; }
+.ui-calculo { margin: .85rem 0 1rem; padding: .75rem 1rem; border: 1px solid var(--panel-border); border-radius: .6rem; background: var(--panel-raised); color: var(--panel-text); }
+.ui-calculo summary { cursor: pointer; color: var(--panel-link); font-weight: 700; }
+.ui-calculo summary:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 3px; }
+.ui-calculo ul { margin: .7rem 0; padding: 0; list-style: none; }
+.ui-calculo li { display: flex; justify-content: space-between; gap: 1rem; padding: .2rem 0; border-bottom: 1px solid var(--panel-border); }
+.ui-calculo li small { display: block; color: var(--panel-muted); font-size: .75rem; }
+.ui-calculo p { margin: .65rem 0 0; color: var(--panel-muted); font-size: .8rem; }
 .ui-table-wrap { overflow-x: auto; }
 .ui-table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 36rem; }
 .ui-table th { text-align: left; padding: .5rem .6rem; background: var(--panel-raised); color: var(--primary-200); font-weight: 700; white-space: nowrap; }
