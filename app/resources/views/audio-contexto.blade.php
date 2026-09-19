@@ -8,6 +8,8 @@
         const botao = document.getElementById('ac-voz');
         if (!botao || !('speechSynthesis' in window)) return;
         botao.hidden = false;
+        const fim = document.querySelector('.fi-topbar-end'); // nas telas com barra, o botão mora nela
+        if (fim) { fim.prepend(botao); botao.classList.add('no-topo'); }
 
         const guardar = (v) => { try { localStorage.setItem('leitura-voz', v ? '1' : '0'); } catch (e) {} };
         const lido = () => { try { return localStorage.getItem('leitura-voz') === '1'; } catch (e) { return false; } };

@@ -237,5 +237,13 @@ input, textarea { caret-color: var(--primary-600); }
 .ac-voz:hover { background: var(--panel-raised); }
 .ac-voz.ligado { background: var(--primary-600); color: #fff; box-shadow: 0 6px 18px rgb(0 0 0 / .3); }
 .ac-voz:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 2px; }
-body:has(.chatbot) .ac-voz { bottom: 7rem; }
+body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
+.ac-voz.no-topo { position: static; width: 2.5rem; min-height: 2.5rem; padding: 0; justify-content: center; background: transparent; color: var(--on-secondary); box-shadow: none; }
+.ac-voz.no-topo .ac-voz-texto { display: none; }
+.ac-voz.no-topo:hover { background: color-mix(in srgb, var(--on-secondary) 14%, transparent); }
+.ac-voz.no-topo.ligado { background: color-mix(in srgb, var(--on-secondary) 24%, transparent); color: var(--on-secondary); box-shadow: inset 0 0 0 2px var(--on-secondary); }
+.ac-voz.no-topo:focus-visible { outline-color: var(--on-secondary); }
 @media (max-width: 640px) { .ac-voz-texto { display: none; } .ac-voz { padding: .6rem; width: 2.9rem; justify-content: center; } }
+
+/* Seção dos KPIs: os cards já têm cor própria, então a moldura não pode ter outro fundo. */
+.fi-section:has(.fi-wi-stats-overview-stat), .fi-section:has(.fi-wi-stats-overview-stat) .fi-section-content-ctn { background: transparent; box-shadow: none; --tw-ring-shadow: 0 0 #0000; border: 0; }
