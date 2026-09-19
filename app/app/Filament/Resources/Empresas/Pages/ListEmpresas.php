@@ -11,6 +11,6 @@ class ListEmpresas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Score = soma ponderada de 8 sinais dos últimos meses, não probabilidade de cancelamento. Exposição = score ÷ 100 × contrato mensal; serve para ordenar, não prevê perda. Ativas primeiro; canceladas ao final.';
+        return 'Ordem por risco × valor do contrato, ajustável em Configurações. O score não é probabilidade de cancelamento. Canceladas ao final.';
     }
 }

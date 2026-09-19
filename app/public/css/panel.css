@@ -157,7 +157,7 @@ input, textarea { caret-color: var(--primary-600); }
 .chatbot-markdown :not(pre) > code { padding: .1rem .3rem; border-radius: .3rem; background: var(--panel-raised); font-size: .9em; }
 .chatbot-markdown pre { overflow-x: auto; padding: .75rem; border-radius: .5rem; background: var(--panel-raised); }
 .chatbot-markdown pre code { white-space: pre; font-size: .85em; }
-.chatbot-markdown blockquote { padding-left: .75rem; border-left: 3px solid var(--primary-400); color: var(--panel-muted); }
+.chatbot-markdown blockquote { margin-inline: 0; padding: .5rem .85rem; border-radius: .5rem; background: var(--panel-raised); color: var(--panel-muted); }
 .chatbot-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .chatbot-markdown th, .chatbot-markdown td { padding: .35rem .6rem; border: 1px solid var(--panel-border); text-align: left; }
 .chatbot-msg small { display: block; margin-top: .4rem; font-size: .7rem; color: var(--panel-muted); }
@@ -254,3 +254,29 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 
 /* Seção dos KPIs: os cards já têm cor própria, então a moldura não pode ter outro fundo. */
 .fi-section:has(.fi-wi-stats-overview-stat), .fi-section:has(.fi-wi-stats-overview-stat) .fi-section-content-ctn { background: transparent; box-shadow: none; --tw-ring-shadow: 0 0 #0000; border: 0; }
+
+/* Lista de empresas: busca larga em destaque e filtros em faixa própria */
+.fi-ta-header-toolbar { padding-block: .9rem; }
+.fi-ta-header-toolbar > div:has(.fi-ta-search-field) { flex: 1 1 auto; max-width: none; margin-inline: 0; }
+.fi-ta-search-field { width: 100%; max-width: none; }
+.fi-ta-search-field .fi-input-wrp { border-radius: 999px; min-height: 2.9rem; background: var(--panel-raised); box-shadow: inset 0 0 0 1.5px var(--panel-border); }
+.fi-ta-search-field .fi-input-wrp:focus-within { box-shadow: inset 0 0 0 2px var(--primary-500), 0 0 0 4px color-mix(in srgb, var(--primary-500) 22%, transparent); }
+.fi-ta-search-field .fi-input { font-size: .95rem; }
+.fi-ta-filters-above-content-ctn { padding: 1rem 1.5rem 1.25rem; border-bottom: 1px solid var(--panel-border); background: color-mix(in srgb, var(--panel-raised) 55%, transparent); }
+.fi-ta-filters-above-content-ctn .fi-fo-field-label-content { font-size: .8rem; font-weight: 600; color: var(--panel-muted); }
+
+/* busca centralizada */
+.fi-ta-header-toolbar { justify-content: center; }
+.fi-ta-header-toolbar > div:has(.fi-ta-search-field) { flex: 0 1 44rem; margin-inline: auto; }
+
+/* Lista de empresas: a busca vem primeiro; filtros logo abaixo, em faixa compacta; breadcrumb é redundante com o menu */
+.fi-breadcrumbs { display: none; }
+.fi-ta-header-ctn { display: flex; flex-direction: column-reverse; }
+.fi-ta-header-toolbar { padding-block: .75rem; }
+.fi-ta-filters-above-content-ctn { padding: .75rem 1.5rem 1rem; }
+.fi-ta-filters-heading { font-size: .8rem; font-weight: 700; color: var(--panel-muted); }
+.fi-ta-filters .fi-fo-field { gap: .25rem; }
+
+/* Configurações: itens da prioridade em uma linha compacta */
+.fi-fo-repeater-item .fi-fo-field-wrp, .fi-fo-repeater-item .fi-fo-toggle { margin: 0; }
+.fi-fo-repeater-item-content { padding-block: .5rem; }
