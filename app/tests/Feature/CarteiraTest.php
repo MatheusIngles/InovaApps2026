@@ -170,7 +170,6 @@ class CarteiraTest extends TestCase
         Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
     }
 
-<<<<<<< Updated upstream
     public function test_chat_conhece_prioridades_personalizadas_da_empresa_e_as_respostas_por_regras(): void
     {
         $this->entrar();
@@ -196,7 +195,8 @@ class CarteiraTest extends TestCase
         $resposta = Assistente::responder('Quais são minhas prioridades métricas?');
         $this->assertStringContainsString('SLA cumprido: peso 70', $resposta);
         $this->assertStringContainsString('alto a partir de 50', $resposta);
-=======
+    }
+
     public function test_ia_e_especialista_na_empresa_certa_em_cada_caso(): void
     {
         $this->entrar();
@@ -241,7 +241,6 @@ class CarteiraTest extends TestCase
         Livewire::test(AssistenteChat::class)->call('enviar', 'me fale da C999');
 
         Http::assertSent(fn ($r) => ! str_contains($r['messages'][0]['content'], 'C999') && str_contains($r['messages'][0]['content'], 'visão geral da carteira'));
->>>>>>> Stashed changes
     }
 
     public function test_pergunta_complexa_escala_para_api_externa(): void
