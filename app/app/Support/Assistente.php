@@ -1,0 +1,83 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\Empresa;
+use Illuminate\Support\Str;
+
+/**
+ * Chatbot local (regras por palavra-chave, sem API externa).
+ */
+class Assistente
+{
+    public static function responder(string $pergunta, ?string $id = null): string
+    {
+        $q = Str::lower(Str::ascii($pergunta));
+        if (! $id && preg_match('/c\d{3}/', $q, $m)) {
+            $id = $m[0];
+        }
+        $c = $id ? Empresa::firstWhere('codigo', strtoupper($id)) : null;
+
+        return $c ? self::sobreEmpresa($c, $q) : self::sobreCarteira($q);
+    }
+
+    private static function sobreEmpresa(Empresa $c, string $q): string
+    {
+        $cab = "{$c['nome']} ({$c['codigo']}) — {$c['nivel']}, score {$c['score']}/100.";
+        $sinais = collect($c['sinais']);
+        if ($c['status'] === 'Cancelado') {
+            $cab .= " Cancelou em {$c['mes_cancel']}.";
+        }
+
+        if (Str::contains($q, ['fazer', 'acao', 'recomend', 'conduta', 'plano'])) {
+            return $sinais->isEmpty() ? "$cab\nSem sinais relevantes: manter cadência normal de acompanhamento."
+                : "$cab\nO que fazer, em ordem:\n".$sinais->map(fn ($s, $i) => ($i + 1).". {$s['acao']}")->join("\n");
+        }
+        if (Str::contains($q, ['similar', 'parecid', 'cancelaram', 'fechou', 'fecharam'])) {
+            return "$cab\nCancelados com perfil parecido:\n".collect($c['similares'])
+                ->map(fn ($s) => "• {$s['nome']} — {$s['sim']}% de semelhança, saiu em {$s['mes_cancel']}")->join("\n");
+        }
+        if (Str::contains($q, ['nps', 'satisf', 'nota'])) {
+            $n = collect($c['nps'])->map(fn ($x) => "{$x['mes']}: ".($x['nota'] ?? 'sem resposta'))->join("\n");
+
+            return "$cab\nHistórico de pesquisas:\n$n";
+        }
+        if (Str::contains($q, ['valor', 'contrato', 'plano', 'quanto', 'receita'])) {
+            return "$cab\nPlano {$c['plano']}, ".Empresa::brl($c['valor'])."/mês, SLA {$c['sla_h']}h, cliente desde {$c['inicio']}. Receita em risco: ".Empresa::brl($c['exposicao']).'.';
+        }
+        // padrão / "por que": evidências
+        return $sinais->isEmpty() ? "$cab\nNenhum sinal relevante nos últimos 3 meses."
+            : "$cab\nEvidências (últimos 3 meses):\n".$sinais->map(fn ($s) => "• {$s['texto']} (+{$s['pts']} pts)")->join("\n");
+    }
+
+    private static function sobreCarteira(string $q): string
+    {
+        $a = Empresa::ativas();
+        $risco = $a->where('score', '>=', 40);
+
+        if (Str::contains($q, ['receita', 'exposi', 'dinheiro', 'financeir'])) {
+            return 'Receita mensal em risco (score × valor): '.Empresa::brl($a->sum('exposicao')).' de '.Empresa::brl($a->sum('valor')).
+                '. Clientes com risco alto/crítico somam '.Empresa::brl($risco->sum('valor')).'/mês.';
+        }
+        if (Str::contains($q, ['segmento', 'setor'])) {
+            return "Risco médio por segmento (ativos):\n".$a->groupBy('segmento')->map(fn ($g) => round($g->avg('score')))
+                ->sortDesc()->map(fn ($v, $k) => "• $k: $v")->join("\n");
+        }
+        if (Str::contains($q, ['cancel', 'churn', 'saiu', 'sairam'])) {
+            $x = Empresa::where('status', 'Cancelado')->get();
+
+            return "{$x->count()} clientes cancelaram (".Empresa::brl($x->sum('valor')).'/mês). Em média tinham score '.round($x->avg('score')).
+                ' vs '.round($a->avg('score')).' dos ativos — o score separa bem quem sai de quem fica.';
+        }
+        if (Str::contains($q, ['resumo', 'quantos', 'carteira', 'geral'])) {
+            return "{$a->count()} clientes ativos: ".collect(['Crítico', 'Alto', 'Médio', 'Baixo'])
+                ->map(fn ($n) => $a->where('nivel', $n)->count()." $n")->join(', ').'.';
+        }
+        if (Str::contains($q, ['prioridade', 'quem', 'primeiro', 'ligar', 'falar', 'ordem', 'critico'])) {
+            return "Fale primeiro com (maior receita em risco):\n".$a->take(5)->map(fn ($c, $i) => ($i + 1).". {$c['nome']} ({$c['codigo']}) — {$c['nivel']}, ".
+                Empresa::brl($c['valor']).'/mês, motivo: '.($c['sinais'][0]['label'] ?? 'sem sinal forte'))->join("\n");
+        }
+
+        return "Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre uma empresa: cite o código, ex.: \"por que C012 está em risco?\" ou \"o que fazer com C012?\".";
+    }
+}
