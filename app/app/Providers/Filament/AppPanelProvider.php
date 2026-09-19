@@ -35,7 +35,7 @@ class AppPanelProvider extends PanelProvider
             ->topNavigation()
             ->homeUrl(fn () => ($c = Customer::ativas()->first()) ? EmpresaResource::getUrl('view', ['record' => $c]) : Painel::getUrl())
             ->font('Plus Jakarta Sans')
-            ->darkMode(false) // identidade azul e branco
+            ->darkMode(true) // identidade azul e branco
             ->colors(['primary' => Color::Blue, 'gray' => Color::Slate])
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
