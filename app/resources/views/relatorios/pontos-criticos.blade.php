@@ -47,10 +47,10 @@
     </p>
     <h2>Composição do score</h2>
     <table>
-        <thead><tr><th>Sinal</th><th>Intensidade</th><th>Peso</th><th>Pontos</th></tr></thead>
+        <thead><tr><th>Sinal</th><th>Métrica</th><th>Ajuste prioridade</th><th>Total</th></tr></thead>
         <tbody>
             @foreach ($empresa->contribuicoesScore() as $parcela)
-                <tr><td>{{ $parcela['rotulo'] }}</td><td>{{ number_format($parcela['intensidade'], 2, ',', '.') }}</td><td>{{ $parcela['peso'] }}</td><td>+{{ number_format($parcela['pontos'], 1, ',', '.') }}</td></tr>
+                <tr><td>{{ $parcela['rotulo'] }}</td><td>{{ number_format($parcela['base'], 1, ',', '.') }}</td><td>{{ number_format($parcela['ajuste_prioridade'], 1, ',', '.') }}</td><td>{{ number_format($parcela['pontos'], 1, ',', '.') }}</td></tr>
             @endforeach
         </tbody>
     </table>

@@ -103,13 +103,18 @@ class CarteiraTest extends TestCase
 
         $this->assertCount(8, $parcelas);
         $this->assertSame($cliente->score, (int) round(array_sum(array_column($parcelas, 'pontos'))));
+        foreach ($parcelas as $parcela) {
+            $this->assertEqualsWithDelta($parcela['pontos'], $parcela['base'] + $parcela['ajuste_prioridade'], 0.001);
+        }
 
         $this->get('/empresas/'.$cliente->codigo)
             ->assertOk()
-            ->assertSee('Ver as 8 parcelas do score')
+            ->assertSee('Como os 8 sinais formam')
             ->assertSee($parcelas[0]['rotulo'])
-            ->assertSee('Exposição =')
-            ->assertSee('não é uma previsão de perda financeira');
+            ->assertSee('Métrica')
+            ->assertSee('prioridade')
+            ->assertSee('Exposição:')
+            ->assertSee('não é perda prevista');
 
         Livewire::test(KpisWidget::class)->assertSee('Soma dos contratos mensais dos ativos');
     }

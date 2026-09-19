@@ -168,12 +168,18 @@ class Customer extends Model
         $pesos = app(CompanyContext::class)->current()?->pesos() ?? Risco::PESOS;
         $pontos = Risco::pontos($severidades, $pesos);
 
-        return array_map(fn ($chave, $pontos) => [
-            'rotulo' => Risco::ROTULOS[$chave],
-            'intensidade' => $severidades[$chave],
-            'peso' => $pesos[$chave],
-            'pontos' => $pontos,
-        ], array_keys($pontos), array_values($pontos));
+        return array_map(function ($chave, $pontos) use ($severidades, $pesos): array {
+            $base = round($severidades[$chave] * 100 / count(Risco::PESOS), 1);
+
+            return [
+                'rotulo' => Risco::ROTULOS[$chave],
+                'intensidade' => $severidades[$chave],
+                'peso' => $pesos[$chave],
+                'base' => $base,
+                'ajuste_prioridade' => round($pontos - $base, 1),
+                'pontos' => $pontos,
+            ];
+        }, array_keys($pontos), array_values($pontos));
     }
 
     public function resumoScore(): string

@@ -29,8 +29,13 @@ class CompanyConfig
     /** Read: configuração efetiva (padrões + personalizações) no formato do formulário. */
     public static function ler(Company $company): array
     {
+        $pesos = $company->pesos();
+        $maiorPeso = max($pesos);
+        $fator = $maiorPeso > 20 ? 20 / $maiorPeso : 1;
+
         return [
-            'metricas' => collect($company->pesos())->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso, 'ativa' => $peso > 0])->values()->all(),
+            'metricas' => collect($pesos)->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso, 'ativa' => $peso > 0])->values()->all(),
+            'pesos' => array_map(fn ($peso) => round($peso * $fator, 1), $pesos),
             'limiares' => $company->limiares(),
             'tema' => $company->tema(),
         ];
@@ -46,7 +51,7 @@ class CompanyConfig
         $v = Validator::make($dados, [
             'metricas' => 'required|array|size:'.count(Risco::PESOS),
             'metricas.*.k' => 'required|in:'.implode(',', array_keys(Risco::PESOS)),
-            'metricas.*.peso' => 'required|numeric|min:0|max:100',
+            'metricas.*.peso' => 'required|numeric|min:0|max:20',
             'limiares.critico' => 'required|integer|between:1,100',
             'limiares.alto' => 'required|integer|between:1,100|lt:limiares.critico',
             'limiares.medio' => 'required|integer|between:1,100|lt:limiares.alto',

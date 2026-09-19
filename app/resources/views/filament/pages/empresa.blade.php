@@ -37,7 +37,6 @@
             {{-- Indicadores atuais --}}
             <section class="ui-card ui-pad">
                 <h2>Indicadores atuais</h2>
-                <p class="ui-muted">Score por regras: soma ponderada dos sinais de atendimento, uso, satisfação e relacionamento. É um indicador de atenção, não uma probabilidade de cancelamento. Uso e SLA são percentuais informados na planilha.</p>
                 <dl class="ui-stats">
                     <div><dt>Contrato/mês</dt><dd>{{ Customer::brl($e->valor) }}</dd></div>
                     <div><dt>Uso da plataforma</dt><dd>{{ $ultimo ? $ultimo['uso'].'%' : '—' }}</dd></div>
@@ -45,20 +44,20 @@
                     <div><dt>Score de sinais</dt><dd>{{ $e->score }}/100</dd></div>
                     <div><dt>Exposição</dt><dd>{{ Customer::brl($e->exposicao) }}</dd></div>
                 </dl>
-                <p class="ui-muted">Exposição = {{ $e->score }} ÷ 100 × {{ Customer::brl($e->valor) }}/mês. Serve para ordenar o atendimento; não é uma previsão de perda financeira.</p>
+                <p class="ui-muted">Score: soma dos sinais abaixo, não é chance de cancelamento. Exposição: {{ $e->score }} ÷ 100 × {{ Customer::brl($e->valor) }}/mês; não é perda prevista.</p>
             </section>
 
             {{-- Destaques: sinais e próximos passos --}}
             <section class="ui-card ui-pad">
                 <h2>{{ $e->cancelada() ? 'Sinais antes do cancelamento' : 'Em destaque: sinais de alerta e próximos passos' }}</h2>
-                <p class="ui-muted">Cada sinal recebe uma intensidade de 0 a 1. Parcela = intensidade × peso configurado ÷ soma dos pesos × 100. O score é a soma das oito parcelas, arredondada para inteiro. Os destaques abaixo mostram só as parcelas mais fortes.</p>
                 @if ($e->currentAssessment)
                     <details class="ui-calculo">
-                        <summary>Ver as 8 parcelas do score de {{ $e->score }} pontos</summary>
+                        <summary>Como os 8 sinais formam {{ $e->score }} pontos</summary>
+                        <p>Parcela da métrica = intensidade × 12,5. Ajuste da prioridade = pontos com seu peso configurado − parcela da métrica. O ajuste pode diminuir os pontos.</p>
                         <ul>
                             @foreach ($parcelas as $parcela)
                                 <li>
-                                    <span>{{ $parcela['rotulo'] }} <small>intensidade {{ number_format($parcela['intensidade'], 2, ',', '.') }} · peso {{ $parcela['peso'] }}</small></span>
+                                    <span>{{ $parcela['rotulo'] }} <small>Métrica {{ number_format($parcela['base'], 1, ',', '.') }} pt {{ $parcela['ajuste_prioridade'] < 0 ? '−' : '+' }} prioridade {{ number_format(abs($parcela['ajuste_prioridade']), 1, ',', '.') }} pt · peso {{ $parcela['peso'] }}</small></span>
                                     <strong>+{{ number_format($parcela['pontos'], 1, ',', '.') }} pt</strong>
                                 </li>
                             @endforeach
@@ -68,7 +67,7 @@
                         @else
                             <p>As parcelas disponíveis não reproduzem o score salvo. Recalcule a avaliação ao salvar as prioridades em Configurações.</p>
                         @endif
-                        <p>Referência: {{ $e->currentAssessment->reference_month->format('m/Y') }}. Os pesos podem ser alterados em Configurações; a pontuação é recalculada ao salvar.</p>
+                        <p>Referência: {{ $e->currentAssessment->reference_month->format('m/Y') }}. Os oito sinais têm 12,5 pontos de peso neutro cada; os pesos de 0 a 20 redistribuem essa participação.</p>
                     </details>
                 @else
                     <p class="ui-muted">Sem avaliação calculada: faltam métricas mensais para esta empresa.</p>

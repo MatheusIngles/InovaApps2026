@@ -10,14 +10,15 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Slider;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -49,56 +50,58 @@ class Configuracoes extends Page implements HasSchemas
     public function form(Schema $schema): Schema
     {
         return $schema->statePath('data')->components([
-            Section::make('Prioridade das métricas')
-                ->description('Ordene da mais para a menos importante: a que fica no topo pesa mais. Desligue uma métrica para ignorá-la no cálculo; ligue de novo quando quiser voltar a usá-la.')
-                ->schema([
-                    Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()->reorderableWithButtons()
-                        ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
-                        ->schema([Hidden::make('k'), Toggle::make('ativa')->label('Considerar no cálculo do risco')->default(true)]),
+            Tabs::make('Configurações')->tabs([
+                Tab::make('Prioridades')->schema([
+                    Section::make('Peso de cada métrica')
+                        ->description('Arraste de 0 a 20. Zero ignora a métrica. Os valores são relativos: a soma é normalizada para formar o score de 0 a 100.')
+                        ->schema([
+                            Grid::make(['default' => 1, 'lg' => 2])->schema(
+                                collect(Risco::ROTULOS)->map(fn (string $rotulo, string $chave) => Slider::make("pesos.{$chave}")
+                                    ->label($rotulo)->range(0, 20)->step(0.1)->tooltips()->pips()->live()
+                                    ->hint(fn (Get $get): string => number_format((float) $get(''), 1, ',', '.').' / 20')
+                                )->values()->all()
+                            ),
+                        ]),
                 ]),
-            Section::make('Níveis de risco')->description('Score mínimo (0 a 100) de cada nível.')->columns(3)->schema([
-                TextInput::make('limiares.critico')->label('Crítico a partir de')->numeric()->required(),
-                TextInput::make('limiares.alto')->label('Alto a partir de')->numeric()->required(),
-                TextInput::make('limiares.medio')->label('Médio a partir de')->numeric()->required(),
-            ]),
-            Section::make('Identidade visual')->description('Cores, fonte e logo aplicados a todo o painel desta empresa.')->schema([
-                Grid::make(['default' => 1, 'md' => 2])->schema([
-                    ColorPicker::make('tema.primary')->label('Cor primária')->required(),
-                    ColorPicker::make('tema.secondary')->label('Cor secundária')->required(),
-                    TextInput::make('tema.brand')->label('Nome exibido no painel')->placeholder('Seer')->maxLength(40)->helperText('Vazio = Seer.'),
+                Tab::make('Níveis de risco')->schema([
+                    Section::make('Limites dos níveis')->description('Score mínimo (0 a 100) de cada nível.')->columns(3)->schema([
+                        TextInput::make('limiares.critico')->label('Crítico a partir de')->numeric()->required(),
+                        TextInput::make('limiares.alto')->label('Alto a partir de')->numeric()->required(),
+                        TextInput::make('limiares.medio')->label('Médio a partir de')->numeric()->required(),
+                    ]),
                 ]),
-                FileUpload::make('tema.logo')->label('Logo')->image()->disk('public')->directory('logos')->maxSize(1024)
-                    ->helperText('Ao enviar, as cores do painel mudam para as do logo. Você pode ajustá-las.'),
-                View::make('filament.components.conta-gotas')
-                    ->afterStateUpdated(function ($state, Livewire $livewire) {
-                        $arquivo = is_array($state) ? Arr::first($state) : $state;
+                Tab::make('Identidade visual')->schema([
+                    Section::make('Aparência')->description('Cores, fonte e logo aplicados a todo o painel desta empresa.')->schema([
+                        Grid::make(['default' => 1, 'md' => 2])->schema([
+                            ColorPicker::make('tema.primary')->label('Cor primária')->required(),
+                            ColorPicker::make('tema.secondary')->label('Cor secundária')->required(),
+                            TextInput::make('tema.brand')->label('Nome exibido no painel')->placeholder('Seer')->maxLength(40)->helperText('Vazio = Seer.'),
+                        ]),
+                        FileUpload::make('tema.logo')->label('Logo')->image()->disk('public')->directory('logos')->maxSize(1024)
+                            ->helperText('Ao enviar, as cores do painel mudam para as do logo. Você pode ajustá-las.'),
+                        View::make('filament.components.conta-gotas')
+                            ->afterStateUpdated(function ($state, Livewire $livewire) {
+                                $arquivo = is_array($state) ? Arr::first($state) : $state;
 
-                        // a cor é lida no navegador (canvas): não depende de extensão do PHP
-                        if ($arquivo instanceof TemporaryUploadedFile) {
-                            $livewire->js('window.corDoLogo($wire, '.json_encode($arquivo->temporaryUrl()).')');
-                        }
-                    }),
-            ]),
+                                if ($arquivo instanceof TemporaryUploadedFile) {
+                                    $livewire->js('window.corDoLogo($wire, '.json_encode($arquivo->temporaryUrl()).')');
+                                }
+                            }),
+                    ]),
+                ]),
+            ])->columnSpanFull(),
         ]);
     }
 
     public function salvar(): void
     {
         $dados = $this->form->getState();
-        // o peso vem da posição: a escala padrão (20, 15, 15, 12...) distribuída na ordem escolhida
-        // métricas desligadas ficam com peso 0 e não ocupam posição na escala
-        $escala = collect(Risco::PESOS)->sortDesc()->values();
-        $i = 0;
-        $metricas = [];
-
-        foreach (array_values($dados['metricas']) as $metrica) {
-            $metricas[] = [
-                'k' => $metrica['k'],
-                'peso' => ($metrica['ativa'] ?? true) ? $escala[$i++] : 0,
-            ];
-        }
-
-        $dados['metricas'] = $metricas;
+        $dados['metricas'] = collect(Risco::PESOS)->keys()
+            ->mapWithKeys(fn (string $chave): array => [$chave => (float) ($dados['pesos'][$chave] ?? 0)])
+            ->sortDesc()
+            ->map(fn (float $peso, string $chave): array => ['k' => $chave, 'peso' => $peso])
+            ->values()->all();
+        unset($dados['pesos']);
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {
