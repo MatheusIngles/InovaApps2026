@@ -7,6 +7,7 @@ use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\Painel;
 use App\Http\Middleware\SetCompanyContext;
 use App\Support\AvatarIniciais;
+use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
