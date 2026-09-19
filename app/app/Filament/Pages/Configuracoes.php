@@ -37,7 +37,7 @@ class Configuracoes extends Page implements HasSchemas
 
     protected static ?string $title = 'Configurações';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
@@ -111,19 +111,7 @@ class Configuracoes extends Page implements HasSchemas
     public function salvar(): void
     {
         $dados = $this->form->getState();
-        // A ordem define a escala padrão; métricas desligadas não ocupam posição nela.
-        $escala = collect(Risco::PESOS)->sortDesc()->values();
-        $i = 0;
-        $metricas = [];
-
-        foreach (array_values($dados['metricas']) as $metrica) {
-            $metricas[] = [
-                'k' => $metrica['k'],
-                'peso' => ($metrica['ativa'] ?? true) ? $escala[$i++] : 0,
-            ];
-        }
-
-        $dados['metricas'] = $metricas;
+        $dados['metricas'] = CompanyConfig::pesosPorPosicao($dados['metricas']); // o peso vem da posição na lista
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {

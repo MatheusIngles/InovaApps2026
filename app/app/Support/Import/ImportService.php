@@ -4,6 +4,7 @@ namespace App\Support\Import;
 
 use App\Models\Company;
 use App\Support\RiskService;
+use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +89,12 @@ class ImportService
 
         $company->update(['imported_at' => now(), 'column_mapping' => $mapa]);
         RiskService::recalcular($company);
+
+        try {
+            app(CompanyContext::class)->within($company, fn () => CompanyConfig::aplicarBaseDosDados($company->fresh()));
+        } catch (\Throwable $e) {
+            report($e); // a configuração base é um bônus: nunca derruba a importação
+        }
 
         return $stats;
     }
