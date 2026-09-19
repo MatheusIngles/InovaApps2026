@@ -333,3 +333,5 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .fi-sc-tabs.fi-contained { background: var(--panel-surface); }
 .fi.dark .fi-sc-tabs.fi-contained { background: var(--panel-surface); }
 .fi-sc-tabs.fi-contained .fi-tabs { border-color: var(--panel-border); }
+.ev .ui-tip { font-size: .8rem; font-weight: 400; }
+.ev-kpis .ui-card { overflow: visible; }

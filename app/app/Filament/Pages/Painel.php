@@ -22,7 +22,7 @@ class Painel extends Dashboard
     {
         return $schema->components([
             Tabs::make('Painel')->tabs([
-                Tab::make('Visão geral')->schema([$this->getWidgetsContentComponent()]),
+                Tab::make('Visão geral')->schema([View::make('filament.components.painel-resumo-evidencia'), $this->getWidgetsContentComponent()]),
                 Tab::make('Evidências')->schema([View::make('filament.components.painel-evidencias')]),
                 Tab::make('Por segmento')->schema([View::make('filament.components.painel-segmentos')]),
             ])->persistTabInQueryString('aba')->columnSpanFull(),
