@@ -26,6 +26,8 @@ class EmpresaResource extends Resource
 
     protected static ?string $modelLabel = 'empresa';
 
+    protected static ?string $navigationLabel = 'Clientes';
+
     protected static ?string $recordTitleAttribute = 'nome';
 
     protected static ?int $navigationSort = 1;
