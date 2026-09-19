@@ -139,6 +139,20 @@ input, textarea { caret-color: var(--primary-600); }
 .chatbot-row.eu { justify-content: flex-end; }
 .chatbot-msg { max-width: min(46rem, 85%); padding: .8rem 1.1rem; border-radius: 1.1rem; border-bottom-left-radius: .3rem; background: var(--panel-surface); color: var(--panel-text); box-shadow: 0 0 0 1px var(--panel-border); line-height: 1.55; white-space: pre-line; }
 .chatbot-row.eu .chatbot-msg { background: var(--primary-600); color: #fff; box-shadow: none; border-radius: 1.1rem; border-bottom-right-radius: .3rem; }
+.chatbot-markdown { white-space: normal; overflow-wrap: anywhere; }
+.chatbot-markdown > * + * { margin-top: .65rem; }
+.chatbot-markdown h1, .chatbot-markdown h2, .chatbot-markdown h3, .chatbot-markdown h4 { font-weight: 700; line-height: 1.3; }
+.chatbot-markdown h1 { font-size: 1.25rem; } .chatbot-markdown h2 { font-size: 1.12rem; } .chatbot-markdown h3 { font-size: 1rem; }
+.chatbot-markdown ul, .chatbot-markdown ol { padding-left: 1.4rem; } .chatbot-markdown ul { list-style: disc; } .chatbot-markdown ol { list-style: decimal; }
+.chatbot-markdown li + li { margin-top: .2rem; }
+.chatbot-markdown a { color: var(--panel-link); text-decoration: underline; }
+.chatbot-markdown a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.chatbot-markdown :not(pre) > code { padding: .1rem .3rem; border-radius: .3rem; background: var(--panel-raised); font-size: .9em; }
+.chatbot-markdown pre { overflow-x: auto; padding: .75rem; border-radius: .5rem; background: var(--panel-raised); }
+.chatbot-markdown pre code { white-space: pre; font-size: .85em; }
+.chatbot-markdown blockquote { padding-left: .75rem; border-left: 3px solid var(--primary-400); color: var(--panel-muted); }
+.chatbot-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.chatbot-markdown th, .chatbot-markdown td { padding: .35rem .6rem; border: 1px solid var(--panel-border); text-align: left; }
 .chatbot-msg small { display: block; margin-top: .4rem; font-size: .7rem; color: var(--panel-muted); }
 .chatbot-typing { display: flex; gap: .3rem; padding: 1rem 1.1rem; } .chatbot-typing i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--primary-400); animation: chatbot-blink 1.2s infinite; }
 .chatbot-typing i:nth-child(2) { animation-delay: .2s; } .chatbot-typing i:nth-child(3) { animation-delay: .4s; }

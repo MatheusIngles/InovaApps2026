@@ -138,6 +138,20 @@ class CarteiraTest extends TestCase
         Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
     }
 
+    public function test_chat_renderiza_markdown_da_resposta_sem_executar_html_do_modelo(): void
+    {
+        $this->entrar();
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => "**Prioridade**\n\n- Revisar SLA\n- Ligar para o cliente\n\n<script>alert(1)</script>"]])]);
+
+        Livewire::test(AssistenteChat::class)->call('enviar', '*minha pergunta*')
+            ->assertSee('<strong>Prioridade</strong>', false)
+            ->assertSee('<li>Revisar SLA</li>', false)
+            ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false)
+            ->assertDontSee('<script>alert(1)</script>', false)
+            ->assertSee('*minha pergunta*')
+            ->assertDontSee('<em>minha pergunta</em>', false);
+    }
+
     public function test_chat_conhece_prioridades_personalizadas_da_empresa_e_as_respostas_por_regras(): void
     {
         $this->entrar();

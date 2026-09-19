@@ -8,7 +8,7 @@ use App\Support\RiskService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
-/** CRUD da configuração de uma empresa: pesos/prioridade das métricas, limiares, tema e chat. */
+/** CRUD das configurações disponíveis ao usuário: pesos, limiares e tema. */
 class CompanyConfig
 {
     public const FONTES = ['Plus Jakarta Sans', 'Inter', 'Poppins', 'Roboto', 'Nunito', 'Lora'];
@@ -33,7 +33,6 @@ class CompanyConfig
             'metricas' => collect($company->pesos())->map(fn ($peso, $k) => ['k' => $k, 'peso' => $peso, 'ativa' => $peso > 0])->values()->all(),
             'limiares' => $company->limiares(),
             'tema' => $company->tema(),
-            'chat' => $company->chat(),
         ];
     }
 
@@ -56,9 +55,6 @@ class CompanyConfig
             'tema.font' => 'sometimes|in:'.implode(',', self::FONTES),
             'tema.brand' => 'nullable|string|max:40',
             'tema.logo' => 'nullable|string|max:255',
-            'chat.enabled' => 'boolean',
-            'chat.ollama_model' => ['nullable', 'max:100', 'regex:/^[\w.:\-\/]+$/'],
-            'chat.instrucoes' => 'nullable|string|max:1000',
         ]);
         $v->after(function ($v) use ($dados) {
             $primaria = $dados['tema']['primary'] ?? '';
@@ -79,7 +75,7 @@ class CompanyConfig
         // != (não !==): 100 e 100.0 são o mesmo peso; a ordem da lista continua contando (desempate de sinais)
         $recalcular = $pesos != ($company->metric_weights ?? self::padrao()) || $limiares != $company->limiares();
 
-        $company->update(['metric_weights' => $pesos, 'level_thresholds' => $limiares, 'theme' => $d['tema'], 'chat_settings' => $d['chat']]);
+        $company->update(['metric_weights' => $pesos, 'level_thresholds' => $limiares, 'theme' => $d['tema']]);
 
         if ($recalcular) {
             RiskService::recalcular($company);
@@ -91,7 +87,7 @@ class CompanyConfig
     /** Delete: remove as personalizações e volta ao padrão do sistema. */
     public static function restaurar(Company $company): void
     {
-        $company->update(['metric_weights' => null, 'level_thresholds' => null, 'theme' => null, 'chat_settings' => null]);
+        $company->update(['metric_weights' => null, 'level_thresholds' => null, 'theme' => null]);
         RiskService::recalcular($company);
     }
 

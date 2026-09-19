@@ -86,9 +86,10 @@ class ConfiguracaoEmpresaTest extends TestCase
         $this->assertSame('Crítico', Risco::nivel(60, ['critico' => 60, 'alto' => 40, 'medio' => 10]));
     }
 
-    public function test_tema_valida_cor_e_restaurar_volta_ao_padrao(): void
+    public function test_tema_valida_cor_e_restaurar_preserva_configuracao_operacional_do_chat(): void
     {
-        $company = Company::factory()->create();
+        $chat = ['enabled' => false, 'ollama_model' => 'llama3.2:3b', 'instrucoes' => 'Tom formal.'];
+        $company = Company::factory()->create(['chat_settings' => $chat]);
         $d = CompanyConfig::ler($company);
         $d['tema']['primary'] = 'azul';
 
@@ -99,14 +100,14 @@ class ConfiguracaoEmpresaTest extends TestCase
         }
 
         $d['tema'] = ['primary' => '#0d9488', 'secondary' => '#115e59', 'font' => 'Inter', 'logo' => null];
-        $d['chat'] = ['enabled' => false, 'ollama_model' => 'llama3.2:3b', 'instrucoes' => 'Tom formal.'];
+        $d['chat'] = ['enabled' => true, 'ollama_model' => 'outro-modelo'];
         CompanyConfig::salvar($company, $d);
         $this->assertSame('#0d9488', $company->fresh()->tema()['primary']);
-        $this->assertFalse($company->fresh()->chat()['enabled']);
+        $this->assertSame($chat, $company->fresh()->chat_settings);
 
         CompanyConfig::restaurar($company);
         $this->assertSame(Company::TEMA_PADRAO['primary'], $company->fresh()->tema()['primary']);
-        $this->assertTrue($company->fresh()->chat()['enabled']);
+        $this->assertSame($chat, $company->fresh()->chat_settings);
     }
 
     public function test_tela_de_configuracoes_salva_e_o_tema_da_empresa_vai_para_a_pagina(): void
@@ -114,7 +115,8 @@ class ConfiguracaoEmpresaTest extends TestCase
         $company = Company::factory()->create(['theme' => ['primary' => '#0d9488', 'secondary' => '#115e59', 'font' => 'Inter']]);
         $this->actingAs(User::factory()->for($company)->create());
 
-        $this->get('/configuracoes')->assertOk()->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('#115e59', false)->assertSee('Inter');
+        $this->get('/configuracoes')->assertOk()->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('#115e59', false)->assertSee('Inter')
+            ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->call('salvar')->assertHasNoErrors();
         $this->assertSame(70, $company->fresh()->limiares()['critico']);
     }

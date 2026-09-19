@@ -23,7 +23,11 @@
         @forelse ($mensagens as $m)
             <div class="chatbot-row {{ $m['eu'] ? 'eu' : '' }}">
                 <div class="chatbot-msg">
-                    {{ $m['texto'] }}
+                    @if ($m['eu'])
+                        {{ $m['texto'] }}
+                    @else
+                        <div class="chatbot-markdown">{!! \Illuminate\Support\Str::markdown($m['texto'], ['html_input' => 'escape', 'allow_unsafe_links' => false]) !!}</div>
+                    @endif
                     @isset($m['fonte'])<small>{{ $m['fonte'] }}</small>@endisset
                 </div>
             </div>
