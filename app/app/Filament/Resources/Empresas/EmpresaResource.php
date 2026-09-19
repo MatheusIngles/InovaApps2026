@@ -4,7 +4,7 @@ namespace App\Filament\Resources\Empresas;
 
 use App\Filament\Resources\Empresas\Pages\ListEmpresas;
 use App\Filament\Resources\Empresas\Pages\ViewEmpresa;
-use App\Models\Empresa;
+use App\Models\Customer;
 use BackedEnum;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class EmpresaResource extends Resource
 {
-    protected static ?string $model = Empresa::class;
+    protected static ?string $model = Customer::class;
 
     protected static ?string $modelLabel = 'empresa';
 
@@ -33,6 +33,11 @@ class EmpresaResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
+
+    public static function getEloquentQuery(): Builder
+    {
+        return Customer::dashboard();
+    }
 
     public static function canCreate(): bool
     {
@@ -47,41 +52,44 @@ class EmpresaResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => Empresa::ordenar($query))
+            ->modifyQueryUsing(fn (Builder $query) => Customer::ordenar($query))
             ->defaultSort(null)
             ->contentGrid(['md' => 2, 'xl' => 3])
             ->paginated([12, 24, 48, 'all'])
             ->defaultPaginationPageOption(24)
             ->searchPlaceholder('Buscar por nome, código ou segmento…')
-            ->recordClasses(fn (Empresa $e) => $e->cancelada() ? 'opacity-60' : null)
+            ->recordClasses(fn (Customer $e) => $e->cancelada() ? 'opacity-60' : null)
             ->columns([
                 Stack::make([
                     Split::make([
-                        TextColumn::make('nome')->weight(FontWeight::SemiBold)->searchable()
-                            ->description(fn (Empresa $e) => "{$e->codigo} · {$e->segmento} · {$e->porte}"),
+                        TextColumn::make('nome')->weight(FontWeight::SemiBold)->searchable(['external_code', 'segment'])
+                            ->description(fn (Customer $e) => "{$e->codigo} · {$e->segmento} · {$e->porte}"),
                         TextColumn::make('nivel')->badge()->grow(false)
-                            ->state(fn (Empresa $e) => $e->rotulo())->color(fn (string $state) => self::cor($state)),
+                            ->state(fn (Customer $e) => $e->rotulo())->color(fn (string $state) => self::cor($state)),
                     ]),
                     Split::make([
                         TextColumn::make('score')->size(TextSize::Large)->weight(FontWeight::Bold)
-                            ->formatStateUsing(fn ($state) => "Risco {$state}/100"),
+                            ->formatStateUsing(fn ($state) => "Score {$state}/100"),
                         TextColumn::make('valor')->alignEnd()
-                            ->state(fn (Empresa $e) => $e->cancelada() ? "Cancelou em {$e->mes_cancel}" : Empresa::brl($e->valor).'/mês'),
+                            ->state(fn (Customer $e) => $e->cancelada() ? "Cancelou em {$e->mes_cancel}" : Customer::brl($e->valor).'/mês'),
                     ]),
                     TextColumn::make('sinais')->color('gray')->size(TextSize::Small)->limit(70)
-                        ->state(fn (Empresa $e) => $e->sinais[0]['texto'] ?? 'Sem sinais relevantes')
-                        ->searchable(['segmento', 'codigo']),
+                        ->state(fn (Customer $e) => $e->sinais[0]['texto'] ?? 'Sem sinais relevantes')
+                        ->searchable(['segment', 'external_code']),
                 ])->space(3),
             ])
             ->filters([
                 SelectFilter::make('nivel')->label('Nível')
                     ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelada' => 'Cancelada'])
                     ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
-                        null, "" => $query,
-                        'Cancelada' => $query->where('status', 'Cancelado'),
-                        default => $query->where('status', 'Ativo')->where('nivel', $data['value']),
+                        null, '' => $query,
+                        'Cancelada' => $query->where('customers.status', 'Cancelado'),
+                        'Crítico' => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', 55),
+                        'Alto' => $query->where('customers.status', 'Ativo')->whereBetween('assessment.health_score', [40, 54]),
+                        'Médio' => $query->where('customers.status', 'Ativo')->whereBetween('assessment.health_score', [25, 39]),
+                        default => $query->where('customers.status', 'Ativo')->where('assessment.health_score', '<', 25),
                     }),
-                SelectFilter::make('segmento')->options(fn () => Empresa::distinct()->orderBy('segmento')->pluck('segmento', 'segmento')->all()),
+                SelectFilter::make('segment')->label('Segmento')->options(fn () => Customer::distinct()->orderBy('segment')->pluck('segment', 'segment')->all()),
             ])
             ->recordActions([]);
     }
@@ -91,11 +99,11 @@ class EmpresaResource extends Resource
         return $schema->components([
             Section::make()->columns(['default' => 2, 'md' => 3, 'xl' => 6])->schema([
                 TextEntry::make('nivel')->label('Nível')->badge()
-                    ->state(fn (Empresa $e) => $e->rotulo())->color(fn (string $state) => self::cor($state)),
-                TextEntry::make('score')->label('Score de risco')->size(TextSize::Large)->weight(FontWeight::Bold)
+                    ->state(fn (Customer $e) => $e->rotulo())->color(fn (string $state) => self::cor($state)),
+                TextEntry::make('score')->label('Score de sinais')->size(TextSize::Large)->weight(FontWeight::Bold)
                     ->formatStateUsing(fn ($state) => "{$state} / 100"),
-                TextEntry::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Empresa::brl($state)),
-                TextEntry::make('exposicao')->label('Receita em risco')->formatStateUsing(fn ($state) => Empresa::brl($state)),
+                TextEntry::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Customer::brl($state)),
+                TextEntry::make('exposicao')->label('Exposição mensal indicativa')->formatStateUsing(fn ($state) => Customer::brl($state)),
                 TextEntry::make('plano'),
                 TextEntry::make('sla_h')->label('SLA contratado')->suffix(' h'),
             ]),
@@ -113,7 +121,7 @@ class EmpresaResource extends Resource
                 ->schema([
                     RepeatableEntry::make('similares')->hiddenLabel()->contained(false)->grid(['md' => 3])->schema([
                         TextEntry::make('nome')->hiddenLabel()->weight(FontWeight::SemiBold)
-                            ->url(fn (string $state) => static::getUrl('view', ['record' => Empresa::where('nome', $state)->value('codigo')])),
+                            ->url(fn (string $state) => static::getUrl('view', ['record' => substr($state, strrpos($state, ' ') + 1)])),
                         TextEntry::make('mes_cancel')->hiddenLabel()->prefix('Cancelou em '),
                         TextEntry::make('sim')->hiddenLabel()->badge()->color('danger')->suffix('% de semelhança'),
                     ]),

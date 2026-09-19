@@ -3,7 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Empresas\EmpresaResource;
-use App\Models\Empresa;
+use App\Models\Customer;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -18,17 +18,17 @@ class FilaTable extends TableWidget
     {
         return $table
             ->heading('Fila de atendimento: com quem falar primeiro')
-            ->description('Ordem por receita em risco (score × valor mensal).')
-            ->query(Empresa::query()->where('status', 'Ativo')->orderByDesc('exposicao')->limit(8))
+            ->description('Ordem por exposição mensal estimada pelo score de sinais.')
+            ->query(Customer::dashboard()->where('customers.status', 'Ativo')->orderByDesc('exposicao')->limit(8))
             ->paginated(false)
-            ->recordUrl(fn (Empresa $e) => EmpresaResource::getUrl('view', ['record' => $e]))
+            ->recordUrl(fn (Customer $e) => EmpresaResource::getUrl('view', ['record' => $e]))
             ->columns([
-                TextColumn::make('nome')->weight('semibold')->description(fn (Empresa $e) => $e->codigo),
+                TextColumn::make('nome')->weight('semibold')->description(fn (Customer $e) => $e->codigo),
                 TextColumn::make('nivel')->label('Nível')->badge()
                     ->color(fn (string $state) => ['Crítico' => 'danger', 'Alto' => 'warning', 'Médio' => 'info'][$state] ?? 'success'),
                 TextColumn::make('score')->label('Score'),
-                TextColumn::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Empresa::brl($state)),
-                TextColumn::make('motivo')->label('Principal motivo')->state(fn (Empresa $e) => $e->sinais[0]['label'] ?? 'Sem sinal forte'),
+                TextColumn::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Customer::brl($state)),
+                TextColumn::make('motivo')->label('Principal motivo')->state(fn (Customer $e) => $e->sinais[0]['label'] ?? 'Sem sinal forte'),
             ]);
     }
 }

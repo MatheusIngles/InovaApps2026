@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Empresa;
+use App\Models\Customer;
 use Filament\Widgets\ChartWidget;
 
 class SegmentosChart extends ChartWidget
@@ -22,7 +22,7 @@ class SegmentosChart extends ChartWidget
 
     protected function getData(): array
     {
-        $s = Empresa::where('status', 'Ativo')->selectRaw('segmento, avg(score) media')->groupBy('segmento')->orderByDesc('media')->pluck('media', 'segmento');
+        $s = Customer::ativas()->groupBy('segmento')->map(fn ($customers) => $customers->avg('score'))->sortDesc();
 
         return [
             'labels' => $s->keys()->all(),
