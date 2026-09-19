@@ -12,6 +12,8 @@ class KpisWidget extends StatsOverviewWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = ['default' => 1, 'sm' => 2, 'xl' => 4];
+
     protected function getStats(): array
     {
         $ativas = Customer::ativas();

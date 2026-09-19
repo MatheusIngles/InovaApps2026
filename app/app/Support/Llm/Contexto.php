@@ -3,13 +3,22 @@
 namespace App\Support\Llm;
 
 use App\Models\Customer;
+use App\Support\Tenancy\CompanyContext;
 
 /** Monta o prompt de sistema injetando o contexto específico da empresa (ou da carteira). */
 class Contexto
 {
     public static function sistema(?Customer $empresa): string
     {
-        return str_replace('{{contexto}}', $empresa ? self::empresa($empresa) : self::carteira(), config('llm.prompt_base'));
+        $company = app(CompanyContext::class)->current();
+        $prompt = str_replace('{{contexto}}', $empresa ? self::empresa($empresa) : self::carteira(), config('llm.prompt_base'));
+
+        // contexto isolado da empresa (tenant) + instruções próprias dela
+        return $company ? "Você atende exclusivamente a empresa \"{$company->name}\"; use somente os dados dela.
+".$prompt.($company->chat()['instrucoes'] ? '
+
+INSTRUÇÕES DA EMPRESA:
+'.$company->chat()['instrucoes'] : '') : $prompt;
     }
 
     public static function empresa(Customer $c): string

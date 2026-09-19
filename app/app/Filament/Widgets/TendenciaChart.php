@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\CustomerMetric;
+use App\Support\Tenancy\CompanyContext;
 use Filament\Widgets\ChartWidget;
 
 class TendenciaChart extends ChartWidget
@@ -23,7 +24,7 @@ class TendenciaChart extends ChartWidget
     protected function getData(): array
     {
         $meses = CustomerMetric::query()->join('customers', 'customers.id', '=', 'customer_metrics.customer_id')
-            ->where('customers.status', 'Ativo')
+            ->where('customers.status', 'Ativo')->where('customers.company_id', app(CompanyContext::class)->id())
             ->selectRaw('reference_month, AVG(platform_usage_percentage) as uso, AVG(sla_percentage) as sla')
             ->groupBy('reference_month')->orderBy('reference_month')->get();
 

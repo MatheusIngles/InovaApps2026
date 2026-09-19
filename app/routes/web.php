@@ -1,12 +1,18 @@
 <?php
 
+use App\Filament\Pages\Planilha;
 use App\Filament\Resources\Empresas\EmpresaResource;
+use App\Http\Middleware\SetCompanyContext;
 use App\Models\Customer;
 use Illuminate\Support\Facades\Route;
 
-// Página principal: a tela da empresa prioritária (a primeira da fila). Visitantes vão para o login.
+// Página principal: empresa nova (sem dados) -> planilha inicial; com dados -> empresa prioritária. Visitantes -> login.
 Route::get('/', function () {
-    $empresa = auth()->check() ? Customer::ativas()->first() : null;
+    if (! auth()->check()) {
+        return redirect('/login');
+    }
 
-    return redirect($empresa ? EmpresaResource::getUrl('view', ['record' => $empresa]) : '/login');
-})->middleware('web');
+    $empresa = Customer::ativas()->first();
+
+    return redirect($empresa ? EmpresaResource::getUrl('view', ['record' => $empresa]) : Planilha::getUrl());
+})->middleware(['web', SetCompanyContext::class]);

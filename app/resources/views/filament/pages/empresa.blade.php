@@ -20,8 +20,7 @@
                     <div class="li-logo" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->segmento, 0, 1)).ltrim(substr($e->codigo, 1), '0') }}</div>
                     <div class="li-title">
                         <h1>{{ $e->nome }}</h1>
-                        <p class="li-headline">{{ $e->segmento }} · porte {{ $e->porte }} · plano {{ $e->plano }}</p>
-                        <p class="li-meta">Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ' · cancelou em '.$e->mes_cancel : '' }}</p>
+                        <p class="li-headline">{{ $e->segmento }}, porte {{ $e->porte }}, plano {{ $e->plano }}. Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ', cancelou em '.$e->mes_cancel : '' }}.</p>
                     </div>
                     <div class="li-actions">
                         <span class="li-badge {{ $nivelCss }}">{{ $rotulo }}{{ $e->cancelada() ? '' : ' · '.$e->score.'/100' }}</span>
@@ -31,18 +30,9 @@
                 </div>
             </section>
 
-            {{-- Sobre --}}
+            {{-- Indicadores atuais --}}
             <section class="li-card li-pad">
-                <h2>Sobre</h2>
-                <p class="li-about">
-                    Empresa do setor de {{ mb_strtolower($e->segmento) }}, de porte {{ mb_strtolower($e->porte) }}, cliente desde {{ date('m/Y', strtotime($e->inicio)) }}
-                    no plano {{ $e->plano }}, com contrato de {{ Customer::brl($e->valor) }} por mês e SLA de {{ $e->sla_h }}h.
-                    @if ($e->cancelada())
-                        O contrato foi encerrado em {{ $e->mes_cancel }}.
-                    @else
-                        O score de sinais atual é {{ $e->score }}/100 ({{ $e->nivel }}), com exposição mensal indicativa de {{ Customer::brl($e->exposicao) }}.
-                    @endif
-                </p>
+                <h2>Indicadores atuais</h2>
                 <dl class="li-stats">
                     <div><dt>Contrato/mês</dt><dd>{{ Customer::brl($e->valor) }}</dd></div>
                     <div><dt>Uso da plataforma</dt><dd>{{ $ultimo ? $ultimo['uso'].'%' : '—' }}</dd></div>
@@ -58,7 +48,7 @@
                     <article class="li-sinal">
                         <div class="li-sinal-top"><strong>{{ $s['label'] }}</strong><span>+{{ $s['pts'] }} pts</span></div>
                         <p>{{ $s['texto'] }}</p>
-                        @unless ($e->cancelada())<p class="li-acao">→ {{ $s['acao'] }}</p>@endunless
+                        @unless ($e->cancelada())<p class="li-acao">{{ $s['acao'] }}</p>@endunless
                     </article>
                 @empty
                     <p class="li-muted">Nenhum sinal relevante nos últimos 3 meses.</p>
