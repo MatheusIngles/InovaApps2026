@@ -31,6 +31,7 @@ class AppPanelProvider extends PanelProvider
             ->login()
             ->registration()
             ->passwordReset()
+            ->globalSearch(false)
             ->brandName('Radar de Retenção')
             ->topNavigation()
             ->homeUrl(fn () => ($c = Customer::ativas()->first()) ? EmpresaResource::getUrl('view', ['record' => $c]) : Painel::getUrl())
