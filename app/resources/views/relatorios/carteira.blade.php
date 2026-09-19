@@ -14,7 +14,13 @@
         th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #e2e8f0; }
         th { font-size: 10px; color: #64748b; }
         li { margin-bottom: 3px; }
-        .quebra { page-break-before: always; }
+        h2, h3 { page-break-after: avoid; }
+        tr, li { page-break-inside: avoid; }
+        /* Colunas lado a lado: aproveitam a largura da página em vez de deixar a metade direita vazia. */
+        table.grade { table-layout: fixed; margin: 0 0 8px; }
+        table.grade > tbody > tr > td, table.grade > tr > td { vertical-align: top; border-bottom: 0; padding: 0 8px 0 0; }
+        table.grade > tbody > tr > td + td, table.grade > tr > td + td { padding: 0 0 0 8px; }
+        .perfil { display: inline-block; width: 31%; margin-right: 1.5%; vertical-align: top; }
         .kpi { display: inline-block; width: 23%; margin-right: 1%; padding: 8px; background: #f1f5f9; border-radius: 6px; vertical-align: top; }
         .kpi b { display: block; font-size: 16px; color: #1d4ed8; }
     </style>
@@ -80,11 +86,27 @@
 
     <h2>4. Variáveis que a atenção ainda não usa</h2>
     <p>São colunas da planilha que não entram no cálculo da atenção hoje. Testadas na mesma régua: as que separam bem podem valer a pena entrar nele.</p>
-    <table>
-        <tr><th>Variável</th><th>Separação</th><th>Média nos cancelados</th><th>Média nos retidos</th></tr>
-        @foreach (collect($r['extras'])->sortByDesc('auc') as $v)
-            <tr><td>{{ $v['rotulo'] }}</td><td>{{ $n($v['auc'], 2) }} ({{ $forca($v['auc']) }})</td><td>{{ $n($v['media_cancelados'], 1) }}</td><td>{{ $n($v['media_retidos'], 1) }}</td></tr>
-        @endforeach
+    <table class="grade">
+        <tr>
+            <td style="width: 55%">
+                <table>
+                    <tr><th>Variável</th><th>Separação</th><th>Cancelados</th><th>Retidos</th></tr>
+                    @foreach (collect($r['extras'])->sortByDesc('auc') as $v)
+                        <tr><td>{{ $v['rotulo'] }}</td><td>{{ $n($v['auc'], 2) }} ({{ $forca($v['auc']) }})</td><td>{{ $n($v['media_cancelados'], 1) }}</td><td>{{ $n($v['media_retidos'], 1) }}</td></tr>
+                    @endforeach
+                </table>
+            </td>
+            <td style="width: 45%">
+                <h3 style="margin-top: 0">Perfil de quem cancelou (% da carteira que cancelou)</h3>
+                @foreach ($r['perfis'] as $titulo => $grupos)
+                    <div style="margin-bottom: 5px"><b>{{ $titulo }}:</b>
+                        @foreach ($grupos as $g)
+                            {{ $g['nome'] }} <b>{{ $n($g['pct']) }}%</b> <span class="muted">({{ $g['cancelados'] }}/{{ $g['total'] }})</span>{{ $loop->last ? '' : ' · ' }}
+                        @endforeach
+                    </div>
+                @endforeach
+            </td>
+        </tr>
     </table>
 
     <h2>4b. Isso vale para o futuro? (validação em período separado)</h2>
@@ -99,24 +121,10 @@
             <tr><td>Cancelados do teste alertados (corte calibrado antes: atenção ≥ {{ $vt['corte_alto'] ?? '—' }})</td><td><b>{{ $vt['detectados'] }} de {{ $vt['teste']['cancelados'] }}</b></td></tr>
             <tr><td>Alarme falso entre os que nunca cancelaram</td><td>{{ $n($vt['alarme_falso_pct'], 1) }}%</td></tr>
         </table>
-        <p class="muted">Quanto mais perto a separação do teste estiver da de calibração, menos o resultado depende de ter sido ajustado aos mesmos casos. Com poucos cancelamentos por período, os números são indicativos.</p>
+        <p class="muted">Quanto mais perto a separação do teste estiver da de calibração, menos o resultado depende de ter sido ajustado aos mesmos casos. Os clientes que saíram depois do corte contam como ativos na calibração, como na época, o que a torna mais difícil que o teste. Com poucos cancelamentos por período, os números são indicativos.</p>
     @else
         <p>Não há cancelamentos suficientes antes e depois de um ponto de corte para validar em período separado.</p>
     @endif
-
-    <h3>Perfil de quem cancelou (% da carteira que cancelou)</h3>
-    <table>
-        <tr>
-            @foreach ($r['perfis'] as $titulo => $grupos)
-                <td style="vertical-align: top; width: 33%">
-                    <b>{{ $titulo }}</b>
-                    @foreach ($grupos as $g)
-                        <div>{{ $g['nome'] }}: <b>{{ $n($g['pct']) }}%</b> <span class="muted">({{ $g['cancelados'] }} de {{ $g['total'] }})</span></div>
-                    @endforeach
-                </td>
-            @endforeach
-        </tr>
-    </table>
 
     <h2>5. Configuração recomendada</h2>
     @if ($r['evidencia_suficiente'])
@@ -130,23 +138,31 @@
         <p>Sem cancelamentos suficientes para recomendar mudanças.</p>
     @endif
 
-    <h2 class="quebra">6. Os {{ count($r['cancelamentos']['alto']) }} cancelamentos, um a um (corte Alto ≥ {{ $alto['limiar'] }})</h2>
+    <h2>6. Os {{ count($r['cancelamentos']['alto']) }} cancelamentos, um a um (corte Alto ≥ {{ $alto['limiar'] }})</h2>
     <p>"Sem alerta" = a atenção não estava acima do corte no último mês antes da saída.</p>
-    <table>
-        <tr><th>Cliente</th><th>Saída</th><th>Contrato/mês</th><th>Alerta desde</th><th>Antecedência</th><th>Atenção final</th></tr>
-        @foreach ($r['cancelamentos']['alto'] as $c)
-            <tr>
-                <td>{{ $c['nome'] }} ({{ $c['codigo'] }})</td>
-                <td>{{ $c['saida'] }}</td>
-                <td>{{ $brl($c['valor']) }}</td>
-                <td>{{ $c['alerta_desde'] ?? 'Sem alerta' }}</td>
-                <td>{{ $meses($c['antecedencia']) }}</td>
-                <td>{{ $c['score_final'] }}</td>
-            </tr>
-        @endforeach
+    <table class="grade">
+        <tr>
+            @foreach (collect($r['cancelamentos']['alto'])->chunk(max(1, (int) ceil(count($r['cancelamentos']['alto']) / 2))) as $metade)
+                <td style="width: 50%">
+                    <table>
+                        <tr><th>Cliente</th><th>Saída</th><th>Contrato/mês</th><th>Alerta desde</th><th>Antec.</th><th>Atenção</th></tr>
+                        @foreach ($metade as $c)
+                            <tr>
+                                <td>{{ $c['nome'] }} ({{ $c['codigo'] }})</td>
+                                <td>{{ $c['saida'] }}</td>
+                                <td>{{ $brl($c['valor']) }}</td>
+                                <td>{{ $c['alerta_desde'] ?? 'Sem alerta' }}</td>
+                                <td>{{ $meses($c['antecedencia']) }}</td>
+                                <td>{{ $c['score_final'] }}</td>
+                            </tr>
+                        @endforeach
+                    </table>
+                </td>
+            @endforeach
+        </tr>
     </table>
 
-    <h2 class="quebra">7. Por segmento</h2>
+    <h2>7. Por segmento</h2>
     <table>
         <tr><th>Segmento</th><th>Cancelaram</th><th>Receita perdida/mês</th><th>O que mais se destacou nos cancelados</th><th>Ativos com o mesmo padrão</th></tr>
         @foreach ($segs as $s)
@@ -160,8 +176,12 @@
         @endforeach
     </table>
 
-    @foreach ($segs as $s)
-        <h3>{{ $s['segmento'] }}: o que aconteceu e o que pode acontecer</h3>
+    <table class="grade">
+    @foreach ($segs->chunk(2) as $par)
+        <tr>
+        @foreach ($par as $s)
+        <td style="width: 50%">
+        <h3 style="margin-top: 6px">{{ $s['segmento'] }}: o que aconteceu e o que pode acontecer</h3>
         <p>{{ $s['cancelados'] }} de {{ $s['total'] }} clientes do segmento cancelaram ({{ $n($s['pct_cancelou']) }}%), o que deixou de render {{ $brl($s['receita_perdida']) }} por mês.</p>
         @if ($s['elevados'])
             <p><b>Elevado nos que cancelaram (último mês antes da saída):</b></p>
@@ -184,7 +204,12 @@
         @else
             <p class="muted">Nenhum cliente ativo deste segmento repete o padrão hoje.</p>
         @endif
+        </td>
+        @endforeach
+        @if ($par->count() < 2)<td style="width: 50%"></td>@endif
+        </tr>
     @endforeach
+    </table>
 
     <p class="muted">Os números indicam correlação com o cancelamento, não causa, e não são uma probabilidade de cancelamento.</p>
 </body>
