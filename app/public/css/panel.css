@@ -358,3 +358,18 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .chatbot-send:hover svg { transform: translate(2px, -2px); transition: transform .15s; }
 .fi-icon-btn svg { transition: transform .15s; } .fi-icon-btn:hover svg { transform: scale(1.12); }
 @media (prefers-reduced-motion: reduce) { .chatbot-mic svg, .sino-toca svg, .fi-icon-btn svg { animation: none !important; transition: none; } }
+
+/* Leitura em voz alta: ao clicar, as ondas do som surgem em sequência e um anel se expande; ligado, as ondas pulsam. */
+@keyframes ac-onda-surge { 0% { opacity: 0; transform: translateX(-4px) scale(.6); } 60% { opacity: 1; transform: translateX(0) scale(1.15); } 100% { opacity: 1; transform: none; } }
+@keyframes ac-onda-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes ac-anel { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-500) 55%, transparent); } 100% { box-shadow: 0 0 0 .9rem transparent; } }
+@keyframes ac-alto-falante { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.18); } 70% { transform: scale(.94); } }
+.ac-voz .ac-onda { transform-box: fill-box; transform-origin: left center; }
+.ac-voz.tocou { animation: ac-anel .6s ease-out; }
+.ac-voz.tocou svg { animation: ac-alto-falante .45s ease-out; }
+.ac-voz.tocou.ligado .ac-onda-1 { animation: ac-onda-surge .4s ease-out both; }
+.ac-voz.tocou.ligado .ac-onda-2 { animation: ac-onda-surge .4s .18s ease-out both; }
+.ac-voz.ligado:not(.tocou) .ac-onda-1 { animation: ac-onda-pulsa 1.4s ease-in-out infinite; }
+.ac-voz.ligado:not(.tocou) .ac-onda-2 { animation: ac-onda-pulsa 1.4s .3s ease-in-out infinite; }
+.ac-voz:not(.ligado) .ac-onda-2 { opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .ac-voz, .ac-voz svg, .ac-voz .ac-onda { animation: none !important; } }

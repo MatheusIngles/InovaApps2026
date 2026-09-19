@@ -1,6 +1,6 @@
 {{-- Leitura em voz alta: com o botão ligado, o que estiver sob o mouse ou o foco do teclado é falado (Web Speech API, pt-BR). --}}
 <button type="button" class="ac-voz" id="ac-voz" aria-pressed="false" hidden>
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="ac-onda ac-onda-1" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="ac-onda ac-onda-2" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     <span class="ac-voz-texto">Leitura em voz alta</span>
 </button>
 <script>
@@ -66,6 +66,7 @@
             ligado = !ligado;
             guardar(ligado);
             atualizar();
+            botao.classList.remove('tocou'); void botao.offsetWidth; botao.classList.add('tocou'); setTimeout(() => botao.classList.remove('tocou'), 800);
             if (ligado) falar('Leitura em voz alta ativada. Passe o mouse ou use o teclado sobre um item para ouvir o que ele é.');
             else { clearTimeout(timer); speechSynthesis.cancel(); }
         });
