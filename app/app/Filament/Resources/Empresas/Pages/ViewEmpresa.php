@@ -3,33 +3,28 @@
 namespace App\Filament\Resources\Empresas\Pages;
 
 use App\Filament\Resources\Empresas\EmpresaResource;
-use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
-use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
 
+/** Perfil da empresa no estilo LinkedIn (banner, logo, sobre, destaques e empresas parecidas). */
 class ViewEmpresa extends ViewRecord
 {
     protected static string $resource = EmpresaResource::class;
 
-    public function getSubheading(): string
-    {
-        $e = $this->record;
+    protected string $view = 'filament.pages.empresa';
 
-        return "{$e->codigo} · {$e->segmento} · porte {$e->porte} · cliente desde ".date('m/Y', strtotime($e->inicio))
-            .($e->cancelada() ? " · cancelou em {$e->mes_cancel}" : '');
+    public function getTitle(): string|Htmlable
+    {
+        return $this->record->nome;
     }
 
-    protected function getHeaderActions(): array
+    public function getHeading(): string|Htmlable
     {
-        return [
-            Action::make('chat')
-                ->label('Chat da empresa')
-                ->icon(Heroicon::OutlinedChatBubbleLeftRight)
-                ->slideOver()
-                ->modalHeading(fn () => "Chat · {$this->record->nome}")
-                ->modalContent(fn () => view('filament.chat-modal', ['codigo' => $this->record->codigo]))
-                ->modalSubmitAction(false)
-                ->modalCancelActionLabel('Fechar'),
-        ];
+        return '';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [];
     }
 }

@@ -6,12 +6,7 @@ use App\Filament\Resources\Empresas\Pages\ListEmpresas;
 use App\Filament\Resources\Empresas\Pages\ViewEmpresa;
 use App\Models\Customer;
 use BackedEnum;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\RepeatableEntry\TableColumn;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
@@ -92,56 +87,6 @@ class EmpresaResource extends Resource
                 SelectFilter::make('segment')->label('Segmento')->options(fn () => Customer::distinct()->orderBy('segment')->pluck('segment', 'segment')->all()),
             ])
             ->recordActions([]);
-    }
-
-    public static function infolist(Schema $schema): Schema
-    {
-        return $schema->components([
-            Section::make()->columns(['default' => 2, 'md' => 3, 'xl' => 6])->schema([
-                TextEntry::make('nivel')->label('Nível')->badge()
-                    ->state(fn (Customer $e) => $e->rotulo())->color(fn (string $state) => self::cor($state)),
-                TextEntry::make('score')->label('Score de sinais')->size(TextSize::Large)->weight(FontWeight::Bold)
-                    ->formatStateUsing(fn ($state) => "{$state} / 100"),
-                TextEntry::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Customer::brl($state)),
-                TextEntry::make('exposicao')->label('Exposição mensal indicativa')->formatStateUsing(fn ($state) => Customer::brl($state)),
-                TextEntry::make('plano'),
-                TextEntry::make('sla_h')->label('SLA contratado')->suffix(' h'),
-            ]),
-            Section::make('Por que está neste nível e o que fazer')
-                ->description('Sinais dos últimos 3 meses, do mais para o menos relevante.')
-                ->schema([
-                    RepeatableEntry::make('sinais')->hiddenLabel()->contained(false)->schema([
-                        TextEntry::make('label')->hiddenLabel()->weight(FontWeight::SemiBold),
-                        TextEntry::make('texto')->hiddenLabel()->color('gray'),
-                        TextEntry::make('acao')->hiddenLabel()->icon(Heroicon::OutlinedArrowRightCircle)->iconColor('primary'),
-                    ])->columns(['md' => 3]),
-                ]),
-            Section::make('Empresas que cancelaram em estado similar')
-                ->description('Comparação do perfil dos últimos 3 meses com o de quem já saiu.')
-                ->schema([
-                    RepeatableEntry::make('similares')->hiddenLabel()->contained(false)->grid(['md' => 3])->schema([
-                        TextEntry::make('nome')->hiddenLabel()->weight(FontWeight::SemiBold)
-                            ->url(fn (string $state) => static::getUrl('view', ['record' => substr($state, strrpos($state, ' ') + 1)])),
-                        TextEntry::make('mes_cancel')->hiddenLabel()->prefix('Cancelou em '),
-                        TextEntry::make('sim')->hiddenLabel()->badge()->color('danger')->suffix('% de semelhança'),
-                    ]),
-                ]),
-            Section::make('Pesquisas de satisfação (NPS)')->collapsible()->schema([
-                RepeatableEntry::make('nps')->hiddenLabel()->contained(false)->grid(['default' => 3, 'md' => 6, 'xl' => 9])->schema([
-                    TextEntry::make('mes')->hiddenLabel()->size(TextSize::ExtraSmall)->color('gray'),
-                    TextEntry::make('nota')->hiddenLabel()->size(TextSize::Large)->weight(FontWeight::Bold),
-                ]),
-            ]),
-            Section::make('Histórico mensal')->collapsible()->schema([
-                RepeatableEntry::make('hist')->hiddenLabel()->table([
-                    TableColumn::make('Mês'), TableColumn::make('Chamados'), TableColumn::make('Reabertos'), TableColumn::make('SLA %'),
-                    TableColumn::make('Uso %'), TableColumn::make('Reclam.'), TableColumn::make('Atraso (d)'), TableColumn::make('Reuniões'),
-                ])->schema([
-                    TextEntry::make('mes'), TextEntry::make('abertos'), TextEntry::make('reabertos'), TextEntry::make('sla'),
-                    TextEntry::make('uso'), TextEntry::make('recl'), TextEntry::make('atraso'), TextEntry::make('reunioes'),
-                ]),
-            ]),
-        ]);
     }
 
     public static function getPages(): array
