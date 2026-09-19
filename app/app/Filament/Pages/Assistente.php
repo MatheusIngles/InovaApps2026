@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
 
 class Assistente extends Page
 {
@@ -16,8 +17,9 @@ class Assistente extends Page
 
     protected static ?string $slug = 'assistente';
 
-    public function getSubheading(): string
+    /** Tela cheia de chat: sem cabeçalho de página. */
+    public function getHeading(): string|Htmlable
     {
-        return 'Responde localmente com base nos dados de toda a carteira. Cite o código (ex.: C012) para falar de uma empresa.';
+        return '';
     }
 }
