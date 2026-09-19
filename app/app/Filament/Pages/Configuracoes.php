@@ -124,7 +124,7 @@ class Configuracoes extends Page implements HasSchemas
             ->modalSubmitActionLabel('Aplicar')
             ->fillForm(fn (): array => ['pos' => collect(CompanyConfig::pesosPorPosicao($this->data['metricas'] ?? []))->where('peso', '>', 0)->pluck('peso')->values()->all()])
             ->schema(fn (): array => collect(range(0, $posicoes() - 1))->map(fn (int $i) => TextInput::make("pos.$i")
-                ->label(($i + 1).'º · '.(Risco::ROTULOS[collect($this->data['metricas'] ?? [])->where('ativa', true)->values()[$i]['k'] ?? ''] ?? ''))
+                ->label('Peso da prioridade '.($i + 1))
                 ->numeric()->minValue(1)->maxValue(100)->required()
                 ->rule(fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get, $i): void {
                     if ($i > 0 && (float) $value > (float) $get('pos.'.($i - 1))) {
