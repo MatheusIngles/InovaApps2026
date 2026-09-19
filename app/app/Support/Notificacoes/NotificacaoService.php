@@ -79,7 +79,8 @@ class NotificacaoService
     /** Poucas (ou nenhuma) reunião realizada no mês mais recente, frente ao previsto. */
     private static function baixoContato(Collection $usuarios, Customer $cliente, array $resultado): void
     {
-        $metrica = $cliente->metrics()->where('reference_month', $resultado['reference_month'])->first();
+        // whereDate (não where): a coluna guarda o mês ora como data pura, ora com hora, a depender de como a linha foi gravada.
+        $metrica = $cliente->metrics()->whereDate('reference_month', $resultado['reference_month'])->first();
 
         if (! $metrica || $metrica->meetings_expected <= 0) {
             return; // sem cadência de reuniões prevista, não há o que cobrar
