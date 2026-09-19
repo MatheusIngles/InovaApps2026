@@ -12,7 +12,6 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -29,7 +28,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Component as Livewire;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
-/** Configuração da empresa: prioridade/peso das métricas, limiares dos níveis, tema e chat. */
+/** Configuração da empresa: prioridade/peso das métricas, limiares dos níveis e tema. */
 class Configuracoes extends Page implements HasSchemas
 {
     use InteractsWithSchemas;
@@ -80,12 +79,6 @@ class Configuracoes extends Page implements HasSchemas
                         }
                     }),
             ]),
-            Section::make('Chat com IA')->description('Configurações isoladas desta empresa.')->schema([
-                Toggle::make('chat.enabled')->label('Usar IA no chat (senão, respostas por regras)'),
-                TextInput::make('chat.ollama_model')->label('Modelo local (Ollama)')->placeholder('vazio = padrão do sistema'),
-                Textarea::make('chat.instrucoes')->label('Instruções adicionais para a IA')->rows(3)->maxLength(1000)
-                    ->helperText('Ex.: tom de voz, termos da empresa, o que priorizar.'),
-            ]),
         ]);
     }
 
@@ -122,7 +115,7 @@ class Configuracoes extends Page implements HasSchemas
     {
         return [
             Action::make('restaurar')->label('Restaurar padrão')->color('gray')->requiresConfirmation()
-                ->modalDescription('Remove pesos, limiares, tema e configurações do chat personalizados desta empresa.')->action(fn () => $this->restaurar()),
+                ->modalDescription('Remove pesos, limiares e tema personalizados desta empresa.')->action(fn () => $this->restaurar()),
         ];
     }
 }

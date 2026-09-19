@@ -52,7 +52,7 @@
     <div class="chatbot-log" role="log" aria-live="polite" aria-label="Conversa" x-effect="pendente; $wire.mensagens.length; $nextTick(() => $el.scrollTop = $el.scrollHeight)">
         @forelse ($mensagens as $m)
             <div class="chatbot-row {{ $m['eu'] ? 'eu' : '' }}">
-                <div class="chatbot-msg">{{ $m['texto'] }}@isset($m['fonte'])<small>{{ $m['fonte'] }}</small>@endisset</div>
+                <div class="chatbot-msg">@if ($m['eu']){{ $m['texto'] }}@else<div class="chatbot-markdown">{!! \Illuminate\Support\Str::markdown($m['texto'], ['html_input' => 'escape', 'allow_unsafe_links' => false]) !!}</div>@endif @isset($m['fonte'])<small>{{ $m['fonte'] }}</small>@endisset</div>
             </div>
         @empty
             <div class="chatbot-vazio" x-show="!pendente">
