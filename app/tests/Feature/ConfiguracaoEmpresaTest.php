@@ -56,7 +56,7 @@ class ConfiguracaoEmpresaTest extends TestCase
         $this->assertFalse(CompanyConfig::salvar($company, $this->dados($company, ['sla' => 20]))); // nada mudou: sem recálculo
     }
 
-    public function test_slider_de_prioridade_altera_score_e_exposicao_do_cliente(): void
+    public function test_reordenar_metricas_na_tela_altera_score_e_exposicao_do_cliente(): void
     {
         $company = $this->empresaComCliente();
         $this->actingAs(User::factory()->for($company)->create());
@@ -65,13 +65,21 @@ class ConfiguracaoEmpresaTest extends TestCase
         Livewire::test(Configuracoes::class)->call('salvar')->assertHasNoErrors();
         $this->assertSame(20, $avaliacao()->score);
 
-        Livewire::test(Configuracoes::class)->set('data.pesos.uso', 8)->call('salvar')->assertHasNoErrors();
+        $metricas = CompanyConfig::ler($company->fresh())['metricas'];
+        $uso = collect($metricas)->firstWhere('k', 'uso');
+        $reordenadas = collect($metricas)->reject(fn ($metrica) => $metrica['k'] === 'uso')->push($uso)->values()->all();
 
-        $this->assertSame(8.0, $company->fresh()->pesos()['uso']);
-        $this->assertSame(9, $avaliacao()->score);
-        $this->assertEqualsWithDelta($avaliacao()->valor * 0.09, $avaliacao()->exposicao, 0.01);
+        Livewire::test(Configuracoes::class)->set('data.metricas', $reordenadas)->call('salvar')->assertHasNoErrors();
 
-        Livewire::test(Configuracoes::class)->set('data.pesos.uso', 0)->call('salvar')->assertHasNoErrors();
+        $this->assertSame('uso', $company->fresh()->metric_weights[7]['k']);
+        $this->assertSame(8, $avaliacao()->score);
+        $this->assertEqualsWithDelta($avaliacao()->valor * 0.08, $avaliacao()->exposicao, 0.01);
+
+        $metricasSemUso = collect(CompanyConfig::ler($company->fresh())['metricas'])
+            ->map(fn ($metrica) => $metrica['k'] === 'uso' ? [...$metrica, 'ativa' => false] : $metrica)
+            ->all();
+
+        Livewire::test(Configuracoes::class)->set('data.metricas', $metricasSemUso)->call('salvar')->assertHasNoErrors();
 
         $this->assertSame(0.0, $company->fresh()->pesos()['uso']);
         $this->assertSame(0, $avaliacao()->score);
@@ -139,7 +147,7 @@ class ConfiguracaoEmpresaTest extends TestCase
         app(CompanyContext::class)->within($company, fn () => Customer::factory()->create(['company_id' => $company->id])); // já fez a carga inicial
 
         $this->get('/configuracoes')->assertOk()->assertSee('Prioridades')->assertSee('Níveis de risco')->assertSee('Identidade visual')
-            ->assertSee('Peso de cada métrica')->assertSee('Acrescentar novos meses')->assertSee('#115e59', false)->assertSee('Inter')
+            ->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
             ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->call('salvar')->assertHasNoErrors();
         $this->assertSame(70, $company->fresh()->limiares()['critico']);
