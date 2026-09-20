@@ -9,6 +9,7 @@ use App\Support\Llm\Escopo;
 use App\Support\Llm\Llm;
 use App\Support\Llm\PerguntasProntas;
 use App\Support\Tenancy\CompanyContext;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -30,6 +31,7 @@ MODO CONVERSA POR VOZ: sua resposta será lida em voz alta. Fale como numa conve
     public string $pergunta = '';
 
     /** @var array<int, array{eu: bool, texto: string, fonte?: string}> */
+    #[Locked]
     public array $mensagens = [];
 
     public function updatedCodigo(): void

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CabecalhosDeSeguranca;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // O login é fornecido pelo painel Filament em /login, mas a rota
         // não possui o nome "login" esperado pelo middleware auth padrão.
         $middleware->redirectGuestsTo('/login');
+        $middleware->append(CabecalhosDeSeguranca::class); // global: vale também para as rotas do painel Filament
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

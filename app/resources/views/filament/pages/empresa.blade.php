@@ -176,7 +176,7 @@
                                 @php($period = $e->periods->first(fn ($entry) => $entry->reference_month->format('Y-m') === $month))
                                 <tr><td>{{ $month }}</td><td>{{ $period?->monthly_value !== null ? Customer::brl((float) $period->monthly_value) : '—' }}</td>@foreach ($definitions as $definition)
                                     @php($observation = $customCells->get($month.':'.$definition->id))
-                                    <td>{{ $observation ? ($definition->value_type === 'text' ? $observation->text_value : number_format((float) $observation->value, $definition->value_type === 'integer' ? 0 : 2, ',', '.')) : '—' }}</td>
+                                    <td>{{ $observation ? (\App\Models\MetricDefinition::semScore($definition->value_type) ? $observation->text_value : number_format((float) $observation->value, $definition->value_type === 'integer' ? 0 : 2, ',', '.')) : '—' }}</td>
                                 @endforeach</tr>
                             @endforeach
                         </tbody>

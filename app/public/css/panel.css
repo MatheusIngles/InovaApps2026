@@ -453,3 +453,21 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .vn-lista { display: grid; grid-template-columns: auto 1fr; gap: .4rem .9rem; margin: 0; font-size: .88rem; }
 .vn-lista dt { font-weight: 700; color: var(--primary-400); white-space: nowrap; }
 .vn-lista dd { margin: 0; line-height: 1.4; }
+
+/* Login/cadastro: título e subtítulo sempre centralizados, inclusive quando quebram de linha */
+.fi-simple-header { text-align: center; }
+.fi-simple-header-subheading { text-align: center; text-wrap: balance; }
+
+/* Login, cadastro e recuperação de senha: campos brancos com texto escuro, também no tema escuro */
+.fi-simple-page .fi-input-wrp, .fi.dark .fi-simple-page .fi-input-wrp { background: #fff; border-color: #cbd5e1; }
+.fi-simple-page .fi-input { color: #0f172a; -webkit-text-fill-color: #0f172a; caret-color: #0f172a; }
+.fi-simple-page .fi-input::placeholder { color: #94a3b8; -webkit-text-fill-color: #94a3b8; }
+.fi-simple-page .fi-input-wrp-suffix, .fi-simple-page .fi-input-wrp-suffix .fi-icon-btn { color: #475569; }
+.fi-simple-page .fi-input-wrp-suffix { border-color: #e2e8f0; }
+
+/* Widgets carregando (gráficos, indicadores): esqueleto com brilho passando, em vez de um bloco vazio */
+.fi-loading-section { position: relative; overflow: hidden; animation: none; }
+.fi-loading-section::before { content: ''; position: absolute; inset: 1.25rem 1.5rem auto; height: 1.1rem; width: 40%; border-radius: .5rem; background: color-mix(in srgb, var(--primary-500) 22%, transparent); }
+.fi-loading-section::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--primary-400) 22%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: esqueleto-brilho 1.4s ease-in-out infinite; }
+@keyframes esqueleto-brilho { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .fi-loading-section::after { animation: none; } }

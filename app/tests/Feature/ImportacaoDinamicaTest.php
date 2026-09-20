@@ -181,6 +181,49 @@ class ImportacaoDinamicaTest extends TestCase
             ->get('/empresas/A')->assertOk()->assertSee('2026-07')->assertSee('Em expansão')->assertSee('1.200,50');
     }
 
+    public function test_tipos_data_binario_e_nota_com_inicio_e_fim(): void
+    {
+        $company = Company::factory()->create();
+        $structure = array_combine(array_keys(DynamicImportService::STRUCTURE), array_keys(DynamicImportService::STRUCTURE));
+        $colunas = ['data_inicio', 'data_fim', 'renovou', 'nota_atendimento'];
+        $table = $this->table([$this->row('A', '2026-06', ['data_inicio' => '01/03/2026', 'data_fim' => '2027-02-28', 'renovou' => 'sim', 'nota_atendimento' => '8,5'])], $colunas);
+
+        $sugestao = DynamicImportService::sugerir($company, $table['cabecalhos'], $table['linhas']);
+        $this->assertSame('date', $sugestao['metrics'][0]['value_type']);
+        $this->assertSame('date', $sugestao['metrics'][1]['value_type']);
+
+        DynamicImportService::importar($company, $table, $structure, [
+            $this->newMetric('data_inicio', 'data_inicio', 'date'),
+            $this->newMetric('data_fim', 'data_fim', 'date'),
+            $this->newMetric('renovou', 'renovou', 'binary'),
+            $this->newMetric('nota_atendimento', 'nota_atendimento', 'grade'),
+        ]);
+
+        app(CompanyContext::class)->within($company, function () use ($company): void {
+            $valor = fn (string $codigo) => MetricValue::whereHas('definition', fn ($q) => $q->where('code', $codigo))->firstOrFail();
+            $this->assertSame('2026-03-01', $valor('data_inicio')->text_value);
+            $this->assertSame('2027-02-28', $valor('data_fim')->text_value);
+            $this->assertSame('1.0000', $valor('renovou')->value);
+            $this->assertSame('8.5000', $valor('nota_atendimento')->value);
+            $this->assertSame('0.00', $company->metricDefinitions()->where('code', 'data_fim')->firstOrFail()->weight);
+        });
+    }
+
+    public function test_nota_acima_de_10_e_data_invalida_sao_rejeitadas(): void
+    {
+        $company = Company::factory()->create();
+        $structure = array_combine(array_keys(DynamicImportService::STRUCTURE), array_keys(DynamicImportService::STRUCTURE));
+
+        foreach ([['grade', '11', 'não corresponde'], ['date', '31/02/2026', 'deve ser uma data']] as [$tipo, $valor, $mensagem]) {
+            try {
+                DynamicImportService::importar($company, $this->table([$this->row('A', '2026-06', ['m' => $valor])], ['m']), $structure, [$this->newMetric('m', 'm', $tipo)]);
+                $this->fail("Aceitou $tipo inválido.");
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString($mensagem, $e->getMessage());
+            }
+        }
+    }
+
     public function test_mapeamento_rejeita_metrica_de_outra_conta_sem_gravar(): void
     {
         $company = Company::factory()->create();

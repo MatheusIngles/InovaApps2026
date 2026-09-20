@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\MetricDefinition;
 use App\Models\RiskAssessment;
 use App\Support\Metricas\MetricRisk;
 use App\Support\Notificacoes\NotificacaoService;
@@ -20,7 +21,7 @@ class RiskService
                 $pesos = $company->pesos();
                 $limiares = $company->limiares();
                 $definitions = $company->metricDefinitions()->get();
-                $enabledDefinitionIds = $definitions->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text' && (float) $definition->weight > 0)->pluck('id');
+                $enabledDefinitionIds = $definitions->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type) && (float) $definition->weight > 0)->pluck('id');
                 $customers = Customer::with(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month'), 'periods' => fn ($q) => $q->orderBy('reference_month')])->get();
                 $results = [];
 

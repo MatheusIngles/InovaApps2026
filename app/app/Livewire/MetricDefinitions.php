@@ -28,7 +28,7 @@ class MetricDefinitions extends Component
     public function create(): void
     {
         $company = app(CompanyContext::class)->current();
-        $text = ($this->newMetric['value_type'] ?? null) === 'text';
+        $text = MetricDefinition::semScore($this->newMetric['value_type'] ?? null);
         $data = $this->validate([
             'newMetric.code' => ['required', 'regex:/^[a-z][a-z0-9_]{0,39}$/', Rule::unique('metric_definitions', 'code')->where('company_id', $company->id)],
             'newMetric.label' => 'required|string|max:100',
@@ -39,7 +39,7 @@ class MetricDefinitions extends Component
             'newMetric.critical_value' => ($text ? 'nullable' : 'required').'|numeric|between:-9999999999,9999999999',
             'newMetric.weight' => 'required|numeric|between:0,100',
         ])['newMetric'];
-        if ($data['value_type'] === 'text') {
+        if (MetricDefinition::semScore($data['value_type'])) {
             $data['weight'] = 0;
             $data['healthy_value'] = 0;
             $data['critical_value'] = 1;
@@ -72,7 +72,7 @@ class MetricDefinitions extends Component
         if ($definition->value_type !== $data['value_type'] && $definition->values()->exists()) {
             throw ValidationException::withMessages(["edits.$id.value_type" => 'Não altere o tipo de uma métrica que já possui valores.']);
         }
-        if ($data['value_type'] === 'text') {
+        if (MetricDefinition::semScore($data['value_type'])) {
             $data['weight'] = 0;
             $data['healthy_value'] = 0;
             $data['critical_value'] = 1;

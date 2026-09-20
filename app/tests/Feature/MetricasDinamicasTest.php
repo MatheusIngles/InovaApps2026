@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\CustomerMetric;
 use App\Models\MetricValue;
 use App\Models\User;
+use App\Support\Import\DynamicImportService;
 use App\Support\Import\PlanilhaReader;
 use App\Support\Import\TemplateImportService;
 use App\Support\Import\TemplateLayout;
@@ -24,6 +25,7 @@ use InvalidArgumentException;
 use Livewire\Livewire;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Reader\XLSX\Reader;
 use OpenSpout\Writer\XLSX\Writer;
 use Tests\TestCase;
 
@@ -215,12 +217,112 @@ class MetricasDinamicasTest extends TestCase
         Storage::assertMissing('imports/invalido.csv');
     }
 
-    public function test_planilha_do_desafio_nao_e_aceita_como_modelo_de_upload(): void
+    /** @param  array<string, list<list<mixed>>>  $abas */
+    private function xlsx(array $abas): string
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('uma única aba');
+        $path = tempnam(sys_get_temp_dir(), 'seer').'.xlsx';
+        $writer = new Writer;
+        $writer->openToFile($path);
+        $primeira = true;
+        foreach ($abas as $nome => $linhas) {
+            $primeira ? $writer->getCurrentSheet()->setName($nome) : $writer->addNewSheetAndMakeItCurrent()->setName($nome);
+            $primeira = false;
+            foreach ($linhas as $linha) {
+                $writer->addRow(Row::fromValues($linha));
+            }
+        }
+        $writer->close();
 
-        PlanilhaReader::lerModelo(database_path('data/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
+        return $path;
+    }
+
+    public function test_planilha_do_desafio_com_varias_abas_e_ligada_por_cliente_id_e_o_dicionario_preenche_as_metricas(): void
+    {
+        $company = Company::factory()->create();
+        $tabela = PlanilhaReader::lerModelo(database_path('data/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
+
+        $this->assertSame(['cliente_id', 'mes_ref'], array_slice($tabela['cabecalhos'], 0, 2));
+        foreach (['segmento', 'valor_mensal', 'chamados_abertos', 'nota_nps', 'situacao', 'mes_cancelamento'] as $coluna) {
+            $this->assertContains($coluna, $tabela['cabecalhos']);
+        }
+        $this->assertArrayHasKey('pct_sla_cumprido', $tabela['dicionario']);
+        $this->assertArrayNotHasKey('Leia-me', $tabela['dicionario']);
+
+        $sugestao = DynamicImportService::sugerir($company, $tabela['cabecalhos'], array_slice($tabela['linhas'], 0, 5), $tabela['dicionario']);
+        $tipos = array_column($sugestao['metrics'], 'value_type', 'column');
+        $this->assertSame('integer', $tipos['chamados_abertos']);
+        $this->assertSame('percentage', $tipos['pct_sla_cumprido']);
+        $this->assertSame('binary', $tipos['reunioes_previstas']);
+        $this->assertSame('grade', $tipos['nota_nps']);
+        $this->assertSame('date', $tipos['inicio_contrato']);
+        $this->assertSame('text', $tipos['classificacao_nps']);
+        $descricoes = array_column($sugestao['metrics'], 'description', 'column');
+        $this->assertNotSame('', $descricoes['chamados_abertos']);
+    }
+
+    public function test_abas_de_dados_sem_cliente_id_ou_com_coluna_repetida_sao_recusadas(): void
+    {
+        $semId = $this->xlsx(['a' => [['cliente_id', 'mes_ref', 'x'], ['C1', '2026-01', 1]], 'b' => [['nome', 'y'], ['C1', 2]]]);
+        try {
+            PlanilhaReader::lerModelo($semId, 'xlsx');
+            $this->fail('Aceitou aba sem cliente_id.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('cliente_id', $e->getMessage());
+        }
+
+        $repetida = $this->xlsx(['a' => [['cliente_id', 'mes_ref', 'x'], ['C1', '2026-01', 1]], 'b' => [['cliente_id', 'x'], ['C1', 2]]]);
+        $this->expectExceptionMessage('aparece nas abas');
+        PlanilhaReader::lerModelo($repetida, 'xlsx');
+    }
+
+    public function test_dicionario_preenchido_configura_a_metrica_inteira_e_importa_com_varias_abas(): void
+    {
+        $company = Company::factory()->create();
+        $path = $this->xlsx([
+            'Leia-me' => [['Instruções']],
+            'dicionario' => [
+                ['aba', 'campo', 'tipo', 'descricao', 'piora_quando', 'valor_saudavel', 'valor_critico', 'peso'],
+                ['metricas', 'uso', 'Percentual', 'Uso da plataforma no mês.', 'diminui', 80, 30, 25],
+            ],
+            'clientes' => [['cliente_id', 'segmento', 'porte', 'plano', 'valor_mensal'], ['C1', 'Varejo', 'Grande', 'Pro', 1500]],
+            'metricas' => [['cliente_id', 'mes_ref', 'uso'], ['C1', '2026-01', 40], ['C1', '2026-02', 35]],
+        ]);
+
+        $tabela = PlanilhaReader::lerModelo($path, 'xlsx');
+        $this->assertCount(2, $tabela['linhas']);
+        $this->assertSame('Varejo', $tabela['linhas'][1]['segmento']);
+
+        $sugestao = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
+        $this->assertEqualsCanonicalizing(
+            ['value_type' => 'percentage', 'description' => 'Uso da plataforma no mês.', 'direction' => 'lower', 'healthy_value' => 80.0, 'critical_value' => 30.0, 'weight' => 25.0],
+            array_intersect_key($sugestao['metrics'][0], array_flip(['value_type', 'description', 'direction', 'healthy_value', 'critical_value', 'weight'])),
+        );
+
+        $resultado = DynamicImportService::importar($company, $tabela, $sugestao['structure'], $sugestao['metrics']);
+        $this->assertSame(1, $resultado['clientes']);
+        $this->assertSame(2, $resultado['valores_metricas']);
+    }
+
+    public function test_modelo_xlsx_baixado_tem_leia_me_dicionario_e_abas_de_dados(): void
+    {
+        $company = Company::factory()->create();
+        $this->definition($company);
+
+        $caminho = DynamicImportService::xlsxModelo($company);
+        $abas = [];
+        $reader = new Reader;
+        $reader->open($caminho);
+        foreach ($reader->getSheetIterator() as $sheet) {
+            $abas[] = $sheet->getName();
+        }
+        $reader->close();
+        $tabela = PlanilhaReader::lerModelo($caminho, 'xlsx');
+        @unlink($caminho);
+
+        $this->assertSame(['Leia-me', 'dicionario', 'clientes', 'metricas_mensais'], $abas);
+        $this->assertContains('cliente_id', $tabela['cabecalhos']);
+        $this->assertNotEmpty($tabela['dicionario']);
+        $this->actingAs(User::factory()->for($company)->create())->get(route('planilha.modelo.xlsx'))->assertOk()->assertDownload('seer-modelo-'.$company->slug.'.xlsx');
     }
 
     public function test_modelo_xlsx_de_uma_aba_e_aceito(): void

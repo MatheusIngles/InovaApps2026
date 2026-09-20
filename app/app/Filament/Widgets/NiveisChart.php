@@ -11,6 +11,9 @@ class NiveisChart extends ChartWidget
 
     protected ?string $heading = 'Clientes ativos por nível de atenção';
 
+    /** Altura reservada enquanto o gráfico carrega, para a página não pular. */
+    protected ?string $placeholderHeight = '22rem';
+
     protected ?string $description = 'Contagem por faixas da atenção (0–100), conforme limites configurados; não é probabilidade.';
 
     protected ?string $maxHeight = '260px';

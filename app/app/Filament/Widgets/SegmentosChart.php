@@ -12,6 +12,9 @@ class SegmentosChart extends ChartWidget
 
     protected ?string $heading = 'Atenção média por segmento';
 
+    /** Altura reservada enquanto o gráfico carrega, para a página não pular. */
+    protected ?string $placeholderHeight = '22rem';
+
     protected ?string $description = 'Média aritmética da atenção por regras (0–100) dos clientes ativos de cada segmento.';
 
     protected ?string $maxHeight = '260px';

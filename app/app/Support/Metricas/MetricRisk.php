@@ -35,7 +35,7 @@ class MetricRisk
         $customEvidence = [];
 
         foreach ($definitions as $definition) {
-            if (! $definition->enabled || $definition->value_type === 'text' || (float) $definition->weight <= 0) {
+            if (! $definition->enabled || MetricDefinition::semScore($definition->value_type) || (float) $definition->weight <= 0) {
                 continue;
             }
 

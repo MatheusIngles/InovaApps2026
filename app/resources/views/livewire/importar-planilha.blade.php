@@ -2,7 +2,8 @@
     <section class="ui-card ui-pad">
         <h2>Enviar planilha</h2>
         <p class="ui-muted">Cada linha representa um cliente em um mês. A planilha precisa identificar cliente, mês, segmento, porte, plano e valor mensal do contrato; adicione qualquer quantidade de colunas de métricas. Arquivos futuros podem conter outras métricas.</p>
-        <p><a class="ui-btn" href="{{ route('planilha.modelo') }}">Baixar modelo CSV básico</a></p>
+        <p><a class="ui-btn primary" href="{{ route('planilha.modelo.xlsx') }}">Baixar modelo completo (XLSX)</a> <a class="ui-btn" href="{{ route('planilha.modelo') }}">Modelo CSV básico</a></p>
+        <p class="ui-muted">O modelo XLSX traz uma aba Leia-me com as instruções e um dicionário dos campos. Você pode usar várias abas, desde que todas tenham a coluna cliente_id. Se preencher o dicionário (tipo, descrição, piora quando, valores e peso), as métricas já chegam configuradas na confirmação.</p>
         <p class="ui-muted">Colunas de métricas omitidas em novos arquivos preservam os valores já importados. Uma célula vazia em uma métrica enviada representa ausência de valor naquele mês.</p>
 
         <label class="pl-drop" wire:loading.class="pl-drop-busy" wire:target="arquivo">
@@ -56,7 +57,7 @@
                                 </label>
                             </div>
                             <label>Descrição<textarea class="fi-input" wire:model="metricMappings.{{ $index }}.description" rows="2" maxlength="1000" required></textarea></label>
-                            @if (($metric['value_type'] ?? 'decimal') !== 'text')
+                            @if (! \App\Models\MetricDefinition::semScore($metric['value_type'] ?? 'decimal'))
                                 <div class="metric-grid">
                                     <label>Quando piora
                                         <select class="fi-input" wire:model="metricMappings.{{ $index }}.direction" required>
@@ -70,7 +71,7 @@
                                     <label>Peso<input class="fi-input" type="number" min="0" max="100" step="0.01" wire:model="metricMappings.{{ $index }}.weight" required></label>
                                 </div>
                             @else
-                                <p class="ui-muted">Valores textuais ficam armazenados no histórico, mas não entram no score.</p>
+                                <p class="ui-muted">Valores textuais e datas ficam armazenados no histórico, mas não entram no cálculo da atenção.</p>
                             @endif
                         @endif
                     </fieldset>

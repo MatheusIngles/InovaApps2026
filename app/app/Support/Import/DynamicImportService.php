@@ -23,6 +23,12 @@ class DynamicImportService
         'valor_mensal' => 'Valor mensal do contrato',
     ];
 
+    /** Modelo em XLSX (Leia-me, dicionário e abas ligadas por cliente_id). Devolve o caminho do arquivo temporário. */
+    public static function xlsxModelo(Company $company): string
+    {
+        return ModeloPlanilha::gerar($company);
+    }
+
     public static function csvModelo(): string
     {
         $stream = fopen('php://temp', 'w+');
@@ -35,7 +41,7 @@ class DynamicImportService
     }
 
     /** @return array{structure: array<string, string|null>, metrics: list<array<string, mixed>>} */
-    public static function sugerir(Company $company, array $headers, array $preview): array
+    public static function sugerir(Company $company, array $headers, array $preview, array $dicionario = []): array
     {
         self::validarCabecalhos($headers);
         $suggestions = ImportService::sugerirMapeamento($headers);
@@ -45,14 +51,15 @@ class DynamicImportService
 
         foreach ($headers as $header) {
             if (! in_array($header, $used, true)) {
-                $metrics[] = self::sugerirMetrica($company, $header, $preview);
+                $metrics[] = self::sugerirMetrica($company, $header, $preview, $dicionario);
             }
         }
 
         return ['structure' => $structure, 'metrics' => $metrics];
     }
 
-    public static function sugerirMetrica(Company $company, string $header, array $preview): array
+    /** @param  array<string, array<string, string>>  $dicionario  campo => linha do dicionário da planilha (opcional) */
+    public static function sugerirMetrica(Company $company, string $header, array $preview, array $dicionario = []): array
     {
         $name = preg_replace('/^metrica__/', '', $header);
         $normalized = self::normalizar($name);
@@ -63,8 +70,10 @@ class DynamicImportService
             ? 'currency' : ($samples->contains(fn ($value) => str_contains((string) $value, '%')) || str_contains($header, '%')
                 ? 'percentage' : 'decimal');
         if ($samples->contains(fn ($value) => ! preg_match('/^-?(?:R\$\s*)?[\d.,]+\s*%?$/', trim((string) $value)))) {
-            $type = 'text';
+            $type = $samples->isNotEmpty() && $samples->every(fn ($value) => self::data(trim((string) $value)) !== null) ? 'date' : 'text';
         }
+        $dic = collect($dicionario)->first(fn (array $linha, string $campo): bool => self::normalizar($campo) === $normalized) ?? [];
+        $type = self::tipoDoDicionario($dic['tipo'] ?? '') ?? $type;
         $code = Str::slug(Str::ascii($name), '_');
         if (! preg_match('/^[a-z]/', $code)) {
             $code = 'm_'.$code;
@@ -75,12 +84,12 @@ class DynamicImportService
             'target' => $existing ? (string) $existing->id : 'new',
             'code' => substr($code, 0, 40),
             'label' => $existing?->label ?? $name,
-            'description' => $existing?->description ?? '',
+            'description' => $existing?->description ?? ($dic['descricao'] ?? ''),
             'value_type' => $existing?->value_type ?? $type,
-            'direction' => $existing?->direction ?? '',
-            'healthy_value' => $existing?->healthy_value ?? '',
-            'critical_value' => $existing?->critical_value ?? '',
-            'weight' => $existing?->weight ?? ($type === 'text' ? 0 : 10),
+            'direction' => $existing?->direction ?? self::direcaoDoDicionario($dic['pioraquando'] ?? ''),
+            'healthy_value' => $existing?->healthy_value ?? self::numeroDoDicionario($dic['valorsaudavel'] ?? ''),
+            'critical_value' => $existing?->critical_value ?? self::numeroDoDicionario($dic['valorcritico'] ?? ''),
+            'weight' => $existing?->weight ?? (MetricDefinition::semScore($type) ? 0 : (self::numeroDoDicionario($dic['peso'] ?? '') ?: 10)),
         ];
     }
 
@@ -231,7 +240,7 @@ class DynamicImportService
             }
             $healthy = $metric['healthy_value'] ?? null;
             $critical = $metric['critical_value'] ?? null;
-            if ($type !== 'text' && (! in_array($direction, ['lower', 'higher'], true)
+            if (! MetricDefinition::semScore($type) && (! in_array($direction, ['lower', 'higher'], true)
                 || ! is_numeric($healthy) || ! is_numeric($critical)
                 || abs((float) $healthy) > 9999999999 || abs((float) $critical) > 9999999999
                 || ($direction === 'higher' && (float) $critical <= (float) $healthy)
@@ -243,10 +252,10 @@ class DynamicImportService
                 'type' => $type,
                 'new' => [
                     'code' => $code, 'label' => $label, 'description' => $description, 'value_type' => $type,
-                    'direction' => $type === 'text' ? 'higher' : $direction,
-                    'healthy_value' => $type === 'text' ? 0 : (float) $healthy,
-                    'critical_value' => $type === 'text' ? 1 : (float) $critical,
-                    'weight' => $type === 'text' ? 0 : (float) $weight,
+                    'direction' => MetricDefinition::semScore($type) ? 'higher' : $direction,
+                    'healthy_value' => MetricDefinition::semScore($type) ? 0 : (float) $healthy,
+                    'critical_value' => MetricDefinition::semScore($type) ? 1 : (float) $critical,
+                    'weight' => MetricDefinition::semScore($type) ? 0 : (float) $weight,
                 ],
             ];
         }
@@ -296,6 +305,56 @@ class DynamicImportService
         return [$structure, $definitions, $records];
     }
 
+    /** Tipo escrito no dicionário ("Decimal (%)", "Inteiro 0-10", "Binario 0/1", "Data"...) para o tipo da métrica. */
+    public static function tipoDoDicionario(string $texto): ?string
+    {
+        $t = Str::lower(Str::ascii(trim($texto)));
+
+        return match (true) {
+            $t === '' => null,
+            str_starts_with($t, 'texto') => 'text',
+            str_starts_with($t, 'data') => 'date',
+            str_contains($t, 'binario') => 'binary',
+            str_contains($t, '0-10') || str_starts_with($t, 'nota') => 'grade',
+            str_contains($t, 'r$') || str_contains($t, 'monet') => 'currency',
+            str_contains($t, '%') || str_contains($t, 'percent') => 'percentage',
+            str_contains($t, 'inteiro') || str_contains($t, 'contagem') => 'integer',
+            str_contains($t, 'decimal') || str_contains($t, 'numer') => 'decimal',
+            default => null,
+        };
+    }
+
+    private static function direcaoDoDicionario(string $texto): string
+    {
+        $t = Str::lower(Str::ascii(trim($texto)));
+
+        return match (true) {
+            str_contains($t, 'dimin') || str_contains($t, 'menor') || str_contains($t, 'cai') => 'lower',
+            str_contains($t, 'aument') || str_contains($t, 'maior') || str_contains($t, 'sobe') => 'higher',
+            default => '',
+        };
+    }
+
+    private static function numeroDoDicionario(string $texto): float|string
+    {
+        $t = str_replace(',', '.', trim($texto));
+
+        return is_numeric($t) ? (float) $t : '';
+    }
+
+    /** Data válida em AAAA-MM-DD ou DD/MM/AAAA, devolvida como AAAA-MM-DD. */
+    private static function data(string $value): ?string
+    {
+        foreach (['Y-m-d', 'd/m/Y'] as $format) {
+            $date = DateTimeImmutable::createFromFormat('!'.$format, $value);
+            if ($date !== false && $date->format($format) === $value) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
     private static function month(string $value): ?string
     {
         foreach (['Y-m', 'Y-m-d'] as $format) {
@@ -314,6 +373,19 @@ class DynamicImportService
         $value = trim((string) $raw);
         if ($value === '') {
             return null;
+        }
+        if ($type === 'date') {
+            $iso = self::data($value) ?? throw new InvalidArgumentException("Linha {$line}: {$column} deve ser uma data (AAAA-MM-DD ou DD/MM/AAAA).");
+
+            return ['value' => null, 'text_value' => $iso];
+        }
+        if ($type === 'binary') {
+            $sim = ['1', 'sim', 's', 'true'];
+            $nao = ['0', 'nao', 'não', 'n', 'false'];
+            $chave = mb_strtolower($value);
+            in_array($chave, [...$sim, ...$nao], true) || throw new InvalidArgumentException("Linha {$line}: {$column} deve ser 0 ou 1.");
+
+            return ['value' => in_array($chave, $sim, true) ? 1.0 : 0.0, 'text_value' => null];
         }
         if ($type === 'text') {
             if (mb_strlen($value) > 1000) {
@@ -339,7 +411,8 @@ class DynamicImportService
         $normalized = trim($normalized);
         $pattern = $type === 'integer' ? '/^-?\d+$/' : '/^-?\d+(?:\.\d{1,4})?$/';
         if (! preg_match($pattern, $normalized) || abs((float) $normalized) > 9999999999.9999
-            || ($type === 'percentage' && ((float) $normalized < 0 || (float) $normalized > 100))) {
+            || ($type === 'percentage' && ((float) $normalized < 0 || (float) $normalized > 100))
+            || ($type === 'grade' && ((float) $normalized < 0 || (float) $normalized > 10))) {
             throw new InvalidArgumentException("Linha {$line}: {$column} não corresponde ao tipo {$type}.");
         }
 

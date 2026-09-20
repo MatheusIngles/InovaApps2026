@@ -44,7 +44,7 @@ class SetCompanyContext
         }
 
         // empresa nova (sem dados): só a tela de planilha até a primeira carga
-        if ($request->user() && $request->isMethod('GET') && ! $request->is('planilha', 'modelo/planilha', 'livewire*', 'logout') && ! Customer::exists()) {
+        if ($request->user() && $request->isMethod('GET') && ! $request->is('planilha', 'modelo/planilha*', 'livewire*', 'logout') && ! Customer::exists()) {
             return redirect(Planilha::getUrl());
         }
 
