@@ -14,7 +14,7 @@ Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes,
 - **Prioridade da fila** por risco × valor do contrato, com constante `K` configurável.
 - **Configurações por empresa**: ordem/peso/ativação dos sinais, limites dos níveis, tema (cores, fonte, logo). Alterações recalculam a carteira.
 - **Painel**: KPIs, clientes por nível, risco por segmento, uso × SLA, comparação com cancelados e fila de atendimento.
-- **Assistente de chat com IA**: Ollama local por padrão ou API externa compatível com OpenAI; histórico filtrado por empresa.
+- **Assistente de chat com IA**: API externa da NVIDIA (prioridade), Ollama local como segunda opção e respostas por regras como último recurso; histórico filtrado por empresa.
 - **Relatório em PDF** por empresa (DomPDF) e **notificações**.
 - **Acessibilidade**: widget **VLibras** (Libras).
 
@@ -100,8 +100,8 @@ Acesse **http://localhost:8000** e entre com um dos usuários acima. Empresa sem
 | `TENANT_BASE_DOMAIN` | Domínio base para detectar a empresa pelo subdomínio. Vazio = desativado |
 | `LLM_ENABLED` | Liga/desliga o assistente de IA |
 | `OLLAMA_URL` / `OLLAMA_MODEL` | Modelo local (padrão `llama3.1` em `localhost:11434`) |
-| `LLM_API_URL` / `LLM_API_KEY` / `LLM_API_MODEL` | API externa (formato OpenAI) para perguntas/contextos maiores |
-| `LLM_LOCAL_MAX_TOKENS` | Limite de contexto enviado ao modelo local |
+| `LLM_API_URL` / `LLM_API_KEY` / `LLM_API_MODEL` | API externa da NVIDIA (formato OpenAI), a primeira opção do chat; sem chave, usa o Ollama |
+| `EDGE_TTS_PYTHON` / `EDGE_TTS_VOZ` | Voz neural do modo conversa por voz: precisa de `pip install edge-tts` no servidor. Sem ela, o navegador lê com a voz local |
 | `QUEUE_CONNECTION` | `database` por padrão; mantenha um worker ativo |
 
 Para usar o chat local:

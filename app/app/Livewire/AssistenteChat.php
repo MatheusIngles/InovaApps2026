@@ -19,6 +19,11 @@ use Livewire\Component;
  */
 class AssistenteChat extends Component
 {
+    /** Modo conversa por voz: a resposta é lida em voz alta, então precisa soar como fala. */
+    private const ESTILO_VOZ = "
+
+MODO CONVERSA POR VOZ: sua resposta será lida em voz alta. Fale como numa conversa entre colegas: tom informal e natural, frases curtas, no máximo 3 frases, sem listas, sem markdown, sem símbolos e sem tabelas. Diga os números por extenso quando soar melhor (ex.: 'atenção de 56'). Se precisar de muito detalhe, dê o principal e pergunte se a pessoa quer que você continue.";
+
     #[Url(as: 'empresa')]
     public ?string $codigo = null;
 
@@ -32,7 +37,7 @@ class AssistenteChat extends Component
         $this->mensagens = [];
     }
 
-    public function enviar(?string $texto = null): void
+    public function enviar(?string $texto = null, bool $porVoz = false): void
     {
         $texto = mb_substr(trim($texto ?? $this->pergunta), 0, 500);
         if ($texto === '') {
@@ -56,7 +61,7 @@ class AssistenteChat extends Component
             if (! $config['enabled']) {
                 throw new \RuntimeException('IA desativada para esta empresa.');
             }
-            $r = Llm::responder(Contexto::sistema($empresa), [...$historico, ['role' => 'user', 'content' => $texto]], $config['ollama_model']);
+            $r = Llm::responder(Contexto::sistema($empresa).($porVoz ? self::ESTILO_VOZ : ''), [...$historico, ['role' => 'user', 'content' => $texto]], $config['ollama_model']);
             if (Escopo::foraDoAssunto($r['texto'])) {
                 $this->mensagens[] = ['eu' => false, 'texto' => Escopo::RECUSA, 'fonte' => 'Fora do escopo do assistente'];
 
