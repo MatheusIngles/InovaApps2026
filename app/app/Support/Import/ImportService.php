@@ -50,20 +50,19 @@ class ImportService
     private const METRICAS = ['chamados_abertos', 'chamados_criticos', 'chamados_reabertos', 'chamados_dentro_sla', 'pct_sla_cumprido',
         'tempo_medio_resolucao_h', 'reclamacoes_formais', 'uso_plataforma_pct', 'dias_atraso_pagamento', 'reunioes_previstas', 'reunioes_realizadas'];
 
-    /** Colunas da base do desafio (os 8 sinais padrão): com todas elas a planilha entra pelo importador dos sinais padrão. */
-    private const BASE_DO_DESAFIO = ['cliente_id', 'mes_ref', 'segmento', 'porte', 'plano', 'valor_mensal', 'chamados_abertos', 'chamados_reabertos',
+    /** Colunas do formato padrão (os 8 sinais): com todas elas a planilha entra pelo importador dos sinais padrão. */
+    private const COLUNAS_PADRAO = ['cliente_id', 'mes_ref', 'segmento', 'porte', 'plano', 'valor_mensal', 'chamados_abertos', 'chamados_reabertos',
         'pct_sla_cumprido', 'reclamacoes_formais', 'uso_plataforma_pct', 'dias_atraso_pagamento', 'reunioes_previstas', 'reunioes_realizadas', 'respondeu', 'nota_nps'];
 
     /**
-     * A planilha é a base do desafio? Então ela deve gerar exatamente o mesmo resultado da base de demonstração (mesmas fórmulas
-     * dos 8 sinais). Vale na primeira carga e para empresas que já usam os sinais padrão; empresas com métricas próprias seguem
-     * pelo importador de métricas.
+     * A planilha está no formato padrão? Então entra pelo importador dos 8 sinais (mesmas fórmulas do seed). Vale na primeira
+     * carga e para empresas que já usam os sinais padrão; empresas com métricas próprias seguem pelo importador de métricas.
      *
      * @param  list<string>  $cabecalhos
      */
-    public static function ehBaseDoDesafio(Company $company, array $cabecalhos): bool
+    public static function ehFormatoPadrao(Company $company, array $cabecalhos): bool
     {
-        return ! array_diff(self::BASE_DO_DESAFIO, $cabecalhos)
+        return ! array_diff(self::COLUNAS_PADRAO, $cabecalhos)
             && (! $company->customers()->withoutGlobalScopes()->where('company_id', $company->id)->exists() || $company->hasLegacyMetrics());
     }
 

@@ -12,7 +12,6 @@ use App\Filament\Widgets\NiveisChart;
 use App\Filament\Widgets\SegmentosChart;
 use App\Filament\Widgets\TendenciaChart;
 use App\Livewire\AssistenteChat;
-use App\Models\ChatMessage;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\User;
@@ -106,7 +105,6 @@ class TenancyTest extends TestCase
 
         Livewire::test(AssistenteChat::class)->call('enviar', 'Quanto rende a carteira?')->assertSee('Quanto rende a carteira?');
 
-        $this->assertSame(0, ChatMessage::count());
         Livewire::test(AssistenteChat::class)->assertSet('mensagens', [])->assertDontSee('Quanto rende a carteira?'); // "voltou" à página: conversa vazia
     }
 

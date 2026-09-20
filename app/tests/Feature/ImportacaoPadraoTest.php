@@ -14,7 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-class BaseDoDesafioTest extends TestCase
+class ImportacaoPadraoTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -25,7 +25,7 @@ class BaseDoDesafioTest extends TestCase
             ->mapWithKeys(fn ($c): array => [$c->codigo => [$c->score, $c->nivel, $c->status]])->all());
     }
 
-    public function test_enviar_a_base_do_desafio_pela_tela_gera_exatamente_o_mesmo_resultado_do_seed(): void
+    public function test_planilha_no_formato_padrao_enviada_pela_tela_gera_o_mesmo_resultado_do_seed(): void
     {
         $xlsx = base_path('../dados/INOVAAPPS_base_de_dados.xlsx');
 
@@ -39,8 +39,8 @@ class BaseDoDesafioTest extends TestCase
         $this->actingAs(User::factory()->for($nova)->create());
         Livewire::test(ImportarPlanilha::class)
             ->set('arquivo', UploadedFile::fake()->createWithContent('base.xlsx', file_get_contents($xlsx)))
-            ->assertSet('baseDoDesafio', true)
-            ->assertSee('Base do desafio reconhecida')
+            ->assertSet('formatoPadrao', true)
+            ->assertSee('Planilha reconhecida')
             ->call('importar')
             ->assertRedirect('/');
 
@@ -61,6 +61,6 @@ class BaseDoDesafioTest extends TestCase
 
         Livewire::test(ImportarPlanilha::class)
             ->set('arquivo', UploadedFile::fake()->createWithContent('base.xlsx', file_get_contents(base_path('../dados/INOVAAPPS_base_de_dados.xlsx'))))
-            ->assertSet('baseDoDesafio', false);
+            ->assertSet('formatoPadrao', false);
     }
 }

@@ -36,9 +36,9 @@ class ImportarPlanilha extends Component
     #[Locked]
     public ?string $extensao = null;
 
-    /** A planilha é a base do desafio: entra pelo importador dos 8 sinais padrão, com o mesmo resultado da base de demonstração. */
+    /** A planilha está no formato padrão (8 sinais): entra pelo importador dos sinais padrão, sem mapeamento. */
     #[Locked]
-    public bool $baseDoDesafio = false;
+    public bool $formatoPadrao = false;
 
     /** @var list<string> */
     public array $cabecalhos = [];
@@ -72,8 +72,8 @@ class ImportarPlanilha extends Component
 
         try {
             $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $extensao, previa: 5);
-            $this->baseDoDesafio = ImportService::ehBaseDoDesafio($company, $tabela['cabecalhos']);
-            $suggestions = $this->baseDoDesafio
+            $this->formatoPadrao = ImportService::ehFormatoPadrao($company, $tabela['cabecalhos']);
+            $suggestions = $this->formatoPadrao
                 ? ['structure' => [], 'metrics' => []]
                 : DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
         } catch (\Throwable $e) {
@@ -122,7 +122,7 @@ class ImportarPlanilha extends Component
         }
 
         if (Storage::size($this->caminho) > self::LIMITE_SINCRONO) {
-            $grande = $this->baseDoDesafio
+            $grande = $this->formatoPadrao
                 ? [ImportService::sugerirMapeamento($this->cabecalhos), false, null, null]
                 : [[], false, $this->structuralMapping, $this->metricMappings];
             ImportarPlanilhaJob::dispatch($company->id, auth()->id(), $this->caminho, $this->extensao, ...$grande);
@@ -135,7 +135,7 @@ class ImportarPlanilha extends Component
 
         try {
             $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $this->extensao);
-            $this->resultado = $this->baseDoDesafio
+            $this->resultado = $this->formatoPadrao
                 ? ImportService::importar($company, $tabela['linhas'], ImportService::sugerirMapeamento($tabela['cabecalhos'])) + ['valores_metricas' => 0, 'novas_metricas' => 0]
                 : DynamicImportService::importar($company, $tabela, $this->structuralMapping, $this->metricMappings);
         } catch (\Throwable $e) {
@@ -157,7 +157,7 @@ class ImportarPlanilha extends Component
         if ($this->caminho) {
             Storage::delete($this->caminho);
         }
-        $this->reset('caminho', 'extensao', 'baseDoDesafio', 'cabecalhos', 'previa', 'dicionario', 'structuralMapping', 'metricMappings', 'arquivo');
+        $this->reset('caminho', 'extensao', 'formatoPadrao', 'cabecalhos', 'previa', 'dicionario', 'structuralMapping', 'metricMappings', 'arquivo');
     }
 
     public function render()

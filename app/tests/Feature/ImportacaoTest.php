@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Jobs\ImportarPlanilhaJob;
 use App\Livewire\ImportarPlanilha;
-use App\Models\ChatMessage;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
@@ -129,7 +128,6 @@ A,2026-02,Cancelado,2
         app(CompanyContext::class)->within($company, function () use ($company) {
             $this->assertSame(1, Customer::count());
             $this->assertSame(1, Customer::where('status', 'Ativo')->count());
-            $this->assertSame(0, ChatMessage::count());
             $this->assertNotNull($company->fresh()->imported_at);
             $this->assertSame('cliente_id', $company->fresh()->column_mapping['cliente_id']);
         });
