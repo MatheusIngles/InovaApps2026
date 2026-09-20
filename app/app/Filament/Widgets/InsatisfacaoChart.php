@@ -17,6 +17,9 @@ class InsatisfacaoChart extends ChartWidget
 
     protected ?string $heading = 'Insatisfação mês a mês e previsão';
 
+    /** Altura reservada enquanto o gráfico carrega, para a página não pular. */
+    protected ?string $placeholderHeight = '22rem';
+
     protected ?string $maxHeight = '280px';
 
     protected int|string|array $columnSpan = 'full';

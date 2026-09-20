@@ -3,6 +3,7 @@
 namespace App\Support\Llm;
 
 use App\Models\Customer;
+use App\Models\MetricDefinition;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyContext;
 
@@ -74,7 +75,7 @@ INSTRUÇÕES DA EMPRESA:
         }
 
         foreach ($company->metricDefinitions()->orderBy('code')->get() as $definition) {
-            $state = ! $definition->enabled ? 'desativada' : ($definition->value_type === 'text' ? 'textual; fora do score' : "peso {$definition->weight}; piora quando ".($definition->direction === 'higher' ? 'aumenta' : 'diminui')."; saudável {$definition->healthy_value}; crítico {$definition->critical_value}");
+            $state = ! $definition->enabled ? 'desativada' : (MetricDefinition::semScore($definition->value_type) ? 'textual; fora do score' : "peso {$definition->weight}; piora quando ".($definition->direction === 'higher' ? 'aumenta' : 'diminui')."; saudável {$definition->healthy_value}; crítico {$definition->critical_value}");
             $linhas[] = "- {$definition->label} ({$definition->code}, {$definition->value_type}): {$definition->description}; {$state}.";
         }
 
@@ -95,7 +96,7 @@ INSTRUÇÕES DA EMPRESA:
                 $month = substr($date, 0, 7);
                 $cells = $definitions->map(function ($definition) use ($month, $values): string {
                     $observed = $values->get($month.':'.$definition->id);
-                    $value = $observed ? ($definition->value_type === 'text' ? $observed->text_value : $observed->value) : 'NULL';
+                    $value = $observed ? (MetricDefinition::semScore($definition->value_type) ? $observed->text_value : $observed->value) : 'NULL';
 
                     return "{$definition->code}={$value}";
                 });

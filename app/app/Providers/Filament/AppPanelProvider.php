@@ -42,7 +42,9 @@ class AppPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->brandName('Seer')
             ->brandLogo(asset('images/seer-logo.png'))
+            ->darkModeBrandLogo(asset('images/seer-logo-branco.png')) // o texto "Seer" do logo é escuro e some no tema escuro
             ->brandLogoHeight('3rem')
+            ->favicon(asset('images/seer-icone-180.png'))
             ->topNavigation()
             ->navigation(fn (): bool => auth()->check() && Customer::exists()) // sem dados, só a planilha inicial
             ->defaultAvatarProvider(AvatarIniciais::class)

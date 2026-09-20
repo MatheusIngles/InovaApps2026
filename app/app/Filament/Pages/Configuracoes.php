@@ -96,7 +96,7 @@ class Configuracoes extends Page implements HasSchemas
                             ColorPicker::make('tema.secondary')->label('Cor secundária')->required(),
                             TextInput::make('tema.brand')->label('Nome exibido no painel')->placeholder('Seer')->maxLength(40)->helperText('Vazio = Seer.'),
                         ]),
-                        FileUpload::make('tema.logo')->label('Logo')->image()->disk('public')->directory('logos')->maxSize(1024)
+                        FileUpload::make('tema.logo')->label('Logo')->image()->acceptedFileTypes(['image/png', 'image/jpeg', 'image/webp'])->disk('public')->directory('logos')->maxSize(1024)
                             ->helperText('Ao enviar, as cores do painel mudam para as do logo. Você pode ajustá-las.'),
                         View::make('filament.components.conta-gotas')
                             ->afterStateUpdated(function ($state, Livewire $livewire) {

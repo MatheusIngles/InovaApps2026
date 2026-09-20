@@ -5,6 +5,7 @@ namespace App\Support\Validacao;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
+use App\Models\MetricDefinition;
 use App\Models\MetricValue;
 use App\Support\Metricas\MetricRisk;
 use App\Support\Risco;
@@ -58,9 +59,9 @@ class Backtest
     {
         $clientes = Customer::with(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month'), 'periods' => fn ($q) => $q->orderBy('reference_month')])->get();
         $definitions = app(CompanyContext::class)->current()?->metricDefinitions()->get();
-        $this->customWeights = $definitions?->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text')
+        $this->customWeights = $definitions?->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type))
             ->mapWithKeys(fn ($definition): array => ['custom:'.$definition->code => (float) $definition->weight])->all() ?? [];
-        $this->customLabels = $definitions?->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text')
+        $this->customLabels = $definitions?->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type))
             ->mapWithKeys(fn ($definition): array => ['custom:'.$definition->code => $definition->label])->all() ?? [];
 
         foreach ($clientes as $c) {
@@ -84,7 +85,7 @@ class Backtest
     {
         $c->loadMissing(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month'), 'periods' => fn ($q) => $q->orderBy('reference_month')]);
         $definitions ??= $c->company->metricDefinitions()->get();
-        $enabledDefinitionIds = $definitions->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text' && (float) $definition->weight > 0)->pluck('id');
+        $enabledDefinitionIds = $definitions->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type) && (float) $definition->weight > 0)->pluck('id');
         $cancelado = $c->status === 'Cancelado';
         $metricas = $c->metrics->filter(fn ($m) => ! $cancelado || $c->cancelled_at === null || $m->reference_month->lt($c->cancelled_at))->values();
         $values = $c->metricValues->filter(fn ($value) => $enabledDefinitionIds->contains($value->metric_definition_id) && $value->value !== null

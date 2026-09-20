@@ -2,21 +2,44 @@
 
 Plataforma **multi-tenant** de gestão de carteira de clientes, saúde da conta e priorização de atendimento, desenvolvida para o desafio **INOVAAPPS 2026** (enunciado em `Desafio - INOVAAPPS 2026.pdf`, base de dados de exemplo em `INOVAAPPS_base_de_dados.xlsx`).
 
-Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes, configura pesos e limites de risco e vê um painel com score, exposição financeira e fila de atendimento, com tema visual próprio e um assistente de IA isolado por empresa.
+Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes, configura pesos e limites de risco e vê um painel com o índice de atenção, exposição financeira e fila de atendimento, com tema visual próprio e um assistente de IA isolado por empresa.
 
 ---
 
 ## ✨ Funcionalidades
 
 - **Multi-tenancy**: usuário vinculado a uma empresa (`company_id`); detecção opcional por subdomínio (`acme.app.com`). Dados, chat e configurações são isolados por empresa.
-- **Importação de planilhas** (XLSX/CSV) com mapeamento dinâmico de colunas. Arquivos grandes (> 2 MB) rodam em fila.
-- **Motor de risco** determinístico e explicável: score 0–100 a partir de sinais (uso da plataforma, SLA, NPS, chamados, reuniões, tendência etc.), níveis Baixo/Médio/Alto/Crítico.
-- **Prioridade da fila** por risco × valor do contrato, com constante `K` configurável.
+- **Importação de planilhas** (XLSX/CSV) com mapeamento dinâmico de colunas. Colunas que não fazem parte do modelo padrão viram **métricas próprias da empresa** (veja abaixo). Arquivos grandes (> 2 MB) rodam em fila.
+- **Motor de risco** determinístico e explicável: **índice de atenção** de 0 a 100 (não é probabilidade de cancelamento) a partir de sinais (uso da plataforma, SLA, NPS, chamados, reuniões, tendência etc.) **e das métricas de cada empresa**, com níveis Baixo/Médio/Alto/Crítico.
+- **Fila de atendimento** em dois grupos: quem já está em alerta vem primeiro; em cada grupo, atenção × (atenção + K) × valor do contrato, com `K` configurável. O prazo de contato segue a posição na fila. Um cliente pode ser marcado como **resolvido** (vai para o fim da fila) e reaberto depois.
 - **Configurações por empresa**: ordem/peso/ativação dos sinais, limites dos níveis, tema (cores, fonte, logo). Alterações recalculam a carteira.
 - **Painel**: KPIs, clientes por nível, risco por segmento, uso × SLA, comparação com cancelados e fila de atendimento.
 - **Assistente de chat com IA**: API externa da NVIDIA (prioridade), Ollama local como segunda opção e respostas por regras como último recurso; histórico filtrado por empresa.
 - **Relatório em PDF** por empresa (DomPDF) e **notificações**.
-- **Acessibilidade**: widget **VLibras** (Libras).
+- **Acessibilidade**: widget **VLibras** (Libras), tamanho de texto ajustável, navegação por comando de voz e **conversa por voz** com o assistente (voz neural via Edge TTS).
+
+## 📊 Métricas por empresa
+
+Cada empresa tem o seu próprio conjunto de métricas, definido a partir da base que ela envia. No envio da planilha, cada coluna nova é mapeada para uma métrica existente ou cadastrada como nova (também dá para cadastrar em Configurações). A métrica guarda nome, descrição, tipo, direção de piora, valores saudável e crítico e peso. Alterar peso, faixa ou estado recalcula a atenção da carteira.
+
+| Tipo | Como o valor é lido | Entra na atenção? |
+|---|---|---|
+| Número decimal | Número com casas decimais (`12,5`) | Sim |
+| Número inteiro (contagem) | Só inteiros (`3`) | Sim |
+| Percentual | 0 a 100, com ou sem `%` | Sim |
+| Valor monetário | Aceita `R$ 1.200,50` | Sim |
+| Binário | `0` ou `1` (também `sim`/`não`) | Sim |
+| Nota | 0 a 10 | Sim |
+| Data | `AAAA-MM-DD` ou `DD/MM/AAAA`, guardada como `AAAA-MM-DD` (útil para data de início e de fim) | Não |
+| Texto | Até 1000 caracteres | Não |
+
+### Modelo de planilha
+
+Em **Planilha** há o modelo completo em XLSX, no formato da base do desafio: uma aba **Leia-me** com as instruções, um **dicionário** dos campos e abas de dados (`clientes` e `metricas_mensais`). Dá para usar quantas abas quiser, desde que todas tenham a coluna `cliente_id`: abas com `mes_ref` são mensais e abas sem ele valem para todos os meses do cliente (a mesma coluna não pode aparecer em duas abas).
+
+Se o dicionário vier preenchido (`campo`, `tipo`, `descricao` e, para métricas que entram na atenção, `piora_quando`, `valor_saudavel`, `valor_critico` e `peso`), as métricas já chegam configuradas na tela de confirmação. O dicionário da base do desafio também funciona: os tipos (Inteiro, Decimal (%), Binario 0/1, Data...) e as descrições são lidos dele.
+
+Valores vazios são aceitos: o mês fica no histórico sem aquela métrica. Métricas de tipo Data e Texto aparecem no histórico do cliente, mas ficam fora do cálculo.
 
 ## 🧱 Stack
 

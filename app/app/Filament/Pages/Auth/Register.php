@@ -25,7 +25,7 @@ class Register extends BaseRegister
             $this->getEmailFormComponent(),
             $this->getPasswordFormComponent(),
             $this->getPasswordConfirmationFormComponent(),
-            FileUpload::make('logo')->label('Logo da empresa (opcional)')->helperText('As cores do painel são tiradas do logo. Sem logo, usamos o azul padrão; dá para mudar depois em Configurações.')->image()->disk('public')->directory('logos')->maxSize(1024),
+            FileUpload::make('logo')->label('Logo da empresa (opcional)')->helperText('As cores do painel são tiradas do logo. Sem logo, usamos o azul padrão; dá para mudar depois em Configurações.')->image()->acceptedFileTypes(['image/png', 'image/jpeg', 'image/webp'])->disk('public')->directory('logos')->maxSize(1024),
         ]);
     }
 

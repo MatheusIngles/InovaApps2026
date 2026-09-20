@@ -10,7 +10,7 @@
                 <label>Tipo<select class="fi-input" wire:model.change="newMetric.value_type">@foreach (\App\Models\MetricDefinition::TYPES as $type => $label)<option value="{{ $type }}">{{ $label }}</option>@endforeach</select></label>
             </div>
             <label>Descrição<textarea class="fi-input" wire:model="newMetric.description" rows="2" required></textarea></label>
-            @if ($newMetric['value_type'] !== 'text')
+            @if (! \App\Models\MetricDefinition::semScore($newMetric['value_type']))
                 <div class="metric-grid">
                     <label>Quando piora<select class="fi-input" wire:model="newMetric.direction"><option value="lower">Quando diminui</option><option value="higher">Quando aumenta</option></select></label>
                     <label>Valor saudável<input class="fi-input" type="number" step="any" wire:model="newMetric.healthy_value" required></label>
@@ -37,7 +37,7 @@
                         <label>Tipo<select class="fi-input" wire:model.change="edits.{{ $definition->id }}.value_type" @disabled($definition->values_count)>@foreach (\App\Models\MetricDefinition::TYPES as $type => $label)<option value="{{ $type }}">{{ $label }}</option>@endforeach</select></label>
                     </div>
                     <label>Descrição<textarea class="fi-input" wire:model="edits.{{ $definition->id }}.description" rows="2"></textarea></label>
-                    @if (($edits[$definition->id]['value_type'] ?? $definition->value_type) !== 'text')
+                    @if (! \App\Models\MetricDefinition::semScore($edits[$definition->id]['value_type'] ?? $definition->value_type))
                     <div class="metric-grid">
                         <label>Quando piora<select class="fi-input" wire:model="edits.{{ $definition->id }}.direction"><option value="lower">Quando diminui</option><option value="higher">Quando aumenta</option></select></label>
                         <label>Valor saudável<input class="fi-input" type="number" step="any" wire:model="edits.{{ $definition->id }}.healthy_value" required></label>
@@ -45,7 +45,7 @@
                         <label>Peso<input class="fi-input" type="number" min="0" max="100" step="0.01" wire:model="edits.{{ $definition->id }}.weight" required></label>
                     </div>
                     @endif
-                    @if (($edits[$definition->id]['value_type'] ?? $definition->value_type) !== 'text')
+                    @if (! \App\Models\MetricDefinition::semScore($edits[$definition->id]['value_type'] ?? $definition->value_type))
                     <div class="metric-grid">
                         <label><input type="checkbox" wire:model="edits.{{ $definition->id }}.enabled"> Considerar no cálculo</label>
                     </div>

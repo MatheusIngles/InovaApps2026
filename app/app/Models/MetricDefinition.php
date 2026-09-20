@@ -20,8 +20,19 @@ class MetricDefinition extends Model
         'integer' => 'Número inteiro',
         'percentage' => 'Percentual',
         'currency' => 'Valor monetário',
+        'binary' => 'Binário (0 ou 1)',
+        'grade' => 'Nota (0 a 10)',
+        'date' => 'Data (não entra no score)',
         'text' => 'Texto (não entra no score)',
     ];
+
+    /** Tipos que guardam o valor como texto e ficam fora do cálculo da atenção. */
+    public const SEM_SCORE = ['text', 'date'];
+
+    public static function semScore(?string $type): bool
+    {
+        return in_array($type, self::SEM_SCORE, true);
+    }
 
     public function values(): HasMany
     {

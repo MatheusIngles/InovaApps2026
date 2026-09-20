@@ -31,6 +31,12 @@ Route::get('/modelo/planilha', function () {
     );
 })->middleware(['web', 'auth', SetCompanyContext::class])->name('planilha.modelo');
 
+Route::get('/modelo/planilha.xlsx', function () {
+    $company = app(CompanyContext::class)->current();
+
+    return response()->download(DynamicImportService::xlsxModelo($company), 'seer-modelo-'.$company->slug.'.xlsx')->deleteFileAfterSend();
+})->middleware(['web', 'auth', SetCompanyContext::class])->name('planilha.modelo.xlsx');
+
 Route::get('/relatorios/{arquivo}/baixar', function (string $arquivo) {
     $user = auth()->user();
     $caminho = GerarRelatorioEmpresaJob::caminho($user->company_id, $user->id, $arquivo);
@@ -53,4 +59,4 @@ Route::post('/assistente/voz', function (Request $request) {
     } finally {
         @unlink($arquivo);
     }
-})->middleware(['web', 'auth', SetCompanyContext::class, 'throttle:40,1'])->name('assistente.voz');
+})->middleware(['web', 'auth', SetCompanyContext::class, 'throttle:20,1'])->name('assistente.voz');

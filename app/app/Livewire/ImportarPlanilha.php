@@ -10,6 +10,7 @@ use App\Support\Tenancy\CompanyContext;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -27,8 +28,11 @@ class ImportarPlanilha extends Component
     #[Validate('nullable|file|max:20480|extensions:xlsx,csv')]
     public $arquivo = null;
 
+    /** Travadas: o navegador não pode apontar para outro arquivo do disco (leitura ou exclusão). */
+    #[Locked]
     public ?string $caminho = null;
 
+    #[Locked]
     public ?string $extensao = null;
 
     /** @var list<string> */
@@ -36,6 +40,9 @@ class ImportarPlanilha extends Component
 
     /** @var list<array<string, mixed>> */
     public array $previa = [];
+
+    /** Dicionário da planilha (campo => tipo, descrição...), usado para preencher as métricas. */
+    public array $dicionario = [];
 
     public array $structuralMapping = [];
 
@@ -60,7 +67,7 @@ class ImportarPlanilha extends Component
 
         try {
             $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $extensao, previa: 5);
-            $suggestions = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas']);
+            $suggestions = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
         } catch (\Throwable $e) {
             $this->descartar();
             Notification::make()->title('Não foi possível ler a planilha')->body($e->getMessage())->danger()->send();
@@ -70,6 +77,7 @@ class ImportarPlanilha extends Component
 
         $this->cabecalhos = $tabela['cabecalhos'];
         $this->previa = array_slice($tabela['linhas'], 0, 5);
+        $this->dicionario = $tabela['dicionario'];
         $this->structuralMapping = $suggestions['structure'];
         $this->metricMappings = $suggestions['metrics'];
         $this->resultado = null;
@@ -81,7 +89,7 @@ class ImportarPlanilha extends Component
         $used = array_filter(array_values($this->structuralMapping));
         $current = collect($this->metricMappings)->keyBy('column');
         $this->metricMappings = collect($this->cabecalhos)->reject(fn ($header) => in_array($header, $used, true))
-            ->map(fn ($header) => $current->get($header) ?? DynamicImportService::sugerirMetrica($company, $header, $this->previa))
+            ->map(fn ($header) => $current->get($header) ?? DynamicImportService::sugerirMetrica($company, $header, $this->previa, $this->dicionario))
             ->values()->all();
     }
 
@@ -127,7 +135,7 @@ class ImportarPlanilha extends Component
         if ($this->caminho) {
             Storage::delete($this->caminho);
         }
-        $this->reset('caminho', 'extensao', 'cabecalhos', 'previa', 'structuralMapping', 'metricMappings', 'arquivo');
+        $this->reset('caminho', 'extensao', 'cabecalhos', 'previa', 'dicionario', 'structuralMapping', 'metricMappings', 'arquivo');
     }
 
     public function render()
