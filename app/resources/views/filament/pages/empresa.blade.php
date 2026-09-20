@@ -30,7 +30,6 @@
                         <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · atenção {{ $e->score }}/100{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
                         <a class="ui-btn primary" href="{{ $chat }}">Conversar com a IA</a>
                         <livewire:relatorio-empresa :codigo="$e->codigo" :key="'relatorio-'.$e->codigo" />
-                        <a class="ui-btn" href="{{ EmpresaResource::getUrl() }}">Todos os clientes</a>
                     </div>
                 </div>
         </section>
