@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
+use App\Support\FilaDeAtendimento;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyContext;
 use Database\Factories\CustomerFactory;
@@ -181,7 +182,7 @@ class Customer extends Model
         return $textos ? implode('; ', $textos) : 'Sem sinais relevantes';
     }
 
-    /** O que fazer e com que urgência (nulo para cancelados): urgência do nível + ação do principal sinal. */
+    /** O que fazer e até quando (nulo para cancelados): prazo pela posição na fila + ação do principal sinal. */
     public function proximoPasso(): ?string
     {
         if ($this->cancelada()) {
@@ -189,7 +190,9 @@ class Customer extends Model
         }
         $acao = $this->sinais[0]['acao'] ?? 'Manter o acompanhamento normal.';
 
-        return (Risco::PRAZOS[$this->nivel] ?? 'Acompanhar').' · '.$acao;
+        $posicao = app(FilaDeAtendimento::class)->posicao($this);
+
+        return ($posicao === null ? 'Acompanhar no ciclo normal' : Risco::prazoPorPosicao($posicao, $this->nivel)).' · '.$acao;
     }
 
     /** Parcelas de todos os sinais, inclusive as menores que o limite dos destaques. */

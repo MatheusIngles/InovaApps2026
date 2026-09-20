@@ -33,8 +33,26 @@ class Risco
         return self::ACOES[$k] ?? null;
     }
 
-    /** Urgência do contato por nível de atenção (o que a equipe deve fazer e em quanto tempo). */
-    public const PRAZOS = ['Crítico' => 'Contato hoje', 'Alto' => 'Contato em até 3 dias', 'Médio' => 'Contato esta semana', 'Baixo' => 'Acompanhar no ciclo normal'];
+    /** Quantos clientes da fila a equipe consegue contatar por dia útil (define os prazos por posição). */
+    public const CONTATOS_POR_DIA = 3;
+
+    /**
+     * Prazo de contato pela posição na fila de atendimento (1 = primeiro): as primeiras posições cabem no dia, as
+     * seguintes em 3 dias e em 5 dias úteis, na capacidade de CONTATOS_POR_DIA. Quem está abaixo do corte de alerta
+     * (nível Baixo) não tem prazo: segue o acompanhamento normal.
+     */
+    public static function prazoPorPosicao(int $posicao, string $nivel): string
+    {
+        $porDia = self::CONTATOS_POR_DIA;
+
+        return match (true) {
+            $nivel === 'Baixo' => 'Acompanhar no ciclo normal',
+            $posicao <= $porDia => 'Contato hoje',
+            $posicao <= $porDia * 3 => 'Contato em até 3 dias',
+            $posicao <= $porDia * 5 => 'Contato esta semana',
+            default => 'Acompanhar no ciclo normal',
+        };
+    }
 
     public const LIMIARES = ['critico' => 55, 'alto' => 40, 'medio' => 25];
 

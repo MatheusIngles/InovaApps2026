@@ -429,6 +429,8 @@ dentro de cada grupo: atenção x (atenção + K) x valor_mensal_do_contrato, do
 
 Assim, um contrato grande desempata entre clientes que já pedem contato, mas nenhum cliente sem alerta passa na frente de um em alerta.
 
+O **prazo de contato** exibido na lista e na fila também sai da posição, e não só do nível: com a capacidade de `Risco::CONTATOS_POR_DIA` (3) contatos por dia, as posições 1 a 3 são "Contato hoje", 4 a 9 "Contato em até 3 dias" e 10 a 15 "Contato esta semana"; quem está abaixo do corte de alerta (nível Baixo) ou além da posição 15 segue o "acompanhamento normal".
+
 ### 8.6 Similaridade
 
 A similaridade compara os vetores de severidade de dois clientes por distância euclidiana:

@@ -219,12 +219,22 @@ class CarteiraTest extends TestCase
         $passo = $top->proximoPasso();
 
         $this->assertNotNull($passo);
-        $this->assertStringStartsWith(Risco::PRAZOS[$top->nivel], $passo);
+        $this->assertStringStartsWith(Risco::prazoPorPosicao(1, $top->nivel), $passo);
         $this->assertStringContainsString($top->sinais[0]['acao'], $passo);
         $this->assertNull(Customer::dashboard()->where('customers.status', 'Cancelado')->first()->proximoPasso()); // cancelados não entram na fila de ação
 
         Livewire::test(FilaTable::class)->assertSee($top->porQue())->assertSee($passo)->assertSee('O que fazer');
-        $this->get('/empresas')->assertOk()->assertSee('Por quê:', false)->assertSee(Risco::PRAZOS[$top->nivel]);
+        $this->get('/empresas')->assertOk()->assertSee('Por quê:', false)->assertSee(Risco::prazoPorPosicao(1, $top->nivel));
+    }
+
+    public function test_prazo_de_contato_segue_a_posicao_na_fila_e_nao_o_nivel(): void
+    {
+        $this->assertSame('Contato hoje', Risco::prazoPorPosicao(1, 'Médio')); // o topo da fila é hoje mesmo sendo nível Médio
+        $this->assertSame('Contato hoje', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA, 'Alto'));
+        $this->assertSame('Contato em até 3 dias', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA + 1, 'Crítico')); // crítico mais abaixo na fila espera mais
+        $this->assertSame('Contato esta semana', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA * 4, 'Médio'));
+        $this->assertSame('Acompanhar no ciclo normal', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA * 5 + 1, 'Alto'));
+        $this->assertSame('Acompanhar no ciclo normal', Risco::prazoPorPosicao(1, 'Baixo')); // sem alerta, sem prazo
     }
 
     public function test_chat_usa_ollama_com_contexto_da_empresa(): void
