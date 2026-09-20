@@ -6,6 +6,14 @@ Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes,
 
 ---
 
+## 🎥 Demonstração em vídeo
+
+Os vídeos de demonstração do projeto estão publicados em:
+- **Shorts:** **https://youtube.com/shorts/JVGu0N8sA-I**
+- **Vídeo completo:** **https://youtu.be/XEI6UQLZjEk**
+
+A gravação com cara de "vídeo caseiro" **não é proposital**. Era a forma que a gente tinha para mostrar o Seer funcionando na prática de forma rápida. Para conseguir demonstrar a aplicação interagindo em tempo real e responder aos comandos de voz sem gastar tempo com edições complexas ou estúdio de gravação, a gente simplesmente pegou o celular e gravou tudo ali na hora.
+
 ## ✨ Funcionalidades
 
 **Plataforma e acesso**
