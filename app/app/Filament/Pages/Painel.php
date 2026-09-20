@@ -25,6 +25,10 @@ class Painel extends Dashboard
 
     protected function getHeaderActions(): array
     {
+        if (! app(CompanyContext::class)->current()->hasLegacyMetrics()) {
+            return [];
+        }
+
         return [
             Action::make('relatorioCarteira')->label('Gerar relatório de evidências')->icon('heroicon-o-document-arrow-down')
                 ->action(function (): void {
@@ -37,6 +41,10 @@ class Painel extends Dashboard
 
     public function content(Schema $schema): Schema
     {
+        if (! app(CompanyContext::class)->current()->hasLegacyMetrics()) {
+            return $schema->components([$this->getWidgetsContentComponent()]);
+        }
+
         return $schema->components([
             Tabs::make('Painel')->tabs([
                 Tab::make('Visão geral')->schema([$this->getWidgetsContentComponent()]),

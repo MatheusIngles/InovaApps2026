@@ -145,10 +145,13 @@ class ConfiguracaoEmpresaTest extends TestCase
     {
         $company = Company::factory()->create(['theme' => ['primary' => '#0d9488', 'secondary' => '#115e59', 'font' => 'Inter']]);
         $this->actingAs(User::factory()->for($company)->create());
-        app(CompanyContext::class)->within($company, fn () => Customer::factory()->create(['company_id' => $company->id])); // já fez a carga inicial
+        app(CompanyContext::class)->within($company, function () use ($company): void {
+            $customer = Customer::factory()->create(['company_id' => $company->id]);
+            CustomerMetric::factory()->for($customer)->create();
+        });
 
         $this->get('/configuracoes')->assertOk()->assertSee('Prioridades')->assertSee('Fila de prioridade')->assertSee('Níveis de atenção')->assertSee('Identidade visual')
-            ->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
+            ->assertSee('Prioridade dos sinais padrão')->assertSee('Métricas da empresa')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
             ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->call('salvar')->assertHasNoErrors();
         $this->assertSame(70, $company->fresh()->limiares()['critico']);
@@ -201,6 +204,7 @@ class ConfiguracaoEmpresaTest extends TestCase
         app(CompanyContext::class)->within($company, function () use ($company) {
             foreach ([['ALTO', 80, 3500], ['GRANDE', 30, 20000]] as [$codigo, $score, $valor]) {
                 $c = Customer::factory()->create(['company_id' => $company->id, 'external_code' => $codigo, 'monthly_value' => $valor, 'status' => 'Ativo']);
+                CustomerMetric::factory()->for($c)->create();
                 RiskAssessment::factory()->create(['customer_id' => $c->id, 'health_score' => $score, 'model_version' => 'rules-v1']);
             }
         });
@@ -210,6 +214,10 @@ class ConfiguracaoEmpresaTest extends TestCase
 
         $this->actingAs(User::factory()->for($company)->create());
         Livewire::test(Configuracoes::class)->set('data.prioridade', 0)->call('salvar')->assertHasNoErrors();
+        app(CompanyContext::class)->within($company, function (): void {
+            Customer::where('external_code', 'ALTO')->firstOrFail()->currentAssessment()->firstOrFail()->update(['health_score' => 80]);
+            Customer::where('external_code', 'GRANDE')->firstOrFail()->currentAssessment()->firstOrFail()->update(['health_score' => 30]);
+        });
         $this->assertSame(0, $company->fresh()->prioridadeK());
         $this->assertSame(['ALTO', 'GRANDE'], $fila());
 

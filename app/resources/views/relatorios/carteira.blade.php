@@ -66,7 +66,8 @@
     </table>
 
     <h2>3. O que mais indica cancelamento</h2>
-    <p>"Separação" (AUC) diz o quanto a variável distingue quem cancelou de quem ficou: 0,50 = não distingue; 1,00 = distingue sempre. O peso sugerido é proporcional ao que passa de 0,50. "Cancelados" e "Retidos" são a severidade média (0 a 100%) no último mês antes da saída e no mês mais recente dos ativos; antecedência e alerta em quem ficou usam severidade ≥ 50%.</p>
+    <p>"Separação" (AUC) diz o quanto a variável distingue quem cancelou de quem ficou: 0,50 = não distingue; 1,00 = distingue sempre. O peso sugerido para os sinais padrão é proporcional ao que passa de 0,50. "Cancelados" e "Retidos" são a severidade média (0 a 100%) no último mês antes da saída e no mês mais recente dos ativos; antecedência e alerta em quem ficou usam severidade ≥ 50%.</p>
+    <h3>Sinais padrão</h3>
     <table>
         <tr><th>Variável</th><th>Separação</th><th>Cancelados</th><th>Retidos</th><th>Antecedência</th><th>Alerta em quem ficou</th><th>Peso atual</th><th>Peso sugerido</th></tr>
         @foreach ($vars as $v)
@@ -82,7 +83,25 @@
             </tr>
         @endforeach
     </table>
-    <p>Atenção completa (todos os sinais juntos): separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais e <b>{{ $n($r['auc_sugerido'], 3) }}</b> com os sugeridos.</p>
+    @if ($r['metricas_proprias'])
+        <h3>Métricas próprias</h3>
+        <p class="muted">Resultados calculados apenas para clientes com observação recente. Sem clientes nos dois grupos, a separação não pode ser estimada.</p>
+        <table>
+            <tr><th>Métrica</th><th>Separação</th><th>Cancelados</th><th>Retidos</th><th>Antecedência</th><th>Alarme falso</th><th>Peso atual</th></tr>
+            @foreach ($r['metricas_proprias'] as $v)
+                <tr>
+                    <td>{{ $v['rotulo'] }}</td>
+                    <td>{{ $v['auc'] === null ? '—' : $n($v['auc'], 2).' ('.$forca($v['auc']).')' }}</td>
+                    <td>{{ $v['cancelados'] ? $n($v['media_cancelados'] * 100).'%' : '—' }} <span class="muted">({{ $v['cancelados'] }})</span></td>
+                    <td>{{ $v['retidos'] ? $n($v['media_retidos'] * 100).'%' : '—' }} <span class="muted">({{ $v['retidos'] }})</span></td>
+                    <td>{{ $meses($v['antecedencia']) }}</td>
+                    <td>{{ $v['alarme_falso_pct'] === null ? '—' : $n($v['alarme_falso_pct']).'%' }}</td>
+                    <td>{{ $n($v['peso_atual']) }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+    <p>Atenção completa (sinais padrão e métricas próprias): separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais e <b>{{ $n($r['auc_sugerido'], 3) }}</b> com pesos sugeridos para os sinais padrão e atuais para as métricas próprias.</p>
 
     <h2>4. Variáveis que a atenção ainda não usa</h2>
     <p>São colunas da planilha que não entram no cálculo da atenção hoje. Testadas na mesma régua: as que separam bem podem valer a pena entrar nele.</p>

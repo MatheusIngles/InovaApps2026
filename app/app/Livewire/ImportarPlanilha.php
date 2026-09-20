@@ -4,15 +4,10 @@ namespace App\Livewire;
 
 use App\Jobs\ImportarPlanilhaJob;
 use App\Models\Customer;
-use App\Support\Import\ImportService;
+use App\Support\Import\DynamicImportService;
 use App\Support\Import\PlanilhaReader;
 use App\Support\Tenancy\CompanyContext;
-use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Concerns\InteractsWithSchemas;
-use Filament\Schemas\Contracts\HasSchemas;
-use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
@@ -20,17 +15,16 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 /**
- * Envio de planilha (XLSX/CSV) com mapeamento de colunas. Usado na população inicial (tela Planilha)
- * e para acrescentar meses novos (tela Configurações).
+ * Prévia e confirmação de uma planilha com seis campos estruturais e métricas livres.
  */
-class ImportarPlanilha extends Component implements HasSchemas
+class ImportarPlanilha extends Component
 {
-    use InteractsWithSchemas, WithFileUploads;
+    use WithFileUploads;
 
     /** Acima disso (bytes) a importação roda em fila, sem prender a requisição. */
     private const LIMITE_SINCRONO = 2 * 1024 * 1024;
 
-    #[Validate('nullable|file|max:20480|extensions:xlsx,csv,txt')]
+    #[Validate('nullable|file|max:20480|extensions:xlsx,csv')]
     public $arquivo = null;
 
     public ?string $caminho = null;
@@ -43,7 +37,9 @@ class ImportarPlanilha extends Component implements HasSchemas
     /** @var list<array<string, mixed>> */
     public array $previa = [];
 
-    public ?array $data = ['mapa' => []];
+    public array $structuralMapping = [];
+
+    public array $metricMappings = [];
 
     public ?array $resultado = null;
 
@@ -63,7 +59,8 @@ class ImportarPlanilha extends Component implements HasSchemas
         $this->extensao = $extensao;
 
         try {
-            $tabela = PlanilhaReader::ler(Storage::path($this->caminho), $extensao, previa: 5);
+            $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $extensao, previa: 5);
+            $suggestions = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas']);
         } catch (\Throwable $e) {
             $this->descartar();
             Notification::make()->title('Não foi possível ler a planilha')->body($e->getMessage())->danger()->send();
@@ -73,18 +70,34 @@ class ImportarPlanilha extends Component implements HasSchemas
 
         $this->cabecalhos = $tabela['cabecalhos'];
         $this->previa = array_slice($tabela['linhas'], 0, 5);
-        $this->data['mapa'] = ImportService::sugerirMapeamento($this->cabecalhos, $company->column_mapping ?? []);
+        $this->structuralMapping = $suggestions['structure'];
+        $this->metricMappings = $suggestions['metrics'];
         $this->resultado = null;
+    }
+
+    public function updatedStructuralMapping(): void
+    {
+        $company = app(CompanyContext::class)->current();
+        $used = array_filter(array_values($this->structuralMapping));
+        $current = collect($this->metricMappings)->keyBy('column');
+        $this->metricMappings = collect($this->cabecalhos)->reject(fn ($header) => in_array($header, $used, true))
+            ->map(fn ($header) => $current->get($header) ?? DynamicImportService::sugerirMetrica($company, $header, $this->previa))
+            ->values()->all();
     }
 
     public function importar(): void
     {
-        $mapa = $this->form->getState()['mapa'] ?? [];
         $company = app(CompanyContext::class)->current();
         $primeiraCarga = ! Customer::exists();
 
+        if (! $this->caminho || ! Storage::exists($this->caminho)) {
+            Notification::make()->title('Selecione uma planilha antes de importar.')->danger()->send();
+
+            return;
+        }
+
         if (Storage::size($this->caminho) > self::LIMITE_SINCRONO) {
-            ImportarPlanilhaJob::dispatch($company->id, auth()->id(), $this->caminho, $this->extensao, $mapa);
+            ImportarPlanilhaJob::dispatch($company->id, auth()->id(), $this->caminho, $this->extensao, [], false, $this->structuralMapping, $this->metricMappings);
             $this->caminho = null; // o job apaga o arquivo ao terminar
             $this->descartar();
             Notification::make()->title('Importação em andamento')->body('A planilha é grande e está sendo processada. Avisamos pelas notificações quando terminar.')->info()->send();
@@ -93,8 +106,8 @@ class ImportarPlanilha extends Component implements HasSchemas
         }
 
         try {
-            $tabela = PlanilhaReader::ler(Storage::path($this->caminho), $this->extensao);
-            $this->resultado = ImportService::importar($company, $tabela['linhas'], $mapa);
+            $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $this->extensao);
+            $this->resultado = DynamicImportService::importar($company, $tabela, $this->structuralMapping, $this->metricMappings);
         } catch (\Throwable $e) {
             Notification::make()->title('Importação não concluída')->body($e->getMessage())->danger()->send();
 
@@ -102,7 +115,7 @@ class ImportarPlanilha extends Component implements HasSchemas
         }
 
         $this->descartar();
-        Notification::make()->title('Planilha importada')->body("{$this->resultado['clientes']} clientes, {$this->resultado['meses']} meses de métricas, {$this->resultado['nps']} pesquisas. O risco foi recalculado.")->success()->send();
+        Notification::make()->title('Planilha importada')->body("{$this->resultado['clientes']} clientes, {$this->resultado['valores_metricas']} valores e {$this->resultado['novas_metricas']} métricas novas. A atenção foi recalculada.")->success()->send();
 
         if ($primeiraCarga) {
             $this->redirect('/'); // dados carregados: segue para a tela da empresa
@@ -114,25 +127,7 @@ class ImportarPlanilha extends Component implements HasSchemas
         if ($this->caminho) {
             Storage::delete($this->caminho);
         }
-        $this->reset('caminho', 'extensao', 'cabecalhos', 'previa', 'arquivo');
-        $this->data['mapa'] = [];
-    }
-
-    public function form(Schema $schema): Schema
-    {
-        $opcoes = array_combine($this->cabecalhos, $this->cabecalhos);
-
-        return $schema->statePath('data')->components([
-            Grid::make(['default' => 1, 'md' => 2, 'xl' => 3])->schema(
-                collect(ImportService::CAMPOS)->map(fn ($def, $campo) => Select::make("mapa.$campo")
-                    ->label($def[0])
-                    ->options($opcoes)
-                    ->placeholder('— não usar —')
-                    ->searchable()
-                    ->required($campo === 'cliente_id')
-                )->values()->all()
-            ),
-        ]);
+        $this->reset('caminho', 'extensao', 'cabecalhos', 'previa', 'structuralMapping', 'metricMappings', 'arquivo');
     }
 
     public function render()

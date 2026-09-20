@@ -58,9 +58,9 @@ class Configuracoes extends Page implements HasSchemas
     {
         return $schema->statePath('data')->components([
             Tabs::make('Configurações')->tabs([
-                Tab::make('Prioridades')->schema([
-                    Section::make('Prioridade das métricas')
-                        ->description('Arraste as métricas para ordenar: a que fica no topo pesa mais. Use "Editar pesos" para definir o peso de cada uma. Desligue uma métrica para ignorá-la no cálculo.')
+                ...($this->hasLegacyMetrics() ? [Tab::make('Prioridades')->schema([
+                    Section::make('Prioridade dos sinais padrão')
+                        ->description('Arraste os oito sinais padrão para ordenar: o que fica no topo pesa mais. Use "Editar pesos" para definir o peso de cada um. As métricas próprias têm pesos na aba ao lado.')
                         ->headerActions([$this->editarPesosAction()])
                         ->schema([
                             Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()
@@ -68,6 +68,9 @@ class Configuracoes extends Page implements HasSchemas
                                 ->schema([Hidden::make('k'), Hidden::make('peso'), Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)]),
                             View::make('filament.components.salvar-configuracao'),
                         ]),
+                ])] : []),
+                Tab::make('Métricas')->schema([
+                    View::make('filament.components.metricas-proprias'),
                 ]),
                 Tab::make('Fila de prioridade')->schema([
                     Section::make('Ordem da lista de clientes')
@@ -113,6 +116,11 @@ class Configuracoes extends Page implements HasSchemas
         ]);
     }
 
+    private function hasLegacyMetrics(): bool
+    {
+        return app(CompanyContext::class)->current()->hasLegacyMetrics();
+    }
+
     /** Os pesos pertencem às posições da lista (1º = maior peso), não às métricas: o modal edita a escala, de forma decrescente. */
     private function editarPesosAction(): Action
     {
@@ -142,12 +150,15 @@ class Configuracoes extends Page implements HasSchemas
 
     public function salvar(): void
     {
-        $dados = $this->form->getState();
-        $dados['metricas'] = CompanyConfig::pesosPorPosicao($dados['metricas']); // o peso vem da posição na lista
+        $company = app(CompanyContext::class)->current();
+        $dados = array_replace_recursive(CompanyConfig::ler($company), $this->form->getState());
+        if ($this->hasLegacyMetrics()) {
+            $dados['metricas'] = CompanyConfig::pesosPorPosicao($dados['metricas']); // o peso vem da posição na lista
+        }
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {
-            $recalculou = CompanyConfig::salvar(app(CompanyContext::class)->current(), $dados);
+            $recalculou = CompanyConfig::salvar($company, $dados);
         } catch (ValidationException $e) {
             Notification::make()->title('Configuração inválida')->body(collect($e->errors())->flatten()->first())->danger()->send();
 

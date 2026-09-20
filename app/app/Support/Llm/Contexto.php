@@ -54,7 +54,7 @@ INSTRUÇÕES DA EMPRESA:
             return 'Prioridades de métricas indisponíveis.';
         }
 
-        $pesos = $company->pesos();
+        $pesos = $company->hasLegacyMetrics() ? $company->pesos() : [];
         $total = array_sum($pesos);
         $linhas = ['PRIORIDADES DAS MÉTRICAS DESTA EMPRESA (ordem configurada; participação na atenção):'];
         $posicao = 0;
@@ -73,6 +73,11 @@ INSTRUÇÕES DA EMPRESA:
             $linhas[] = "{$posicao}. {$rotulo}: peso {$peso}; participação máxima {$participacao} pontos em 100";
         }
 
+        foreach ($company->metricDefinitions()->orderBy('code')->get() as $definition) {
+            $state = ! $definition->enabled ? 'desativada' : ($definition->value_type === 'text' ? 'textual; fora do score' : "peso {$definition->weight}; piora quando ".($definition->direction === 'higher' ? 'aumenta' : 'diminui')."; saudável {$definition->healthy_value}; crítico {$definition->critical_value}");
+            $linhas[] = "- {$definition->label} ({$definition->code}, {$definition->value_type}): {$definition->description}; {$state}.";
+        }
+
         $limiares = $company->limiares();
         $linhas[] = "Limites de nível: médio a partir de {$limiares['medio']}, alto a partir de {$limiares['alto']}, crítico a partir de {$limiares['critico']}.";
 
@@ -81,6 +86,34 @@ INSTRUÇÕES DA EMPRESA:
 
     public static function empresa(Customer $c): string
     {
+        $company = app(CompanyContext::class)->current();
+        if (! $c->metrics()->exists()) {
+            $definitions = $company->metricDefinitions()->orderBy('code')->get();
+            $values = $c->metricValues()->get()->keyBy(fn ($value) => $value->reference_month->format('Y-m').':'.$value->metric_definition_id);
+            $months = $c->periods()->orderByDesc('reference_month')->limit(6)->pluck('reference_month');
+            $history = $months->map(function ($date) use ($definitions, $values): string {
+                $month = substr($date, 0, 7);
+                $cells = $definitions->map(function ($definition) use ($month, $values): string {
+                    $observed = $values->get($month.':'.$definition->id);
+                    $value = $observed ? ($definition->value_type === 'text' ? $observed->text_value : $observed->value) : 'NULL';
+
+                    return "{$definition->code}={$value}";
+                });
+
+                return "- {$month}: ".$cells->implode('; ');
+            });
+
+            return implode("\n", [
+                "CLIENTE EM FOCO: {$c->nome} (código {$c->codigo})",
+                "Segmento: {$c->segmento} | Porte: {$c->porte} | Plano: {$c->plano} | Contrato: ".Customer::brl($c->valor).'/mês',
+                'Atenção: '.($c->currentAssessment ? "{$c->score}/100 ({$c->nivel})" : 'sem avaliação numérica').'; valores ausentes são NULL, não zero.',
+                'SINAIS RECENTES:',
+                ...($c->sinais ? array_map(fn ($signal) => "- {$signal['label']}: {$signal['texto']}", $c->sinais) : ['- nenhum sinal relevante']),
+                'HISTÓRICO MENSAL DE MÉTRICAS:',
+                ...$history->all(),
+            ]);
+        }
+
         $linhas = [
             "CLIENTE EM FOCO: {$c->nome} (código {$c->codigo})",
             "Segmento: {$c->segmento} | Porte: {$c->porte} | Plano: {$c->plano} | Cliente desde: {$c->inicio}",
@@ -105,6 +138,15 @@ INSTRUÇÕES DA EMPRESA:
     public static function carteira(): string
     {
         $ativas = Customer::ativas();
+        if (! app(CompanyContext::class)->current()->hasLegacyMetrics()) {
+            return implode("\n", [
+                'CONTEXTO: visão geral da carteira (sem cliente específico em foco).',
+                "Clientes ativos: {$ativas->count()} | Receita mensal ativa: ".Customer::brl($ativas->sum('valor')).' | Métricas configuradas: '.app(CompanyContext::class)->current()->metricDefinitions()->count(),
+                'FILA DE ATENDIMENTO (top 10 por atenção e valor mensal):',
+                ...$ativas->take(10)->map(fn ($c, $i) => ($i + 1).". {$c->nome} ({$c->codigo}) — {$c->rotulo()}, atenção {$c->score}/100, ".Customer::brl($c->valor).'/mês, principal motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->all(),
+            ]);
+        }
+
         $linhas = [
             'CONTEXTO: visão geral da carteira (sem cliente específico em foco).',
             "Clientes ativos: {$ativas->count()} | Receita mensal ativa: ".Customer::brl($ativas->sum('valor')).' | Exposição mensal total: '.Customer::brl($ativas->sum('exposicao')),

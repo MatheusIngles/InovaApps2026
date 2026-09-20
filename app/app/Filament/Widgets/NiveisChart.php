@@ -22,12 +22,12 @@ class NiveisChart extends ChartWidget
 
     protected function getData(): array
     {
-        $n = Customer::ativas()->countBy('nivel');
-        $niveis = ['Crítico', 'Alto', 'Médio', 'Baixo'];
+        $n = Customer::ativas()->countBy(fn (Customer $customer) => $customer->rotulo());
+        $niveis = ['Crítico', 'Alto', 'Médio', 'Baixo', 'Sem avaliação'];
 
         return [
             'labels' => $niveis,
-            'datasets' => [['data' => array_map(fn ($x) => $n[$x] ?? 0, $niveis), 'backgroundColor' => ['#dc2626', '#f97316', '#3b82f6', '#93c5fd']]],
+            'datasets' => [['data' => array_map(fn ($x) => $n[$x] ?? 0, $niveis), 'backgroundColor' => ['#dc2626', '#f97316', '#3b82f6', '#93c5fd', '#94a3b8']]],
         ];
     }
 }

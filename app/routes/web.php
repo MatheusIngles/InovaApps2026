@@ -5,7 +5,10 @@ use App\Filament\Resources\Empresas\EmpresaResource;
 use App\Http\Middleware\SetCompanyContext;
 use App\Jobs\GerarRelatorioEmpresaJob;
 use App\Models\Customer;
+use App\Support\Import\DynamicImportService;
+use App\Support\Tenancy\CompanyContext;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
@@ -17,6 +20,16 @@ Route::get('/', function () {
 
     return redirect(Customer::exists() ? EmpresaResource::getUrl() : Planilha::getUrl());
 })->middleware(['web', SetCompanyContext::class]);
+
+Route::get('/modelo/planilha', function () {
+    $company = app(CompanyContext::class)->current();
+
+    return response()->streamDownload(
+        fn () => print (DynamicImportService::csvModelo()),
+        'seer-modelo-livre-'.$company->slug.'.csv',
+        ['Content-Type' => 'text/csv; charset=UTF-8'],
+    );
+})->middleware(['web', 'auth', SetCompanyContext::class])->name('planilha.modelo');
 
 Route::get('/relatorios/{arquivo}/baixar', function (string $arquivo) {
     $user = auth()->user();

@@ -45,6 +45,7 @@ class CompanyConfig
      */
     public static function salvar(Company $company, array $dados): bool
     {
+        $legacy = $company->hasLegacyMetrics();
         $v = Validator::make($dados, [
             'metricas' => 'required|array|size:'.count(Risco::PESOS),
             'metricas.*.k' => 'required|distinct|in:'.implode(',', array_keys(Risco::PESOS)),
@@ -59,7 +60,7 @@ class CompanyConfig
             'tema.brand' => 'nullable|string|max:40',
             'tema.logo' => 'nullable|string|max:255',
         ]);
-        $v->after(function ($v) use ($dados) {
+        $v->after(function ($v) use ($dados, $company) {
             $primaria = $dados['tema']['primary'] ?? '';
 
             // botões primários levam texto branco: a cor precisa sustentar pelo menos 3:1 (componentes de interface)
@@ -67,7 +68,8 @@ class CompanyConfig
                 $v->errors()->add('tema.primary', 'A cor primária é clara demais: o texto branco dos botões ficaria ilegível. Escolha uma cor mais escura.');
             }
 
-            if (array_sum(array_column($dados['metricas'] ?? [], 'peso')) <= 0) {
+            $customWeight = $company->metricDefinitions()->where('enabled', true)->sum('weight');
+            if (array_sum(array_column($dados['metricas'] ?? [], 'peso')) + $customWeight <= 0) {
                 $v->errors()->add('metricas', 'Pelo menos uma métrica precisa ter peso maior que zero.');
             }
         });
@@ -76,9 +78,13 @@ class CompanyConfig
         $pesos = array_map(fn ($m) => ['k' => $m['k'], 'peso' => (float) $m['peso']], array_values($d['metricas']));
         $limiares = array_map('intval', $d['limiares']);
         // != (não !==): 100 e 100.0 são o mesmo peso; a ordem da lista continua contando (desempate de sinais)
-        $recalcular = $pesos != ($company->metric_weights ?? self::padrao()) || $limiares != $company->limiares();
+        $recalcular = ($legacy && $pesos != ($company->metric_weights ?? self::padrao())) || $limiares != $company->limiares();
 
-        $company->update(['metric_weights' => $pesos, 'level_thresholds' => $limiares, 'theme' => $d['tema'], 'priority_balance' => (int) $d['prioridade']]);
+        $settings = ['level_thresholds' => $limiares, 'theme' => $d['tema'], 'priority_balance' => (int) $d['prioridade']];
+        if ($legacy) {
+            $settings['metric_weights'] = $pesos;
+        }
+        $company->update($settings);
 
         if ($recalcular) {
             RiskService::recalcular($company);
@@ -138,7 +144,7 @@ class CompanyConfig
     /** Configuração base após a primeira carga de dados: só se a empresa ainda não personalizou pesos nem cortes. */
     public static function aplicarBaseDosDados(Company $company): bool
     {
-        if ($company->metric_weights !== null || $company->level_thresholds !== null) {
+        if ($company->metric_weights !== null || $company->level_thresholds !== null || $company->metricDefinitions()->exists()) {
             return false;
         }
 

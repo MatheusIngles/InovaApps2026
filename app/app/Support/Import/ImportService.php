@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Support\RiskService;
 use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
+use App\Support\Validacao\Backtest;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -72,7 +73,7 @@ class ImportService
      * @param  array<string, string|null>  $mapa  campo canônico → cabeçalho da planilha
      * @return array{clientes: int, meses: int, nps: int, ignoradas: int}
      */
-    public static function importar(Company $company, array $linhas, array $mapa): array
+    public static function importar(Company $company, array $linhas, array $mapa, array $customColumns = []): array
     {
         $mapa = array_filter($mapa, fn ($h) => is_string($h) && $h !== '');
 
@@ -83,11 +84,12 @@ class ImportService
             throw new InvalidArgumentException('A planilha não tem linhas de dados.');
         }
 
-        $stats = DB::transaction(function () use ($company, $linhas, $mapa): array {
-            return app(CompanyContext::class)->within($company, fn () => self::gravar($company, $linhas, $mapa));
+        $stats = DB::transaction(function () use ($company, $linhas, $mapa, $customColumns): array {
+            return app(CompanyContext::class)->within($company, fn () => self::gravar($company, $linhas, $mapa, $customColumns));
         });
 
         $company->update(['imported_at' => now(), 'column_mapping' => $mapa]);
+        Backtest::invalidar($company);
         RiskService::recalcular($company);
 
         try {
@@ -99,7 +101,7 @@ class ImportService
         return $stats;
     }
 
-    private static function gravar(Company $company, array $linhas, array $mapa): array
+    private static function gravar(Company $company, array $linhas, array $mapa, array $customColumns): array
     {
         $v = fn (array $linha, string $campo) => isset($mapa[$campo]) && array_key_exists($mapa[$campo], $linha) && $linha[$mapa[$campo]] !== '' ? $linha[$mapa[$campo]] : null;
         $clientes = [];
@@ -192,7 +194,49 @@ class ImportService
             DB::table('customer_nps')->upsert($lote, ['customer_id', 'reference_month'], ['answered', 'score', 'classification', 'updated_at']);
         }
 
-        return ['clientes' => count($clientes), 'meses' => count($linhasMetricas), 'nps' => count($linhasNps), 'ignoradas' => $ignoradas];
+        $customCount = 0;
+        if ($customColumns) {
+            $definitions = $company->metricDefinitions()->whereIn('code', array_keys($customColumns))->pluck('id', 'code');
+            if ($definitions->count() !== count($customColumns)) {
+                throw new InvalidArgumentException('Uma métrica do modelo não pertence a esta empresa.');
+            }
+            $customRows = [];
+            $emptyValues = [];
+            foreach ($linhas as $row) {
+                $code = trim((string) $v($row, 'cliente_id'));
+                $month = self::mes($v($row, 'mes_ref'));
+                foreach ($customColumns as $metricCode => $column) {
+                    $raw = $row[$column] ?? null;
+                    if ($raw === null || $raw === '') {
+                        $emptyValues[$ids[$code]][$month][] = $definitions[$metricCode];
+
+                        continue;
+                    }
+                    $value = self::numero($raw);
+                    if ($value === null) {
+                        throw new InvalidArgumentException("Valor inválido na métrica {$metricCode}.");
+                    }
+                    $customRows[] = [
+                        'company_id' => $company->id, 'customer_id' => $ids[$code], 'metric_definition_id' => $definitions[$metricCode],
+                        'reference_month' => $month, 'value' => $value, 'created_at' => $agora, 'updated_at' => $agora,
+                    ];
+                }
+            }
+            foreach ($emptyValues as $customerId => $months) {
+                foreach ($months as $month => $definitionIds) {
+                    DB::table('metric_values')->where('customer_id', $customerId)->where('reference_month', $month)
+                        ->whereIn('metric_definition_id', $definitionIds)->delete();
+                }
+            }
+            foreach (array_chunk($customRows, 250) as $batch) {
+                DB::table('metric_values')->upsert($batch, ['customer_id', 'metric_definition_id', 'reference_month'], ['value', 'updated_at']);
+            }
+            $customCount = count($customRows);
+        }
+
+        $stats = ['clientes' => count($clientes), 'meses' => count($linhasMetricas), 'nps' => count($linhasNps), 'ignoradas' => $ignoradas];
+
+        return $customColumns ? $stats + ['valores_metricas' => $customCount] : $stats;
     }
 
     /** Cancelado sem mês de saída informado: assume o mês seguinte ao último com métricas (sem métricas = sem data). */

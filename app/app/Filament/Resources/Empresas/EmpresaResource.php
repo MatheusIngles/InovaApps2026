@@ -61,7 +61,7 @@ class EmpresaResource extends Resource
             ->paginated([12, 24, 48, 'all'])
             ->defaultPaginationPageOption(24)
             ->searchPlaceholder('Buscar por nome, código ou segmento…')
-            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Resolvido' => 'baixo', 'Cancelado' => 'canc'][$e->rotulo()])
+            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Resolvido' => 'baixo', 'Sem avaliação' => 'canc', 'Cancelado' => 'canc'][$e->rotulo()])
             ->columns([
                 Stack::make([
                     Split::make([
@@ -72,7 +72,8 @@ class EmpresaResource extends Resource
                     ]),
                     Split::make([
                         TextColumn::make('score')->size(TextSize::Large)->weight(FontWeight::Bold)
-                            ->formatStateUsing(fn ($state) => "Atenção {$state}/100")
+                            ->formatStateUsing(fn ($state, Customer $record) => $record->currentAssessment ? "Atenção {$state}/100" : 'Sem avaliação')
+                            ->description('Sinais com pesos ajustáveis; veja as parcelas no cliente.')
                             ->tooltip(fn (Customer $e) => $e->resumoScore()),
                         TextColumn::make('valor')->alignEnd()
                             ->state(fn (Customer $e) => $e->cancelada() ? "Cancelou em {$e->mes_cancel}" : Customer::brl($e->valor).'/mês'),
@@ -87,7 +88,7 @@ class EmpresaResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('nivel')->label('Nível de atenção')->multiple()
-                    ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Resolvido' => 'Resolvido', 'Cancelado' => 'Cancelado'])
+                    ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Resolvido' => 'Resolvido', 'Sem avaliação' => 'Sem avaliação', 'Cancelado' => 'Cancelado'])
                     ->query(function (Builder $query, array $data) {
                         $niveis = array_filter($data['values'] ?? []);
                         $l = app(CompanyContext::class)->current()->limiares(); // limiares da empresa
@@ -97,6 +98,7 @@ class EmpresaResource extends Resource
                                 $query->orWhere(fn (Builder $q) => match ($nivel) {
                                     'Cancelado' => $q->where('customers.status', 'Cancelado'),
                                     'Resolvido' => $q->where('customers.status', 'Ativo')->whereNotNull('customers.resolved_at'),
+                                    'Sem avaliação' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->whereNull('assessment.health_score'),
                                     'Crítico' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '>=', $l['critico']),
                                     'Alto' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
                                     'Médio' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),
