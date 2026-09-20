@@ -1,0 +1,6 @@
+[Unit]
+Description=Seer - verifica se o site responde e reinicia se travar
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'curl -fsS -m 10 -o /dev/null http://127.0.0.1:8000/up || systemctl restart seer-web'

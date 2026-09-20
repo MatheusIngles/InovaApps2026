@@ -1,0 +1,54 @@
+name: Automate Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Conectar e Atualizar no Servidor
+        uses: appleboy/ssh-action@v1.2.5
+
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 2222
+
+          script: |
+            set -e
+
+            cd /home/matheus/InovaApps2026
+            git pull origin main
+
+            cd /home/matheus/InovaApps2026/app
+
+            composer install \
+              --no-dev \
+              --no-interaction \
+              --prefer-dist \
+              --optimize-autoloader
+
+            # Builds anteriores rodavam com sudo e podem ter deixado estes diretórios como root.
+            # Recupera somente os arquivos gerados; npm ci e Vite rodam como o usuário SSH.
+            for generated_path in node_modules public/build; do
+              if [ -e "$generated_path" ]; then
+                printf '%s\n' "${{ secrets.SUDO_PASSWORD }}" | sudo -S chown -R "$(id -u):$(id -g)" "$generated_path"
+              fi
+            done
+
+            npm ci
+            npm run build
+
+            php artisan migrate --force
+            php artisan storage:link || true # serve os logos enviados (storage/app/public)
+
+            php artisan optimize:clear
+            php artisan optimize
+
+            php artisan queue:restart
+            php artisan reload || true
