@@ -17,7 +17,7 @@ Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes,
 **Dados e métricas**
 - **Importação de planilhas** (XLSX/CSV) com várias abas ligadas por `cliente_id`, dicionário de campos e tela de confirmação em cartões. Arquivos grandes (> 2 MB) rodam em fila.
 - **Modelo de planilha em XLSX** (Leia-me, dicionário e abas de dados) para baixar.
-- **Métricas próprias por empresa,** com 8 tipos (decimal, inteiro, percentual, monetário, binário, nota, data e texto), direção de piora, faixas, peso e ativação. Mudar qualquer valor recalcula a carteira.
+- **Métricas próprias por empresa,** com tela de cartões e participação de cada fator na atenção, e 8 tipos (decimal, inteiro, percentual, monetário, binário, nota, data e texto), direção de piora, faixas, peso e ativação. Mudar qualquer valor recalcula a carteira.
 - **Colunas opcionais:** `segmento` e `plano` (viram "Não informado"), `situacao`, `mes_cancelamento` e `inicio_contrato` (reconhecem quem cancelou).
 - **Sinais extras do desafio** (chamados críticos, tempo de resolução e volume de chamados) entram no cálculo quando a base tem esses dados.
 
@@ -36,6 +36,8 @@ Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes,
 ## 📊 Métricas por empresa
 
 Cada empresa tem o seu próprio conjunto de métricas, definido a partir da base que ela envia. No envio da planilha, cada coluna nova é mapeada para uma métrica existente ou cadastrada como nova (também dá para cadastrar em Configurações). A métrica guarda nome, descrição, tipo, direção de piora, valores saudável e crítico e peso. Alterar peso, faixa ou estado recalcula a atenção da carteira.
+
+Em **Configurações › Métricas**, as métricas aparecem em cartões recolhíveis (nome, tipo, estado, participação e resumo da faixa) e o painel **Participação de cada fator na atenção** mostra, em %, quanto cada um pesa. Os **8 sinais padrão** (aba Prioridades) e as métricas da empresa entram na **mesma conta**: a participação é o peso de cada fator dividido pela soma de todos os pesos. Por isso, ligar uma métrica nova reduz a participação relativa dos demais.
 
 | Tipo | Como o valor é lido | Entra na atenção? |
 |---|---|---|
