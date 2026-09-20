@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\MetricDefinition;
+use App\Support\Risco;
 use App\Support\RiskService;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Validacao\Backtest;
@@ -108,8 +109,16 @@ class MetricDefinitions extends Component
     {
         $company = app(CompanyContext::class)->current();
 
+        $definitions = $company->metricDefinitions()->withCount('values')->orderBy('code')->get();
+        $padrao = $company->hasLegacyMetrics() ? collect($company->pesos())->filter(fn ($peso): bool => $peso > 0) : collect();
+        $proprias = $definitions->filter(fn (MetricDefinition $definition): bool => $definition->enabled && ! MetricDefinition::semScore($definition->value_type) && (float) $definition->weight > 0);
+        $total = $padrao->sum() + $proprias->sum(fn (MetricDefinition $definition): float => (float) $definition->weight);
+        $pct = fn (float $peso): float => $total > 0 ? round($peso / $total * 100, 1) : 0.0;
+
         return view('livewire.metric-definitions', [
-            'definitions' => $company->metricDefinitions()->withCount('values')->orderBy('code')->get(),
+            'definitions' => $definitions,
+            'padrao' => $padrao->map(fn ($peso, string $chave): array => ['rotulo' => Risco::ROTULOS[$chave], 'pct' => $pct((float) $peso)])->values(),
+            'participacao' => $proprias->mapWithKeys(fn (MetricDefinition $definition): array => [$definition->id => $pct((float) $definition->weight)])->all(),
         ]);
     }
 }

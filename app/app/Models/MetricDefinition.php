@@ -22,8 +22,8 @@ class MetricDefinition extends Model
         'currency' => 'Valor monetário',
         'binary' => 'Binário (0 ou 1)',
         'grade' => 'Nota (0 a 10)',
-        'date' => 'Data (não entra no score)',
-        'text' => 'Texto (não entra no score)',
+        'date' => 'Data (fora do cálculo da atenção)',
+        'text' => 'Texto (fora do cálculo da atenção)',
     ];
 
     /** Tipos que guardam o valor como texto e ficam fora do cálculo da atenção. */

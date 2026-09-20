@@ -595,4 +595,21 @@ class MetricasDinamicasTest extends TestCase
             ->call('saveDefinition', $definition->id)
             ->assertHasErrors("edits.{$definition->id}.critical_value");
     }
+
+    public function test_tela_de_metricas_mostra_a_participacao_de_cada_fator_na_atencao(): void
+    {
+        $company = Company::factory()->create();
+        $this->actingAs(User::factory()->for($company)->create());
+        app(CompanyContext::class)->within($company, function () use ($company): void {
+            foreach ([['pedidos', 30], ['reclamacoes', 10]] as [$code, $peso]) {
+                $company->metricDefinitions()->create(['code' => $code, 'label' => ucfirst($code), 'description' => 'x', 'value_type' => 'decimal', 'direction' => 'lower',
+                    'healthy_value' => 100, 'critical_value' => 0, 'weight' => $peso, 'enabled' => true]);
+            }
+        });
+
+        Livewire::test(MetricDefinitions::class)
+            ->assertSee('Participação de cada fator na atenção')
+            ->assertSee('75,0%')
+            ->assertSee('25,0%');
+    }
 }
