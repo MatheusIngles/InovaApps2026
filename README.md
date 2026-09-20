@@ -1,6 +1,6 @@
 # InovaApps 2026
 
-Plataforma **multi-tenant** de gestão de carteira de clientes, saúde da conta e priorização de atendimento, desenvolvida para o desafio **INOVAAPPS 2026** (enunciado em `Desafio - INOVAAPPS 2026.pdf`, base de dados de exemplo em `INOVAAPPS_base_de_dados.xlsx`).
+Plataforma **multi-tenant** de gestão de carteira de clientes, saúde da conta e priorização de atendimento, desenvolvida para o desafio **INOVAAPPS 2026** (enunciado e base de exemplo na pasta [`dados/`](dados/)).
 
 Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes, configura pesos e limites de risco e vê um painel com o índice de atenção, exposição financeira e fila de atendimento, com tema visual próprio e um assistente de IA isolado por empresa.
 
@@ -8,15 +8,30 @@ Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes,
 
 ## ✨ Funcionalidades
 
-- **Multi-tenancy**: usuário vinculado a uma empresa (`company_id`); detecção opcional por subdomínio (`acme.app.com`). Dados, chat e configurações são isolados por empresa.
-- **Importação de planilhas** (XLSX/CSV) com mapeamento dinâmico de colunas. Colunas que não fazem parte do modelo padrão viram **métricas próprias da empresa** (veja abaixo). Arquivos grandes (> 2 MB) rodam em fila.
-- **Motor de risco** determinístico e explicável: **índice de atenção** de 0 a 100 (não é probabilidade de cancelamento) a partir de sinais (uso da plataforma, SLA, NPS, chamados, reuniões, tendência etc.) **e das métricas de cada empresa**, com níveis Baixo/Médio/Alto/Crítico.
-- **Fila de atendimento** em dois grupos: quem já está em alerta vem primeiro; em cada grupo, atenção × (atenção + K) × valor do contrato, com `K` configurável. O prazo de contato segue a posição na fila. Um cliente pode ser marcado como **resolvido** (vai para o fim da fila) e reaberto depois.
-- **Configurações por empresa**: ordem/peso/ativação dos sinais, limites dos níveis, tema (cores, fonte, logo). Alterações recalculam a carteira.
-- **Painel**: KPIs, clientes por nível, risco por segmento, uso × SLA, comparação com cancelados e fila de atendimento.
-- **Assistente de chat com IA**: API externa da NVIDIA (prioridade), Ollama local como segunda opção e respostas por regras como último recurso; histórico filtrado por empresa.
-- **Relatório em PDF** por empresa (DomPDF) e **notificações**.
-- **Acessibilidade**: widget **VLibras** (Libras), tamanho de texto ajustável, navegação por comando de voz e **conversa por voz** com o assistente (voz neural via Edge TTS).
+**Plataforma e acesso**
+- **Multi-tenancy:** cada usuário pertence a uma empresa (`company_id`); dados, chat e configurações são isolados. Detecção opcional da empresa por subdomínio.
+- **Login e cadastro** de empresa, com bloqueio por tentativas (10 erros em 15 minutos por e-mail), cabeçalhos de segurança, HSTS em HTTPS e proteção contra upload de arquivos inesperados.
+- **Tema por empresa:** cores, fonte e logo próprios (com cores sugeridas a partir da logo), favicon e tela de login do Seer.
+- **Carregamento com esqueleto** nos gráficos e seções enquanto renderizam.
+
+**Dados e métricas**
+- **Importação de planilhas** (XLSX/CSV) com várias abas ligadas por `cliente_id`, dicionário de campos e tela de confirmação em cartões. Arquivos grandes (> 2 MB) rodam em fila.
+- **Modelo de planilha em XLSX** (Leia-me, dicionário e abas de dados) para baixar.
+- **Métricas próprias por empresa,** com 8 tipos (decimal, inteiro, percentual, monetário, binário, nota, data e texto), direção de piora, faixas, peso e ativação. Mudar qualquer valor recalcula a carteira.
+- **Colunas opcionais:** `segmento` e `plano` (viram "Não informado"), `situacao`, `mes_cancelamento` e `inicio_contrato` (reconhecem quem cancelou).
+- **Sinais extras do desafio** (chamados críticos, tempo de resolução e volume de chamados) entram no cálculo quando a base tem esses dados.
+
+**Análise**
+- **Índice de atenção** de 0 a 100 (não é probabilidade de cancelamento), explicável, com níveis Baixo/Médio/Alto/Crítico.
+- **Fila de atendimento** em dois grupos, com prazo de contato pela posição e cliente **marcado como resolvido** (vai para o fim da fila).
+- **Painel** em abas (Visão geral, Gráficos e Por segmento): KPIs, clientes por nível, risco por segmento, uso × SLA e comparação com cancelados.
+- **Validação com cancelados** (backtest) e **relatório de evidências em PDF** que funciona para qualquer empresa, com ou sem os 8 sinais padrão.
+- **Notificações** de clientes que pioraram.
+
+**Assistente de IA**
+- **Chat** por empresa, opcionalmente focado em um cliente: API da NVIDIA (prioridade), Ollama local e respostas por regras como último recurso.
+- **Conversa por voz** com voz neural (Edge TTS) e respostas menos formais, e **Libras:** o avatar do VLibras sinaliza as respostas da IA.
+- **Acessibilidade:** widget VLibras, tamanho de texto ajustável e navegação por comando de voz.
 
 ## 📊 Métricas por empresa
 
@@ -49,131 +64,76 @@ PHP 8.3+ · Laravel 13 · Filament 5 · Livewire 4 · Tailwind CSS 4 · Vite 8 �
 
 ---
 
-## 📋 Pré-requisitos
+## 🌐 Site no ar
 
-| Ferramenta | Versão |
+Está publicado em **https://sitedemerda.com.br**.
+
+O nome do domínio **não é proposital**. Era um domínio que um dos membros do time já tinha e usava para subir aplicações de teste. Para colocar o Seer em produção rápido, sem gastar tempo com registro e configuração de DNS de um domínio novo, a gente reaproveitou esse. Se o projeto seguir adiante, o certo é trocar por um domínio próprio (basta mudar `APP_URL` no `.env` e o proxy).
+
+## 🖥️ Onde o site roda
+
+O Seer roda em um servidor físico próprio, um PC de mesa (gabinete Multilaser) ligado à rede local. O domínio aponta para ele por um proxy reverso (Nginx Proxy Manager) com HTTPS.
+
+![Servidor: gabinete Multilaser onde o Seer está hospedado](docs/imagens/servidor-frente.jpg)
+
+| Item | Especificação |
 |---|---|
-| PHP | 8.3+ (extensões usuais do Laravel, `sqlite`, `zip`, `gd`) |
-| Composer | 2.x |
-| Node.js + npm | 18+ |
-| Ollama *(opcional, para o chat local)* | https://ollama.com |
+| Processador | Intel Core i5-9400F @ 2,90 GHz (6 núcleos) |
+| Memória RAM | 8 GB (7,7 GiB úteis) |
+| Armazenamento | SSD NVMe de 240 GB (223,6 GiB) |
+| Sistema operacional | Ubuntu 24.04.5 LTS |
+| PHP | 8.4 (`php artisan serve` com 4 workers, mais `queue:work`, ambos via `nohup`) |
 
----
+O selo "AMD FX" no gabinete é da carcaça antiga: o processador de hoje é Intel.
 
 ## ▶️ Como rodar
 
-O código Laravel fica na pasta [`app/`](app/).
+O código Laravel fica em [`app/`](app/). O passo a passo de instalação (dependências, `.env`, banco, build, dados de demonstração e testes) está em **[app/README.md](app/README.md)**.
+
+Resumo:
 
 ```bash
 git clone https://github.com/MatheusIngles/InovaApps2026.git
 cd InovaApps2026/app
-
-# Atalho: instala dependências, cria .env, gera chave, migra e faz build
 composer setup
-```
-
-Ou manualmente:
-
-```bash
-composer install
-cp .env.example .env
-php artisan key:generate
-touch database/database.sqlite
-php artisan migrate
-npm install
-npm run build
-php artisan storage:link      # necessário para servir os logos enviados
-```
-
-### Popular com dados de demonstração
-
-```bash
 php artisan db:seed
+composer dev      # http://localhost:8000
 ```
 
-Cria as empresas **demo** (com a base do desafio já importada e riscos calculados) e **beta** (vazia, com tema próprio, ideal para testar o envio de planilha).
+Contas de demonstração (só para desenvolvimento; o seeder se recusa a rodar em produção):
 
 | Usuário | Senha | Empresa |
 |---|---|---|
-| `admin@inova.com` | `senha123` | Demo |
-| `demo@inova.com` | `senha123` | Demo |
-| `admin@beta.com` | `senha123` | Beta |
-
-### Subir o ambiente de desenvolvimento
-
-```bash
-composer dev
-```
-
-Alternativa em terminais separados:
-
-```bash
-php artisan serve      # http://localhost:8000
-npm run dev            # Vite com hot-reload
-php artisan queue:work # obrigatório para importações grandes
-```
-
-Acesse **http://localhost:8000** e entre com um dos usuários acima. Empresa sem dados cai na tela de planilha; com dados, na lista de empresas/clientes.
-
----
-
-## ⚙️ Configuração (`.env`)
-
-| Variável | Descrição |
-|---|---|
-| `DB_CONNECTION` | `sqlite` por padrão; pode usar MySQL/PostgreSQL |
-| `TENANT_BASE_DOMAIN` | Domínio base para detectar a empresa pelo subdomínio. Vazio = desativado |
-| `LLM_ENABLED` | Liga/desliga o assistente de IA |
-| `OLLAMA_URL` / `OLLAMA_MODEL` | Modelo local (padrão `llama3.1` em `localhost:11434`) |
-| `LLM_API_URL` / `LLM_API_KEY` / `LLM_API_MODEL` | API externa da NVIDIA (formato OpenAI), a primeira opção do chat; sem chave, usa o Ollama |
-| `EDGE_TTS_PYTHON` / `EDGE_TTS_VOZ` | Voz neural do modo conversa por voz: precisa de `pip install edge-tts` no servidor. Sem ela, o navegador lê com a voz local |
-| `QUEUE_CONNECTION` | `database` por padrão; mantenha um worker ativo |
-
-Para usar o chat local:
-
-```bash
-ollama pull llama3.1
-ollama serve
-```
-
----
-
-## 🧪 Testes e qualidade
-
-```bash
-composer test                 # limpa config e roda a suíte
-php artisan test --filter=TenancyTest
-vendor/bin/pint               # formatação (Laravel Pint)
-```
-
-Cobertura atual: isolamento de tenants, importação, configuração de empresa, carteira, relatório e notificações.
-
----
+| `admin@inova.com` | `senha123` | Globalsys (base do desafio) |
+| `demo@inova.com` | `senha123` | Globalsys (base do desafio) |
+| `admin@beta.com` | `senha123` | Beta (vazia, para testar o envio de planilha) |
 
 ## 🗂️ Estrutura
 
 ```
-InovaApps/
-├── Desafio - INOVAAPPS 2026.pdf     # enunciado
-├── INOVAAPPS_base_de_dados.xlsx     # base de exemplo
-├── todo_checklist_inova.md          # checklist de requisitos
+InovaApps2026/
+├── dados/                           # dados do desafio e de teste
+│   ├── Desafio - INOVAAPPS 2026.pdf # enunciado
+│   ├── INOVAAPPS_base_de_dados.xlsx # base de exemplo (usada pelo seeder e pelos testes)
+│   └── exemplo_planilha.csv         # planilha pequena para testar a importação
+├── docs/                            # documentação técnica, funcional, negócio e checklist
 ├── .github/workflows/deploy.yaml    # deploy automático via SSH
-└── app/                             # projeto Laravel
+└── app/                             # projeto Laravel (veja app/README.md)
     ├── app/Filament/                # Painel, Planilha, Configurações, Assistente, Empresas
     ├── app/Livewire/                # AssistenteChat, ImportarPlanilha, RelatorioEmpresa
     ├── app/Jobs/                    # ImportarPlanilhaJob (fila)
-    ├── app/Models/                  # Company, Customer, CustomerMetric, CustomerNps, RiskAssessment...
-    ├── app/Support/                 # Risco, RiskService, Import, Llm, Tenancy, Relatorio, Notificacoes
+    ├── app/Models/                  # Company, Customer, MetricDefinition, MetricValue...
+    ├── app/Support/                 # Risco, RiskService, Import, Llm, Tenancy, Relatorio, Metricas
     ├── database/{migrations,seeders}
-    ├── docs/                        # documentação técnica e funcional
     └── tests/
 ```
 
 ## 📚 Documentação
 
-- [Arquitetura e funcionamento](app/docs/ARQUITETURA-E-FUNCIONAMENTO.md): camadas, modelo de dados, limitações conhecidas.
-- [Guia funcional do painel](app/docs/GUIA-FUNCIONAL-DO-PAINEL.md): como cada métrica, peso e nível é calculado.
-- [Checklist do desafio](todo_checklist_inova.md): requisitos e status.
+- [Arquitetura e funcionamento](docs/ARQUITETURA-E-FUNCIONAMENTO.md): camadas, modelo de dados, limitações conhecidas.
+- [Guia funcional do painel](docs/GUIA-FUNCIONAL-DO-PAINEL.md): como cada métrica, peso e nível é calculado.
+- [Modelo de negócio](docs/MODELO-DE-NEGOCIO.md)
+- [Checklist do desafio](docs/checklist-do-desafio.md): requisitos e status.
 
 ## 🚢 Deploy
 

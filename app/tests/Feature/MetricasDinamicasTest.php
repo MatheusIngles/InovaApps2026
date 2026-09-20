@@ -239,7 +239,7 @@ class MetricasDinamicasTest extends TestCase
     public function test_planilha_do_desafio_com_varias_abas_e_ligada_por_cliente_id_e_o_dicionario_preenche_as_metricas(): void
     {
         $company = Company::factory()->create();
-        $tabela = PlanilhaReader::lerModelo(database_path('data/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
+        $tabela = PlanilhaReader::lerModelo(base_path('../dados/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
 
         $this->assertSame(['cliente_id', 'mes_ref'], array_slice($tabela['cabecalhos'], 0, 2));
         foreach (['segmento', 'valor_mensal', 'chamados_abertos', 'nota_nps', 'situacao', 'mes_cancelamento'] as $coluna) {

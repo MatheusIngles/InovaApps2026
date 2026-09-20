@@ -16,6 +16,8 @@ class CabecalhosDeSeguranca
     {
         $response = $next($request);
 
+        header_remove('X-Powered-By'); // não anuncia a versão do PHP
+
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');

@@ -19,6 +19,25 @@
             },
             escolher(pergunta) { this.ativo = -1; this.enviar(pergunta); },
             suportado: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+            /** Libras: com a opção ligada, o avatar do VLibras sinaliza cada resposta da IA (a preferência fica no navegador). */
+            libras: (() => { try { return localStorage.getItem('seer-libras') === '1'; } catch { return false; } })(),
+            alternarLibras() {
+                this.libras = !this.libras;
+                try { localStorage.setItem('seer-libras', this.libras ? '1' : '0'); } catch {}
+                if (this.libras) this.abrirLibras(); else window.plugin?.player?.stop?.();
+            },
+            ultimaResposta() { return [...document.querySelectorAll('.chatbot-row:not(.eu) .chatbot-markdown')].pop()?.innerText ?? ''; },
+            /** Abre o avatar e espera o plugin carregar (ele é baixado sob demanda, na primeira abertura). */
+            async abrirLibras() {
+                window.VLibrasWidget?.open?.();
+                for (let i = 0; i < 80 && !window.plugin?.translate; i++) await new Promise(ok => setTimeout(ok, 250));
+                return !!window.plugin?.translate;
+            },
+            async sinalizar(texto) {
+                texto = texto.replace(/\s+/g, ' ').trim().slice(0, 600); // respostas longas demoram a sinalizar: manda o começo
+                if (!this.libras || !texto || !(await this.abrirLibras())) return;
+                try { await window.plugin.translate(texto); } catch {}
+            },
             /** Modo conversa: ouve, envia quando a pessoa para de falar, lê a resposta em voz alta e volta a ouvir, até clicar de novo. */
             conversa: false, falando: false, audio: null,
             alternar() { this.conversa ? this.parar() : this.iniciar(); },
@@ -57,7 +76,7 @@
                 await this.enviar(pergunta, true);
                 await this.$nextTick();
                 if (!this.conversa) return;
-                const resposta = [...document.querySelectorAll('.chatbot-row:not(.eu) .chatbot-markdown')].pop()?.innerText;
+                const resposta = this.ultimaResposta();
                 if (!resposta) return this.ouvir();
                 this.falando = true;
                 try { await this.falarNeural(resposta); } catch { await this.falarNavegador(resposta); }
@@ -93,6 +112,7 @@
                 campo.value = '';
                 campo.dispatchEvent(new Event('input'));
                 try { await $wire.enviar(texto, porVoz); } finally { this.pendente = null; }
+                if (this.libras) { await this.$nextTick(); this.sinalizar(this.ultimaResposta()); }
             },
         }">
     <header class="chatbot-head">
@@ -155,6 +175,10 @@
                    x-on:keydown.escape="fechado = true; ativo = -1"
                    x-on:keydown.enter="if (ativo >= 0 && sugeridas[ativo]) { $event.preventDefault(); escolher(sugeridas[ativo]); }"
                    :placeholder="falando ? 'Respondendo em voz alta…' : ouvindo ? 'Ouvindo… pode falar' : conversa ? 'Analisando…' : @js($foco ? 'Pergunte algo sobre '.$foco->nome.'…' : 'Pergunte sobre a carteira…')" aria-label="Sua pergunta">
+            <button type="button" class="chatbot-mic chatbot-libras" x-on:click="alternarLibras()" :aria-pressed="libras"
+                    :aria-label="libras ? 'Desligar avatar de Libras' : 'Mostrar respostas em Libras'" :title="libras ? 'Desligar avatar de Libras' : 'Mostrar respostas em Libras (VLibras)'">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11.5v-7a1.5 1.5 0 0 1 3 0V12M14 11.5v-5a1.5 1.5 0 0 1 3 0V13M17 9.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.7-2.3L4.5 15a1.6 1.6 0 0 1 2.4-2.1L8 14"/></svg>
+            </button>
             <button type="button" class="chatbot-mic" x-show="suportado" x-cloak x-on:click="alternar()" :aria-pressed="conversa"
                     :aria-label="conversa ? 'Encerrar conversa por voz' : 'Conversar por voz'" :title="conversa ? 'Encerrar conversa por voz' : 'Conversar por voz'">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>

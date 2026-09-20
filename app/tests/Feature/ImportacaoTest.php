@@ -97,7 +97,7 @@ A,2026-02,Cancelado,2
 
     public function test_planilha_do_desafio_em_xlsx_e_achatada(): void
     {
-        $tabela = PlanilhaReader::ler(database_path('data/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
+        $tabela = PlanilhaReader::ler(base_path('../dados/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
 
         $this->assertContains('cliente_id', $tabela['cabecalhos']);
         $this->assertContains('nota_nps', $tabela['cabecalhos']);

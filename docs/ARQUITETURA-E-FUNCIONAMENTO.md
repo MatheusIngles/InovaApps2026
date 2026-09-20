@@ -26,7 +26,7 @@ O produto não é, no estado atual, um modelo estatístico de previsão de churn
 - PHPUnit `^12.5`
 - SQLite como banco padrão do ambiente atual
 
-A configuração de dependências está em [composer.json](../composer.json) e [package.json](../package.json). O frontend usa os componentes do Filament, Livewire e Alpine; não há JavaScript próprio relevante em `resources/js/app.js`.
+A configuração de dependências está em [composer.json](../app/composer.json) e [package.json](../app/package.json). O frontend usa os componentes do Filament, Livewire e Alpine; não há JavaScript próprio relevante em `resources/js/app.js`.
 
 ## 3. Arquitetura da aplicação
 
@@ -60,8 +60,8 @@ XLSX -> CustomerDataSeeder -> customers, customer_metrics, customer_nps
 
 ### 3.2 Bootstrap e painel
 
-- [bootstrap/app.php](../bootstrap/app.php) registra o health check `/up`.
-- [AppPanelProvider.php](../app/Providers/Filament/AppPanelProvider.php) configura o painel Filament.
+- [bootstrap/app.php](../app/bootstrap/app.php) registra o health check `/up`.
+- [AppPanelProvider.php](../app/app/Providers/Filament/AppPanelProvider.php) configura o painel Filament.
 - O painel usa caminho vazio, portanto atende a raiz `/`.
 - O painel exige autenticação, sessão, CSRF, binding de rotas e autenticação de sessão.
 - O painel permite login, cadastro e recuperação de senha.
@@ -69,7 +69,7 @@ XLSX -> CustomerDataSeeder -> customers, customer_metrics, customer_nps
 - O tema atual é claro, com azul como cor primária e Slate como cor neutra.
 - O hook `BODY_END` injeta o widget externo do VLibras.
 
-[routes/web.php](../routes/web.php) não declara rotas de negócio; as rotas são descobertas e registradas pelo Filament.
+[routes/web.php](../app/routes/web.php) não declara rotas de negócio; as rotas são descobertas e registradas pelo Filament.
 
 ### 3.3 Rotas efetivas
 
@@ -86,7 +86,7 @@ Não existe API própria, prefixo `/api`, controller de domínio ou endpoint pú
 
 ### 3.4 Autorização
 
-Multi-tenancy: todo usuário pertence a uma empresa (`company_id`). O middleware [SetCompanyContext.php](../app/Http/Middleware/SetCompanyContext.php) define a empresa ativa (a do usuário; em telas públicas, por subdomínio ou `?empresa=`, via [TenantResolver.php](../app/Support/Tenancy/TenantResolver.php)) e o trait `BelongsToCompany` filtra toda consulta e grava o `company_id` em toda inserção. Dados, configuração, chat e relatórios são isolados por empresa. Dentro da empresa, todo usuário autenticado tem acesso integral: não há perfis, papéis nem permissões por equipe.
+Multi-tenancy: todo usuário pertence a uma empresa (`company_id`). O middleware [SetCompanyContext.php](../app/app/Http/Middleware/SetCompanyContext.php) define a empresa ativa (a do usuário; em telas públicas, por subdomínio ou `?empresa=`, via [TenantResolver.php](../app/app/Support/Tenancy/TenantResolver.php)) e o trait `BelongsToCompany` filtra toda consulta e grava o `company_id` em toda inserção. Dados, configuração, chat e relatórios são isolados por empresa. Dentro da empresa, todo usuário autenticado tem acesso integral: não há perfis, papéis nem permissões por equipe.
 
 ## 4. Organização do código
 
@@ -98,17 +98,17 @@ Multi-tenancy: todo usuário pertence a uma empresa (`company_id`). O middleware
 - `app/Livewire`: estado e interação do chat.
 - `database/migrations`: estrutura versionada do banco.
 - `database/seeders`: importação e cálculo inicial dos dados.
-- `database/data`: planilha de entrada.
+- `../dados`: enunciado, base de exemplo e planilha de teste (fora da pasta do Laravel).
 - `resources/views`: templates Blade do assistente, modal e acessibilidade.
 - `tests`: testes de feature e unitários.
 
-O controller base em [Controller.php](../app/Http/Controllers/Controller.php) não contém lógica de domínio.
+O controller base em [Controller.php](../app/app/Http/Controllers/Controller.php) não contém lógica de domínio.
 
 ## 5. Modelo de domínio
 
 ### 5.1 Customer
 
-Arquivo: [Customer.php](../app/Models/Customer.php)
+Arquivo: [Customer.php](../app/app/Models/Customer.php)
 
 Representa uma empresa/cliente da carteira.
 
@@ -127,7 +127,7 @@ Comportamentos importantes:
 - `ordenar()` coloca ativos antes de cancelados e ordena pela exposição decrescente.
 - `score` vem de `health_score`.
 - `exposicao` vem de `exposure_indicator`.
-- `nivel` é derivado pelos limiares de [Risco.php](../app/Support/Risco.php).
+- `nivel` é derivado pelos limiares de [Risco.php](../app/app/Support/Risco.php).
 - `sinais` e `similares` são lidos de `signals_json`.
 - `hist` e `nps` transformam os dados persistidos em estruturas próprias para a tela.
 
@@ -135,7 +135,7 @@ A função `brl()` exibe valores como moeda brasileira sem casas decimais, por e
 
 ### 5.2 CustomerMetric
 
-Arquivo: [CustomerMetric.php](../app/Models/CustomerMetric.php)
+Arquivo: [CustomerMetric.php](../app/app/Models/CustomerMetric.php)
 
 Representa uma fotografia mensal de atendimento, uso, pagamentos e reuniões de um cliente. O par `customer_id + reference_month` é único.
 
@@ -152,7 +152,7 @@ Campos principais:
 
 ### 5.3 CustomerNps
 
-Arquivo: [CustomerNps.php](../app/Models/CustomerNps.php)
+Arquivo: [CustomerNps.php](../app/app/Models/CustomerNps.php)
 
 Representa uma pesquisa mensal de satisfação. O par `customer_id + reference_month` é único.
 
@@ -166,7 +166,7 @@ Pesquisas sem resposta continuam registradas e influenciam a severidade de NPS c
 
 ### 5.4 RiskAssessment
 
-Arquivo: [RiskAssessment.php](../app/Models/RiskAssessment.php)
+Arquivo: [RiskAssessment.php](../app/app/Models/RiskAssessment.php)
 
 Armazena o resultado calculado para um cliente, mês de referência e versão de modelo. O índice único é `customer_id + reference_month + model_version`.
 
@@ -188,7 +188,7 @@ Todas as foreign keys de dados de clientes usam `cascadeOnDelete`: ao remover um
 
 ### 6.1 Tabela `customers`
 
-Migration: [2026_09_19_132055_create_customers_table.php](../database/migrations/2026_09_19_132055_create_customers_table.php)
+Migration: [2026_09_19_132055_create_customers_table.php](../app/database/migrations/2026_09_19_132055_create_customers_table.php)
 
 | Campo | Tipo | Regra/uso |
 |---|---|---|
@@ -206,7 +206,7 @@ Migration: [2026_09_19_132055_create_customers_table.php](../database/migrations
 
 ### 6.2 Tabela `customer_metrics`
 
-Migration: [2026_09_19_132056_create_customer_metrics_table.php](../database/migrations/2026_09_19_132056_create_customer_metrics_table.php)
+Migration: [2026_09_19_132056_create_customer_metrics_table.php](../app/database/migrations/2026_09_19_132056_create_customer_metrics_table.php)
 
 | Campo | Tipo | Regra/uso |
 |---|---|---|
@@ -225,11 +225,11 @@ Migration: [2026_09_19_132056_create_customer_metrics_table.php](../database/mig
 | `meetings_completed` | unsigned smallint | reuniões realizadas |
 | `customer_id + reference_month` | unique | uma linha por cliente/mês |
 
-A migration [2026_09_19_134626_make_customer_metrics_sla_nullable.php](../database/migrations/2026_09_19_134626_make_customer_metrics_sla_nullable.php) permite SLA nulo em meses sem chamados.
+A migration [2026_09_19_134626_make_customer_metrics_sla_nullable.php](../app/database/migrations/2026_09_19_134626_make_customer_metrics_sla_nullable.php) permite SLA nulo em meses sem chamados.
 
 ### 6.3 Tabela `customer_nps`
 
-Migration: [2026_09_19_132057_create_customer_nps_table.php](../database/migrations/2026_09_19_132057_create_customer_nps_table.php)
+Migration: [2026_09_19_132057_create_customer_nps_table.php](../app/database/migrations/2026_09_19_132057_create_customer_nps_table.php)
 
 | Campo | Tipo | Regra/uso |
 |---|---|---|
@@ -242,9 +242,9 @@ Migration: [2026_09_19_132057_create_customer_nps_table.php](../database/migrati
 
 ### 6.4 Tabela `risk_assessments`
 
-Migration inicial: [2026_09_19_132059_create_risk_assessments_table.php](../database/migrations/2026_09_19_132059_create_risk_assessments_table.php).
+Migration inicial: [2026_09_19_132059_create_risk_assessments_table.php](../app/database/migrations/2026_09_19_132059_create_risk_assessments_table.php).
 
-A migration [2026_09_19_134141_add_rule_score_to_risk_assessments_table.php](../database/migrations/2026_09_19_134141_add_rule_score_to_risk_assessments_table.php) adiciona `health_score` e torna `risk_probability` e `expected_revenue_at_risk` anuláveis, refletindo a implementação atual baseada em regras.
+A migration [2026_09_19_134141_add_rule_score_to_risk_assessments_table.php](../app/database/migrations/2026_09_19_134141_add_rule_score_to_risk_assessments_table.php) adiciona `health_score` e torna `risk_probability` e `expected_revenue_at_risk` anuláveis, refletindo a implementação atual baseada em regras.
 
 | Campo | Tipo | Regra/uso atual |
 |---|---|---|
@@ -275,7 +275,7 @@ No ambiente padrão, sessão, cache e filas estão configurados para usar o banc
 
 ### 7.1 Fonte
 
-A fonte principal é [INOVAAPPS_base_de_dados.xlsx](../database/data/INOVAAPPS_base_de_dados.xlsx). O importador espera as abas:
+A fonte principal é [INOVAAPPS_base_de_dados.xlsx](../dados/INOVAAPPS_base_de_dados.xlsx). O importador espera as abas:
 
 - `clientes`;
 - `atendimento_mensal`;
@@ -284,7 +284,7 @@ A fonte principal é [INOVAAPPS_base_de_dados.xlsx](../database/data/INOVAAPPS_b
 
 ### 7.2 Importação
 
-[CustomerDataSeeder.php](../database/seeders/CustomerDataSeeder.php):
+[CustomerDataSeeder.php](../app/database/seeders/CustomerDataSeeder.php):
 
 1. lê o XLSX usando OpenSpout;
 2. valida as abas esperadas;
@@ -295,7 +295,7 @@ A fonte principal é [INOVAAPPS_base_de_dados.xlsx](../database/data/INOVAAPPS_b
 
 ### 7.3 Cálculo de risco
 
-[RiskAssessmentSeeder.php](../database/seeders/RiskAssessmentSeeder.php):
+[RiskAssessmentSeeder.php](../app/database/seeders/RiskAssessmentSeeder.php):
 
 1. carrega cada cliente com métricas e NPS ordenados por mês;
 2. para cancelados, ignora métricas posteriores à data de cancelamento;
@@ -329,7 +329,7 @@ O PHP precisa ter `pdo_sqlite` habilitado quando o banco configurado for SQLite.
 
 ## 8. Cálculo de risco
 
-Implementação: [Risco.php](../app/Support/Risco.php).
+Implementação: [Risco.php](../app/app/Support/Risco.php).
 
 ### 8.1 Janela e agregação
 
@@ -446,23 +446,23 @@ O resultado é apresentado como percentual e serve para encontrar até três cli
 
 ### 9.1 Dashboard
 
-Widgets registrados em [app/Filament/Widgets](../app/Filament/Widgets):
+Widgets registrados em [app/Filament/Widgets](../app/app/Filament/Widgets):
 
-- **KPIs** ([KpisWidget.php](../app/Filament/Widgets/KpisWidget.php))
+- **KPIs** ([KpisWidget.php](../app/app/Filament/Widgets/KpisWidget.php))
   - clientes ativos;
   - receita mensal ativa;
   - quantidade de ativos com score alto ou crítico;
   - receita já perdida, calculada a partir do valor mensal dos cancelados.
-- **Clientes ativos por nível** ([NiveisChart.php](../app/Filament/Widgets/NiveisChart.php))
+- **Clientes ativos por nível** ([NiveisChart.php](../app/app/Filament/Widgets/NiveisChart.php))
   - gráfico doughnut com Baixo, Médio, Alto e Crítico.
-- **Risco médio por segmento** ([SegmentosChart.php](../app/Filament/Widgets/SegmentosChart.php))
+- **Risco médio por segmento** ([SegmentosChart.php](../app/app/Filament/Widgets/SegmentosChart.php))
   - média do score dos ativos agrupada por segmento.
-- **Uso x SLA** ([TendenciaChart.php](../app/Filament/Widgets/TendenciaChart.php))
+- **Uso x SLA** ([TendenciaChart.php](../app/app/Filament/Widgets/TendenciaChart.php))
   - médias mensais da carteira ativa, em percentual.
-- **Comparação exploratória** ([BacktestWidget.php](../app/Filament/Widgets/BacktestWidget.php))
+- **Comparação exploratória** ([BacktestWidget.php](../app/app/Filament/Widgets/BacktestWidget.php))
   - score médio de cancelados versus ativos;
   - quantidade de cancelados e ativos com score maior ou igual a 40.
-- **Fila de atendimento** ([FilaTable.php](../app/Filament/Widgets/FilaTable.php))
+- **Fila de atendimento** ([FilaTable.php](../app/app/Filament/Widgets/FilaTable.php))
   - oito ativos com maior exposição mensal;
   - link para o detalhe da empresa;
   - nível, score, contrato e principal sinal.
@@ -471,7 +471,7 @@ A comparação do backtest é explicitamente exploratória e não valida previs�
 
 ### 9.2 Lista de empresas
 
-Implementação: [EmpresaResource.php](../app/Filament/Resources/Empresas/EmpresaResource.php).
+Implementação: [EmpresaResource.php](../app/app/Filament/Resources/Empresas/EmpresaResource.php).
 
 Características:
 
@@ -499,7 +499,7 @@ A página de detalhe mostra:
 
 ### 9.4 Assistente
 
-A página Filament está em [Assistente.php](../app/Filament/Pages/Assistente.php). O componente Livewire está em [AssistenteChat.php](../app/Livewire/AssistenteChat.php), com template em [assistente-chat.blade.php](../resources/views/livewire/assistente-chat.blade.php).
+A página Filament está em [Assistente.php](../app/app/Filament/Pages/Assistente.php). O componente Livewire está em [AssistenteChat.php](../app/app/Livewire/AssistenteChat.php), com template em [assistente-chat.blade.php](../app/resources/views/livewire/assistente-chat.blade.php).
 
 O componente:
 
@@ -508,10 +508,10 @@ O componente:
 - não persiste conversas;
 - limita a pergunta a 500 caracteres;
 - responde com um LLM: Ollama local por padrão, ou uma API compatível com OpenAI para contextos maiores (`config/llm.php`), com o contexto da empresa ou do cliente em foco;
-- barra perguntas fora do assunto e tentativas de mudar as regras ([Escopo.php](../app/Support/Llm/Escopo.php)): um filtro antes da chamada e uma instrução no prompt, que faz o modelo responder `FORA_DO_ESCOPO`;
+- barra perguntas fora do assunto e tentativas de mudar as regras ([Escopo.php](../app/app/Support/Llm/Escopo.php)): um filtro antes da chamada e uma instrução no prompt, que faz o modelo responder `FORA_DO_ESCOPO`;
 - se o LLM estiver indisponível, cai nas respostas por regras.
 
-As respostas por regras estão em [Assistente.php](../app/Support/Assistente.php). Elas normalizam caixa e acentos, identificam códigos no formato `C###` e usam palavras-chave.
+As respostas por regras estão em [Assistente.php](../app/app/Support/Assistente.php). Elas normalizam caixa e acentos, identificam códigos no formato `C###` e usam palavras-chave.
 
 Perguntas sobre a carteira cobrem:
 
@@ -533,24 +533,24 @@ Quando a intenção não é reconhecida, o assistente devolve uma mensagem de or
 
 ### 9.5 Acessibilidade e recursos externos
 
-[vlibras.blade.php](../resources/views/vlibras.blade.php) carrega o VLibras por script externo. A fonte visual configurada para o painel é Plus Jakarta Sans. A dependência externa do VLibras não possui fallback local implementado.
+[vlibras.blade.php](../app/resources/views/vlibras.blade.php) carrega o VLibras por script externo. A fonte visual configurada para o painel é Plus Jakarta Sans. A dependência externa do VLibras não possui fallback local implementado.
 
 ## 10. Seeders, factories e credenciais de desenvolvimento
 
-[DatabaseSeeder.php](../database/seeders/DatabaseSeeder.php) executa a carga de usuários, dados de clientes e avaliações de risco.
+[DatabaseSeeder.php](../app/database/seeders/DatabaseSeeder.php) executa a carga de usuários, dados de clientes e avaliações de risco.
 
-[UserSeeder.php](../database/seeders/UserSeeder.php) cria os usuários demonstrativos:
+[UserSeeder.php](../app/database/seeders/UserSeeder.php) cria os usuários demonstrativos:
 
 - `admin@inova.com`
 - `demo@inova.com`
 
 Ambos usam a senha fixa `senha123` no ambiente de demonstração. Essas credenciais devem ser substituídas ou removidas antes de qualquer ambiente real.
 
-As factories em [database/factories](../database/factories) existem para testes e geração de dados, mas não necessariamente reproduzem a distribuição e a integridade da planilha oficial.
+As factories em [database/factories](../app/database/factories) existem para testes e geração de dados, mas não necessariamente reproduzem a distribuição e a integridade da planilha oficial.
 
 ## 11. Testes
 
-Os testes de feature estão em [tests/Feature](../tests/Feature), e os unitários em [tests/Unit](../tests/Unit).
+Os testes de feature estão em [tests/Feature](../app/tests/Feature), e os unitários em [tests/Unit](../app/tests/Unit).
 
 A suíte de carteira cobre, entre outros pontos:
 
@@ -574,7 +574,7 @@ Os números esperados na base de teste incluem:
 - 80 avaliações de risco;
 - 23 métricas sem SLA.
 
-Ainda não há cobertura unitária específica para todos os limites de [Risco.php](../app/Support/Risco.php), dados vazios, métricas incompletas, similaridade, severidades ou mensagens não reconhecidas do assistente.
+Ainda não há cobertura unitária específica para todos os limites de [Risco.php](../app/app/Support/Risco.php), dados vazios, métricas incompletas, similaridade, severidades ou mensagens não reconhecidas do assistente.
 
 Comando recomendado:
 
@@ -599,7 +599,7 @@ npm run build
 php artisan serve
 ```
 
-O script `composer setup`, definido em [composer.json](../composer.json), automatiza parte desse processo. As variáveis de ambiente de banco estão em `.env` e os defaults estão em [config/database.php](../config/database.php).
+O script `composer setup`, definido em [composer.json](../app/composer.json), automatiza parte desse processo. As variáveis de ambiente de banco estão em `.env` e os defaults estão em [config/database.php](../app/config/database.php).
 
 Serviços previstos na configuração, mas não usados diretamente pelo domínio atual:
 
@@ -627,13 +627,13 @@ Serviços previstos na configuração, mas não usados diretamente pelo domínio
 
 ## 14. Referências principais
 
-- [composer.json](../composer.json)
-- [AppPanelProvider.php](../app/Providers/Filament/AppPanelProvider.php)
-- [Customer.php](../app/Models/Customer.php)
-- [Risco.php](../app/Support/Risco.php)
-- [Assistente.php](../app/Support/Assistente.php)
-- [CustomerDataSeeder.php](../database/seeders/CustomerDataSeeder.php)
-- [RiskAssessmentSeeder.php](../database/seeders/RiskAssessmentSeeder.php)
-- [EmpresaResource.php](../app/Filament/Resources/Empresas/EmpresaResource.php)
-- [KpisWidget.php](../app/Filament/Widgets/KpisWidget.php)
-- [tests/Feature/CarteiraTest.php](../tests/Feature/CarteiraTest.php)
+- [composer.json](../app/composer.json)
+- [AppPanelProvider.php](../app/app/Providers/Filament/AppPanelProvider.php)
+- [Customer.php](../app/app/Models/Customer.php)
+- [Risco.php](../app/app/Support/Risco.php)
+- [Assistente.php](../app/app/Support/Assistente.php)
+- [CustomerDataSeeder.php](../app/database/seeders/CustomerDataSeeder.php)
+- [RiskAssessmentSeeder.php](../app/database/seeders/RiskAssessmentSeeder.php)
+- [EmpresaResource.php](../app/app/Filament/Resources/Empresas/EmpresaResource.php)
+- [KpisWidget.php](../app/app/Filament/Widgets/KpisWidget.php)
+- [tests/Feature/CarteiraTest.php](../app/tests/Feature/CarteiraTest.php)

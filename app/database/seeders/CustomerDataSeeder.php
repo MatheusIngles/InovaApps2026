@@ -12,8 +12,8 @@ class CustomerDataSeeder extends Seeder
 {
     public function run(): void
     {
-        $company = Company::firstOrCreate(['slug' => 'demo'], ['name' => 'Empresa Demo']);
-        $tabela = PlanilhaReader::ler(database_path('data/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
+        $company = Company::firstOrCreate(['slug' => 'demo'], ['name' => 'Globalsys']);
+        $tabela = PlanilhaReader::ler(base_path('../dados/INOVAAPPS_base_de_dados.xlsx'), 'xlsx');
 
         // a planilha do desafio já usa os nomes canônicos de coluna
         ImportService::importar($company, $tabela['linhas'], ImportService::sugerirMapeamento($tabela['cabecalhos']));

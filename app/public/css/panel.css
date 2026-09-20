@@ -203,6 +203,7 @@ input, textarea { caret-color: var(--primary-600); }
 .chatbot-mic { background: transparent; color: var(--panel-link); }
 .chatbot-mic:hover { background: color-mix(in srgb, var(--primary-500) 16%, transparent); }
 .chatbot-mic[aria-pressed="true"] { background: var(--primary-600); color: #fff; animation: chatbot-pulso 1.4s ease-in-out infinite; }
+.chatbot-libras[aria-pressed="true"] { animation: none; }
 .chatbot-send { background: var(--primary-600); color: #fff; }
 .chatbot-send:hover { background: var(--primary-700); } .chatbot-send:active { transform: scale(.95); } .chatbot-send:disabled { opacity: .6; }
 .chatbot-mic:focus-visible, .chatbot-send:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 2px; }

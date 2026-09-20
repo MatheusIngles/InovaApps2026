@@ -6,13 +6,21 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class UserSeeder extends Seeder
 {
     /** Duas empresas de demonstração: "demo" (com a base do desafio) e "beta" (vazia, para testar o envio de planilha e o tema próprio). */
     public function run(): void
     {
-        $demo = Company::firstOrCreate(['slug' => 'demo'], ['name' => 'Empresa Demo']);
+        // "demo" é a Globalsys, dona da base do desafio. A logo (dados/globalsys-logo.png) é copiada para o disco público se existir.
+        $tema = ['primary' => '#0a9bdc', 'secondary' => '#58595b', 'font' => 'Plus Jakarta Sans'];
+        $logo = base_path('../dados/globalsys-logo.png');
+        if (is_file($logo)) {
+            Storage::disk('public')->put('logos/globalsys.png', file_get_contents($logo));
+            $tema['logo'] = 'logos/globalsys.png';
+        }
+        $demo = Company::updateOrCreate(['slug' => 'demo'], ['name' => 'Globalsys', 'theme' => $tema]);
         $beta = Company::firstOrCreate(['slug' => 'beta'], [
             'name' => 'Beta Serviços',
             'theme' => ['primary' => '#0d9488', 'secondary' => '#115e59', 'font' => 'Inter'],
