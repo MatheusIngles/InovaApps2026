@@ -2,7 +2,11 @@
     <section class="ui-card ui-pad">
         <h2>Enviar planilha</h2>
         <p class="ui-muted">Cada linha representa um cliente em um mês. A planilha precisa identificar cliente, mês, segmento, porte, plano e valor mensal do contrato; adicione qualquer quantidade de colunas de métricas. Arquivos futuros podem conter outras métricas.</p>
-        <p><a class="ui-btn primary" href="{{ route('planilha.modelo.xlsx') }}">Baixar modelo completo (XLSX)</a> <a class="ui-btn" href="{{ route('planilha.modelo') }}">Modelo CSV básico</a></p>
+        <div class="ui-actions">
+            <a class="ui-btn primary" href="{{ route('planilha.modelo.xlsx') }}">Baixar modelo completo (XLSX)</a>
+            <button type="button" class="ui-btn" x-on:click="$dispatch('open-modal', { id: 'tutorial-importacao' })">Como preparar minha planilha</button>
+            <a class="ui-btn" href="{{ route('planilha.modelo') }}">Modelo CSV básico</a>
+        </div>
         <p class="ui-muted">O modelo XLSX traz uma aba Leia-me com as instruções e um dicionário dos campos. Você pode usar várias abas, desde que todas tenham a coluna cliente_id. Se preencher o dicionário (tipo, descrição, piora quando, valores e peso), as métricas já chegam configuradas na confirmação.</p>
         <p class="ui-muted">Colunas de métricas omitidas em novos arquivos preservam os valores já importados. Uma célula vazia em uma métrica enviada representa ausência de valor naquele mês.</p>
 
@@ -14,6 +18,56 @@
         </label>
         @error('arquivo')<p class="pl-erro" role="alert">{{ $message }}</p>@enderror
     </section>
+
+    <x-filament::modal id="tutorial-importacao" width="4xl" heading="Como preparar sua planilha para importação">
+        <div class="space-y-5 text-sm leading-6">
+            <p>Você pode começar com uma base de clientes de qualquer origem. Organize os dados antes do envio para que cada valor seja associado ao cliente e ao mês corretos.</p>
+
+            <section>
+                <h3 class="font-semibold">1. Identifique as informações na sua base</h3>
+                <p>Encontre uma identificação estável para cada cliente (código, matrícula ou outro identificador), o mês de cada registro, o porte e o valor mensal do contrato. Separe também as medidas que deseja acompanhar, como uso, chamados ou satisfação. Se a base tiver apenas nomes, crie um código único por cliente e use sempre o mesmo código nos meses seguintes.</p>
+            </section>
+
+            <section>
+                <h3 class="font-semibold">2. Organize as linhas e colunas</h3>
+                <p>Na primeira linha, escreva um cabeçalho para cada coluna, sem nomes vazios ou repetidos. Em uma tabela única (CSV ou XLSX), use uma linha para cada combinação de cliente e mês. Não repita o mesmo cliente no mesmo mês. O arquivo precisa ter ao menos uma coluna de métrica e um valor de métrica preenchido.</p>
+                <div class="ui-table-wrap mt-2">
+                    <table class="ui-table">
+                        <thead><tr><th>cliente_id</th><th>mes_ref</th><th>porte</th><th>valor_mensal</th><th>uso_plataforma_pct</th><th>chamados_criticos</th></tr></thead>
+                        <tbody>
+                            <tr><td>C007</td><td>2026-01</td><td>Médio</td><td>3848,00</td><td>83</td><td>2</td></tr>
+                            <tr><td>C007</td><td>2026-02</td><td>Médio</td><td>3848,00</td><td>76</td><td>3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>O mês deve ser <strong>AAAA-MM</strong> (por exemplo, 2026-01). Também é aceita uma data no primeiro dia do mês, como 2026-01-01. O valor mensal deve ser positivo ou zero, com no máximo duas casas decimais.</p>
+            </section>
+
+            <section>
+                <h3 class="font-semibold">3. Confira os campos necessários</h3>
+                <ul class="list-disc pl-5">
+                    <li><strong>Obrigatórios:</strong> código do cliente, mês de referência, porte e valor mensal do contrato. Esses valores devem estar preenchidos em todas as linhas.</li>
+                    <li><strong>Opcionais:</strong> segmento e plano. Se não existirem, ficam como “Não informado”.</li>
+                    <li><strong>Cadastro adicional:</strong> <code>situacao</code> (Ativo ou Cancelado), <code>mes_cancelamento</code> (AAAA-MM) e <code>inicio_contrato</code> (AAAA-MM-DD ou DD/MM/AAAA). Informe o mês de cancelamento para clientes Cancelados; não o informe para clientes Ativos.</li>
+                    <li><strong>Métricas:</strong> cada outra coluna representa uma medida. Dê nomes claros, mantenha um único tipo de valor por coluna e deixe a célula vazia quando não houver dado naquele mês.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3 class="font-semibold">4. Se seus dados estão em várias abas</h3>
+                <p>Use um arquivo XLSX. Todas as abas de dados precisam da coluna <code>cliente_id</code>, com o mesmo código para o mesmo cliente. Abas com <code>mes_ref</code> guardam dados mensais; abas sem essa coluna guardam dados de cadastro que valem para todos os meses. Tenha pelo menos uma aba mensal e não repita uma coluna de dados em abas diferentes. As abas “Leia-me” e “dicionario” do modelo são apenas de apoio.</p>
+            </section>
+
+            <section>
+                <h3 class="font-semibold">5. Configure suas métricas e envie</h3>
+                <p>No XLSX, você pode preencher a aba <code>dicionario</code> com o nome exato da coluna em <code>campo</code>, tipo, descrição, direção de piora, valor saudável, valor crítico e peso. Para métricas numéricas, informe se pioram quando aumentam ou diminuem; o valor crítico deve ficar nessa direção em relação ao saudável. O peso vai de 0 a 100. Textos e datas ficam no histórico e não entram no cálculo da atenção.</p>
+                <p>Salve como <strong>.xlsx ou .csv</strong> (até 20 MB), escolha o arquivo acima e confira a prévia. Na tela de confirmação, associe as colunas da sua base aos campos obrigatórios, revise cada métrica nova ou vincule-a a uma existente e só então clique em <strong>Confirmar e importar</strong>. O CSV básico contém apenas os cabeçalhos estruturais: acrescente pelo menos uma coluna de métrica antes de enviar.</p>
+            </section>
+        </div>
+        <x-slot name="footerActions">
+            <x-filament::button color="gray" x-on:click="$dispatch('close-modal', { id: 'tutorial-importacao' })">Fechar tutorial</x-filament::button>
+        </x-slot>
+    </x-filament::modal>
 
     @if ($cabecalhos && $formatoPadrao)
         <section class="ui-card ui-pad">
