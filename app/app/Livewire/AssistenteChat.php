@@ -7,6 +7,7 @@ use App\Support\Assistente;
 use App\Support\Llm\Contexto;
 use App\Support\Llm\Escopo;
 use App\Support\Llm\Llm;
+use App\Support\Llm\PerguntasProntas;
 use App\Support\Tenancy\CompanyContext;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -84,6 +85,7 @@ class AssistenteChat extends Component
             'sugestoes' => $foco
                 ? ['Por que está em risco?', 'O que devo fazer primeiro?', 'Quais métricas priorizei?', 'Compare com os cancelados parecidos', 'Resuma o histórico de NPS']
                 : ['Quem devo ligar primeiro?', 'Quais são minhas prioridades métricas?', 'Resumo da carteira', 'Qual a receita em risco?', 'Risco por segmento'],
+            'prontas' => PerguntasProntas::para($foco !== null),
             'empresas' => Customer::ordenar(Customer::dashboard())->get(),
         ]);
     }
