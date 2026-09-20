@@ -363,6 +363,16 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .fi-icon-btn svg { transition: transform .15s; } .fi-icon-btn:hover svg { transform: scale(1.12); }
 @media (prefers-reduced-motion: reduce) { .chatbot-mic svg, .sino-toca svg, .fi-icon-btn svg { animation: none !important; transition: none; } }
 
+/* Tamanho do texto (A- / A / A+), ao lado do seletor de tema */
+.fi-tt { display: grid; grid-auto-flow: column; gap: .25rem; margin-top: .25rem; }
+.fi-tt button { display: flex; align-items: baseline; justify-content: center; gap: .05rem; padding: .35rem .5rem; border-radius: .375rem; font-weight: 700; font-size: .875rem; line-height: 1.25rem; color: var(--panel-muted); transition: background .1s, color .1s; }
+.fi-tt button:hover:not(:disabled), .fi-tt button:focus-visible { background: color-mix(in srgb, var(--primary-500) 14%, transparent); color: var(--panel-text); }
+.fi-tt button:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 1px; }
+.fi-tt button:disabled { opacity: .35; cursor: not-allowed; }
+.fi-tt button[aria-pressed="true"] { color: var(--primary-400); background: color-mix(in srgb, var(--primary-500) 12%, transparent); }
+.fi-tt small { font-size: .7em; font-weight: 800; }
+.fi-tt-nivel { font-size: .75rem; font-variant-numeric: tabular-nums; }
+
 /* Indicadores: 2 colunas alinhadas no celular (sem os divisores laterais, que desalinhavam ao quebrar linha) */
 @media (max-width: 640px) {
   .ui-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
