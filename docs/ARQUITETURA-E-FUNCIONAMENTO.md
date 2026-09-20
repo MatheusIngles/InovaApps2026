@@ -46,16 +46,17 @@ Filament Panel (rota raiz /)
 Models Eloquent / queries de dashboard
         |
         +-- Customer
-        +-- CustomerMetric
+        +-- MetricDefinition / MetricValue
         +-- CustomerNps
         +-- RiskAssessment
         |
         v
 SQLite / banco configurado pelo Laravel
 
-Importação inicial:
-XLSX -> CustomerDataSeeder -> customers, customer_metrics, customer_nps
-                         -> RiskAssessmentSeeder -> risk_assessments
+Importação:
+CSV/XLSX -> ImportService ou DynamicImportService
+         -> customers, customer_periods, metric_definitions, metric_values, customer_nps
+         -> RiskService -> risk_assessments
 ```
 
 ### 3.2 Bootstrap e painel
@@ -114,7 +115,6 @@ Representa uma empresa/cliente da carteira.
 
 Relações:
 
-- `hasMany(CustomerMetric::class)` em `metrics`.
 - `hasMany(CustomerNps::class)` em `npsResponses`.
 - `hasMany(RiskAssessment::class)` em `riskAssessments`.
 - `hasOne(RiskAssessment::class)` em `currentAssessment`, filtrado por `rules-v1` e selecionando o mês mais recente.
@@ -133,22 +133,9 @@ Comportamentos importantes:
 
 A função `brl()` exibe valores como moeda brasileira sem casas decimais, por exemplo `R$ 12.500`.
 
-### 5.2 CustomerMetric
+### 5.2 Observações mensais
 
-Arquivo: [CustomerMetric.php](../app/app/Models/CustomerMetric.php)
-
-Representa uma fotografia mensal de atendimento, uso, pagamentos e reuniões de um cliente. O par `customer_id + reference_month` é único.
-
-Campos principais:
-
-- chamados abertos, críticos e reabertos;
-- chamados dentro do SLA;
-- percentual de SLA, que pode ser nulo quando não há chamados;
-- tempo médio de resolução em horas;
-- reclamações formais;
-- percentual de uso da plataforma;
-- dias de atraso de pagamento;
-- reuniões previstas e realizadas.
+As observações de indicadores são armazenadas por cliente e mês. O conjunto de colunas varia conforme a planilha e é convertido em definições e valores de métricas pela importação dinâmica. Cada valor fica ligado à empresa, ao cliente, à definição da métrica e ao mês de referência.
 
 ### 5.3 CustomerNps
 
@@ -182,6 +169,14 @@ Campos relevantes:
 - `model_version`: atualmente `rules-v1`;
 - `calculated_at`: data/hora do cálculo.
 
+### 5.5 MetricDefinition e MetricValue
+
+Arquivos: [MetricDefinition.php](../app/app/Models/MetricDefinition.php) e [MetricValue.php](../app/app/Models/MetricValue.php)
+
+`MetricDefinition` descreve uma métrica configurada pela empresa. Cada definição informa código, nome, descrição, tipo, direção, valor saudável, valor crítico, peso e se está ativa. O conjunto de definições varia por empresa e não é limitado a uma lista fixa de indicadores.
+
+`MetricValue` guarda a observação de uma métrica para um cliente e mês. O par `customer_id + metric_definition_id + reference_month` é único. Tipos numéricos podem participar da atenção; texto e data ficam disponíveis para histórico e contexto, mas não pontuam.
+
 ## 6. Banco de dados
 
 Todas as foreign keys de dados de clientes usam `cascadeOnDelete`: ao remover um cliente, suas métricas, pesquisas e avaliações são removidas.
@@ -204,28 +199,15 @@ Migration: [2026_09_19_132055_create_customers_table.php](../app/database/migrat
 | `cancelled_at` | date nullable | data do cancelamento |
 | `created_at`, `updated_at` | timestamps | controle Laravel |
 
-### 6.2 Tabela `customer_metrics`
+### 6.2 Tabelas `metric_definitions` e `metric_values`
 
-Migration: [2026_09_19_132056_create_customer_metrics_table.php](../app/database/migrations/2026_09_19_132056_create_customer_metrics_table.php)
+As métricas são definidas por empresa e observadas por cliente e mês. `metric_definitions` guarda a configuração do indicador; `metric_values` guarda o valor numérico ou textual importado.
 
-| Campo | Tipo | Regra/uso |
-|---|---|---|
-| `customer_id` | foreign key | cliente proprietário |
-| `reference_month` | date | mês de referência |
-| `tickets_opened` | unsigned smallint | chamados abertos |
-| `tickets_critical` | unsigned smallint | chamados críticos |
-| `tickets_reopened` | unsigned smallint | chamados reabertos |
-| `tickets_within_sla` | unsigned smallint | chamados dentro do SLA |
-| `sla_percentage` | decimal(5,2) nullable | percentual calculado/importado |
-| `avg_resolution_hours` | decimal(8,2) | tempo médio de resolução |
-| `formal_complaints` | unsigned smallint | reclamações formais |
-| `platform_usage_percentage` | decimal(5,2) | uso da plataforma |
-| `payment_delay_days` | unsigned smallint | atraso de pagamento |
-| `meetings_expected` | unsigned smallint | reuniões previstas |
-| `meetings_completed` | unsigned smallint | reuniões realizadas |
-| `customer_id + reference_month` | unique | uma linha por cliente/mês |
-
-A migration [2026_09_19_134626_make_customer_metrics_sla_nullable.php](../app/database/migrations/2026_09_19_134626_make_customer_metrics_sla_nullable.php) permite SLA nulo em meses sem chamados.
+| Tabela | Regra/uso |
+|---|---|
+| `metric_definitions` | Uma definição por código dentro da empresa, com tipo, direção, limites saudável/crítico, peso e status ativo. |
+| `metric_values` | Uma observação por cliente, métrica e mês; valores numéricos podem participar da atenção. |
+| `customer_id + metric_definition_id + reference_month` | Chave lógica que evita duplicidade de observação. |
 
 ### 6.3 Tabela `customer_nps`
 
@@ -284,23 +266,23 @@ A fonte principal é [INOVAAPPS_base_de_dados.xlsx](../dados/INOVAAPPS_base_de_d
 
 ### 7.2 Importação
 
-[CustomerDataSeeder.php](../app/database/seeders/CustomerDataSeeder.php):
+[ImportService.php](../app/app/Support/Import/ImportService.php) e [DynamicImportService.php](../app/app/Support/Import/DynamicImportService.php):
 
-1. lê o XLSX usando OpenSpout;
-2. valida as abas esperadas;
-3. transforma linhas da planilha em registros de clientes, métricas e NPS;
-4. executa o processo em transação;
-5. grava em lotes de 250 registros;
-6. usa `upsert`, tornando a importação idempotente.
+1. leem CSV/XLSX usando OpenSpout;
+2. identificam e validam os campos estruturais;
+3. criam ou atualizam as definições de métricas configuradas pela empresa;
+4. transformam as linhas em clientes, meses, valores de métricas e pesquisas;
+5. executam o processo em transação e usam `upsert`, tornando a importação idempotente;
+6. invalidam validações anteriores e chamam o recálculo da carteira.
 
 ### 7.3 Cálculo de risco
 
-[RiskAssessmentSeeder.php](../app/database/seeders/RiskAssessmentSeeder.php):
+[RiskService.php](../app/app/Support/RiskService.php), chamado após a importação e pelo seeder de avaliações:
 
-1. carrega cada cliente com métricas e NPS ordenados por mês;
-2. para cancelados, ignora métricas posteriores à data de cancelamento;
+1. carrega cada cliente com definições, valores de métricas, períodos e pesquisas ordenados por mês;
+2. para cancelados, ignora observações posteriores à data de cancelamento;
 3. usa o último mês válido como `reference_month`;
-4. monta os vetores de histórico e chama `Risco::calcular()`;
+4. monta a janela de observações e chama `MetricRisk::calcular()`;
 5. compara o vetor do cliente com clientes cancelados elegíveis;
 6. mantém até três similares, ordenados pela semelhança;
 7. grava ou atualiza a avaliação `rules-v1` com `updateOrCreate`.
@@ -329,75 +311,50 @@ O PHP precisa ter `pdo_sqlite` habilitado quando o banco configurado for SQLite.
 
 ## 8. Cálculo de risco
 
-Implementação: [Risco.php](../app/app/Support/Risco.php).
+Implementação: [MetricRisk.php](../app/app/Support/Metricas/MetricRisk.php), [Risco.php](../app/app/Support/Risco.php) e [RiskService.php](../app/app/Support/RiskService.php).
 
 ### 8.1 Janela e agregação
 
-O cálculo considera os três meses mais recentes de métricas (`w`) e, quando existe histórico anterior, compara a janela com os meses anteriores (`prev`).
+O cálculo usa o último mês com dados como referência e considera a janela de até três meses do calendário que termina nesse mês. Para clientes cancelados, só entram dados anteriores à data de cancelamento.
 
-- Uso, SLA, atraso e outras medidas mensais usam mediana na janela recente.
-- Chamados e reuniões são somados na janela.
-- Reincidência é chamados reabertos divididos por chamados abertos.
-- Execução de reuniões é reuniões realizadas divididas por reuniões previstas.
-- NPS usa a última resposta disponível dentro dos três meses.
-- Se não houver pesquisa respondida, a nota fica ausente.
-- Um mês sem chamados recebe SLA padrão de 100% na regra.
-- Se não houver reuniões previstas, a execução fica ausente e sua severidade é zero.
+- Métricas numéricas usam a mediana dos valores disponíveis na janela.
+- Valores ausentes não são convertidos em alerta e não entram na agregação.
+- Cada métrica ativa possui tipo, direção, valor saudável, valor crítico e peso em `MetricDefinition`.
+- Métricas de texto e data são armazenadas para consulta, mas ficam fora da atenção.
+- Indicadores derivados, como proporções, somas ou tendências, são calculados antes da comparação quando a regra de importação ou configuração do indicador exigir.
+- A avaliação só é criada quando existe dado suficiente para pelo menos uma métrica na janela.
 
-### 8.2 Sinais e pesos
+### 8.2 Intensidade, direção e pesos
 
-A atenção final é a soma de oito severidades entre 0 e 1, multiplicadas por pesos que totalizam 100:
-
-| Sinal | Peso | Interpretação |
-|---|---:|---|
-| Uso da plataforma | 20 | uso abaixo do patamar esperado |
-| SLA cumprido | 15 | queda no cumprimento do SLA |
-| Reincidência de chamados | 10 | proporção de chamados reabertos |
-| Reclamações formais | 10 | volume de reclamações em três meses |
-| Atraso de pagamento | 10 | dias de atraso |
-| Reuniões realizadas | 12 | baixa execução da cadência prevista |
-| NPS | 15 | nota baixa e/ou ausência de resposta |
-| Tendência de queda | 8 | queda de uso em relação ao início do histórico |
-
-A pontuação de cada sinal é:
+Para cada métrica numérica ativa, a intensidade é calculada com os limites definidos pela empresa:
 
 ```text
-pontos_sinal = arredondar(severidade_sinal x peso_sinal, 1)
-atenção = arredondar(soma dos pontos_sinal)
+intensidade = clamp(
+    (mediana - valor_saudável) /
+    (valor_crítico - valor_saudável)
+)
+clamp(x) = max(0, min(1, x))
 ```
 
-A severidade é limitada ao intervalo `[0, 1]` pela função de saturação. Portanto, cada sinal não ultrapassa o próprio peso.
+A direção é representada pela ordem dos limites: em uma métrica `higher`, o valor crítico é maior que o saudável; em uma métrica `lower`, o valor crítico é menor que o saudável. Assim, a mesma fórmula funciona para indicadores em que aumentar é pior ou em que diminuir é pior.
 
-### 8.3 Fórmulas de severidade
-
-Com `clamp(x) = max(0, min(1, x))`:
+A pontuação usa todas as métricas ativas com observação na janela e normaliza os pesos:
 
 ```text
-uso     = clamp((85 - mediana(uso_pct)) / 35)
-sla     = clamp((85 - mediana(sla_pct)) / 45)
-reinc   = clamp(reabertos / abertos / 0,25)
-recl    = clamp(reclamacoes / 4)
-atraso  = clamp(mediana(dias_atraso) / 10)
-reun    = clamp((0,8 - realizadas/previstas) / 0,6)
+parcela_métrica = arredondar(
+    intensidade × peso / soma_dos_pesos_ativos × 100,
+    1 casa
+)
+atenção = arredondar(soma das parcelas das métricas)
 ```
 
-Para NPS:
+Uma métrica sem observação não recebe pontos. A normalização mantém a atenção entre 0 e 100 independentemente da soma dos pesos configurados. A configuração e os valores são persistidos em `metric_definitions` e `metric_values`; o resultado agregado fica em `risk_assessments`.
 
-```text
-nota_nps = 0                         se não há nota
-nota_nps = clamp((8 - nota) / 6)     quando há nota
-silencio = pesquisas_sem_resposta / total_de_pesquisas
-nps      = 0,5 x nota_nps + 0,5 x silencio
-```
+### 8.3 Evidências e explicabilidade
 
-Para tendência:
+As métricas com parcela relevante são apresentadas como evidências, com intensidade, pontos, peso, valor observado, referência saudável e ação sugerida. A lista é ordenada pelos pontos calculados, mas todas as métricas ativas continuam compondo a atenção.
 
-```text
-queda_uso = média_do_historico_anterior - mediana_do_uso_recente
-tend      = clamp(queda_uso / 30)
-```
-
-A implementação usa números decimais com ponto no código PHP; a vírgula acima é apenas notação brasileira.
+Quando há histórico de clientes cancelados, o sistema compara as intensidades das métricas compartilhadas e apresenta até três perfis semelhantes. Essa comparação é exploratória: não é probabilidade de cancelamento, não prova causalidade e não estima o momento da saída.
 
 ### 8.4 Níveis
 
@@ -612,7 +569,7 @@ Serviços previstos na configuração, mas não usados diretamente pelo domínio
 
 - O cálculo atual é um índice de atenção por regras, não uma probabilidade de churn.
 - `risk_probability`, `expected_revenue_at_risk`, `confidence` e `recommended_action_json` não são preenchidos pelo seeder atual.
-- `tickets_critical`, `avg_resolution_hours` e `tickets_opened` entram na atenção como métricas extras (a importação as ativa quando há dados; `php artisan seer:ativar-sinais-extras` faz o mesmo para bases já importadas). `tickets_within_sla` continua só armazenado.
+- Indicadores numéricos importados podem ser ativados como métricas da atenção quando houver dados e configuração válida. `tickets_critical`, `avg_resolution_hours` e `tickets_opened` são exemplos de indicadores que podem ser usados; `tickets_within_sla` permanece disponível para histórico quando não for configurado para pontuar.
 - Não existe recálculo agendado: o risco é recalculado ao importar dados novos e ao alterar pesos ou limiares (`RiskService::recalcular`).
 - Não há CRUD nem edição manual de clientes e não há histórico de importações. A planilha é enviada pela interface (tela Planilha e Configurações › Acrescentar novos meses).
 - Não há API pública, integração com CRM nem e-mail de operação. Há notificações no painel (mudança de nível, reaproximação) e relatórios em PDF.

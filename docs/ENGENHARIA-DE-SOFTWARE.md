@@ -10,7 +10,7 @@ Diagramas e decisões de projeto. Os diagramas usam [Mermaid](https://mermaid.js
 |---|---|
 | RF01 | Cada empresa entra no seu próprio contexto, sem ver dados de outra. |
 | RF02 | Importar planilhas (XLSX/CSV) com uma ou várias abas e mapear as colunas. |
-| RF03 | Definir métricas próprias (tipo, faixa saudável/crítica, peso, direção). |
+| RF03 | Definir métricas dinâmicas por empresa (tipo, faixa saudável/crítica, peso, direção). |
 | RF04 | Calcular a atenção (0 a 100) de cada cliente e o nível de alerta. |
 | RF05 | Ordenar a fila de atendimento por atenção e valor do contrato. |
 | RF06 | Explicar por que um cliente está em alerta e sugerir a ação. |
@@ -103,7 +103,6 @@ classDiagram
         +limiares() array
         +prioridadeK() int
         +chat() array
-        +hasLegacyMetrics() bool
     }
     class User {
         +string name
@@ -120,19 +119,6 @@ classDiagram
         +date cancelled_at
         +date resolved_at
         +ordenar() Builder
-    }
-    class CustomerMetric {
-        +date reference_month
-        +int tickets_opened
-        +int tickets_critical
-        +int tickets_reopened
-        +float sla_percentage
-        +float avg_resolution_hours
-        +int formal_complaints
-        +float platform_usage_percentage
-        +int payment_delay_days
-        +int meetings_expected
-        +int meetings_completed
     }
     class CustomerNps {
         +date reference_month
@@ -170,7 +156,6 @@ classDiagram
     Company "1" --> "*" User
     Company "1" --> "*" Customer
     Company "1" --> "*" MetricDefinition
-    Customer "1" --> "*" CustomerMetric
     Customer "1" --> "*" CustomerNps
     Customer "1" --> "*" CustomerPeriod
     Customer "1" --> "*" MetricValue
@@ -185,7 +170,6 @@ classDiagram
 ```mermaid
 classDiagram
     class Risco {
-        +PESOS
         +LIMIARES
         +calcular() array
         +nivel(atencao) string
@@ -253,7 +237,6 @@ erDiagram
     companies ||--o{ metric_definitions : "define"
     companies ||--o{ metric_values : "isola"
     companies ||--o{ customer_periods : "isola"
-    customers ||--o{ customer_metrics : "histórico mensal"
     customers ||--o{ customer_nps : "pesquisas"
     customers ||--o{ customer_periods : "valor por mês"
     customers ||--o{ metric_values : "valores"
@@ -265,7 +248,7 @@ erDiagram
         string name
         string slug
         text theme "JSON: cores, fonte, logo, nome"
-        text metric_weights "JSON: ordem e peso dos sinais"
+        text metric_weights "JSON: ordem e peso das métricas"
         text level_thresholds "JSON: cortes dos níveis"
         int priority_balance "K da fila"
         text chat_settings "JSON: IA ligada, modelo, instruções"
@@ -292,22 +275,6 @@ erDiagram
         string status "Ativo ou Cancelado"
         date cancelled_at
         datetime resolved_at
-    }
-    customer_metrics {
-        int id PK
-        int customer_id FK
-        date reference_month
-        int tickets_opened
-        int tickets_critical
-        int tickets_reopened
-        int tickets_within_sla
-        decimal sla_percentage
-        decimal avg_resolution_hours
-        int formal_complaints
-        decimal platform_usage_percentage
-        int payment_delay_days
-        int meetings_expected
-        int meetings_completed
     }
     customer_nps {
         int id PK
@@ -512,7 +479,7 @@ sequenceDiagram
 |---|---|
 | Atenção calculada por regras, sem IA | É explicável, auditável, barata e igual toda vez. A IA só explica o resultado. |
 | Mediana dos 3 últimos meses | Ignora piora de um mês só. |
-| Métricas por empresa (`MetricDefinition`) | Cada empresa tem dados diferentes; o modelo padrão de 8 sinais é só um ponto de partida. |
+| Métricas por empresa (`MetricDefinition`) | Cada empresa define o conjunto de indicadores, tipos, limites, direções e pesos que participa da atenção. |
 | Multi-tenant por `company_id` com escopo global | Isolamento simples e testável; um único banco. |
 | SQLite | Suficiente para o volume atual; o app aceita MySQL/PostgreSQL trocando o `.env`. |
 | Fila `database` | Sem serviço extra; importações grandes e relatórios rodam em segundo plano. |
