@@ -7,16 +7,19 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Cliente de LLM: Ollama local por padrão, API externa (OpenAI-compatível) quando o
- * contexto exige um modelo maior ou o Ollama está fora do ar.
+ * Cliente de LLM em cascata: 1) API externa da NVIDIA (formato OpenAI); 2) Ollama local, se a API não estiver
+ * configurada, falhar ou devolver uma resposta fraca; 3) o chamador cai nas respostas por regras.
  */
 class Llm
 {
+    /** Trechos de respostas evasivas típicas de modelo, que não ajudam quem perguntou. */
+    private const EVASIVAS = ['como um modelo de linguagem', 'como uma ia', 'as an ai', 'i cannot', "i can't", 'não consigo ajudar', 'nao consigo ajudar'];
+
     /**
      * @param  array<int, array{role: string, content: string}>  $mensagens  histórico + pergunta atual (sem o prompt de sistema)
      * @return array{texto: string, provedor: string}
      *
-     * @throws RuntimeException quando nenhum provedor responde (o chamador cai para as regras locais)
+     * @throws RuntimeException quando nenhum provedor responde bem (o chamador cai para as regras locais)
      */
     public static function responder(string $sistema, array $mensagens, ?string $modeloLocal = null): array
     {
@@ -25,30 +28,34 @@ class Llm
         }
 
         $todas = [['role' => 'system', 'content' => $sistema], ...$mensagens];
-        $ordem = self::precisaModeloMaior($todas) ? ['api', 'ollama'] : ['ollama', 'api'];
         $erro = null;
 
-        foreach ($ordem as $provedor) {
+        foreach (['api', 'ollama'] as $provedor) {
             if ($provedor === 'api' && ! config('llm.api.key')) {
                 continue; // sem chave, a API externa não está disponível
             }
             try {
-                return ['texto' => $provedor === 'api' ? self::api($todas) : self::ollama($todas, $modeloLocal), 'provedor' => $provedor];
+                $texto = $provedor === 'api' ? self::api($todas) : self::ollama($todas, $modeloLocal);
+                if (! self::fraca($texto)) {
+                    return ['texto' => $texto, 'provedor' => $provedor];
+                }
+                $erro = new RuntimeException("Resposta fraca de $provedor.");
             } catch (\Throwable $e) {
                 $erro = $e;
             }
         }
 
-        throw new RuntimeException('Nenhum provedor de LLM respondeu.', 0, $erro);
+        throw new RuntimeException('Nenhum provedor de LLM respondeu bem.', 0, $erro);
     }
 
-    /** Contexto grande demais para o modelo local, ou pergunta que pede raciocínio mais robusto. */
-    public static function precisaModeloMaior(array $mensagens): bool
+    /** Resposta fraca: curta demais ou evasiva. A recusa de escopo é curta de propósito e vale como resposta boa. */
+    public static function fraca(string $texto): bool
     {
-        $tokens = (int) ceil(array_sum(array_map(fn ($m) => mb_strlen($m['content']), $mensagens)) / 4);
-        $pergunta = Str::lower(Str::ascii(collect($mensagens)->where('role', 'user')->last()['content'] ?? ''));
+        if (Escopo::foraDoAssunto($texto)) {
+            return false;
+        }
 
-        return $tokens > config('llm.limite_tokens_local') || Str::contains($pergunta, config('llm.palavras_complexas'));
+        return mb_strlen($texto) < 20 || Str::contains(Str::lower($texto), self::EVASIVAS);
     }
 
     private static function ollama(array $mensagens, ?string $modelo = null): string

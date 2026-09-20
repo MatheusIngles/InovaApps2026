@@ -19,34 +19,80 @@
             },
             escolher(pergunta) { this.ativo = -1; this.enviar(pergunta); },
             suportado: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
-            alternar() {
-                if (this.ouvindo) { this.rec.stop(); return; }
+            /** Modo conversa: ouve, envia quando a pessoa para de falar, lê a resposta em voz alta e volta a ouvir, até clicar de novo. */
+            conversa: false, falando: false, audio: null,
+            alternar() { this.conversa ? this.parar() : this.iniciar(); },
+            iniciar() { this.conversa = true; this.erro = ''; this.ouvir(); },
+            parar() { this.conversa = false; this.ouvindo = false; this.falando = false; window.speechSynthesis?.cancel(); this.audio?.pause(); this.rec?.abort(); },
+            ouvir() {
+                if (!this.conversa) return;
                 const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const campo = this.$refs.campo, base = campo.value.trim() ? campo.value.trim() + ' ' : '';
+                const campo = this.$refs.campo;
+                let dito = '';
                 this.rec = new Reconhecimento();
                 this.rec.lang = 'pt-BR';
                 this.rec.interimResults = true;
                 this.rec.onresult = (e) => {
-                    campo.value = (base + [...e.results].map(r => r[0].transcript).join('')).slice(0, 500);
+                    dito = [...e.results].map(r => r[0].transcript).join('').slice(0, 500);
+                    campo.value = dito;
                     campo.dispatchEvent(new Event('input')); // avisa o Livewire
                 };
-                this.rec.onend = () => { this.ouvindo = false; campo.focus(); };
-                this.rec.onerror = (e) => { this.erro = e.error === 'not-allowed' ? 'Permita o uso do microfone no navegador para falar com o assistente.' : 'Não consegui ouvir. Tente de novo.'; };
-                this.erro = '';
+                this.rec.onend = () => {
+                    this.ouvindo = false;
+                    if (!this.conversa) return;
+                    dito.trim() ? this.responder(dito) : setTimeout(() => this.ouvir(), 300); // silêncio: continua ouvindo
+                };
+                this.rec.onerror = (e) => {
+                    if (['not-allowed', 'service-not-allowed'].includes(e.error)) { this.erro = 'Permita o uso do microfone no navegador para falar com o assistente.'; this.conversa = false; }
+                };
                 this.rec.start();
                 this.ouvindo = true;
             },
+            /** Melhor voz pt-BR instalada: as neurais/online (Google, Microsoft Online/Natural) soam bem mais naturais. */
+            voz() {
+                const nota = (v) => (/natural|online|neural/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 3 : 0) + (v.lang === 'pt-BR' ? 2 : 0) + (/francisca|antonio|thalita|luciana|felipe/i.test(v.name) ? 1 : 0);
+                return speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').startsWith('pt')).sort((a, b) => nota(b) - nota(a))[0] ?? null;
+            },
+            async responder(pergunta) {
+                await this.enviar(pergunta, true);
+                await this.$nextTick();
+                if (!this.conversa) return;
+                const resposta = [...document.querySelectorAll('.chatbot-row:not(.eu) .chatbot-markdown')].pop()?.innerText;
+                if (!resposta) return this.ouvir();
+                this.falando = true;
+                try { await this.falarNeural(resposta); } catch { await this.falarNavegador(resposta); }
+                this.falando = false;
+                this.ouvir();
+            },
+            /** Voz neural gerada no servidor (Edge TTS). */
+            async falarNeural(texto) {
+                const r = await fetch(@js(route('assistente.voz')), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token()), 'Accept': 'audio/mpeg' }, body: JSON.stringify({ texto: texto.slice(0, 1500) }) });
+                if (!r.ok) throw new Error('voz indisponível');
+                this.audio = new Audio(URL.createObjectURL(await r.blob()));
+                await new Promise((ok, erro) => { this.audio.onended = ok; this.audio.onerror = erro; this.audio.play().catch(erro); });
+            },
+            /** Reserva: voz do navegador, quando o servidor não gera o áudio. */
+            falarNavegador(texto) {
+                return new Promise((ok) => {
+                    if (!window.speechSynthesis) return ok();
+                    const fala = new SpeechSynthesisUtterance(texto);
+                    fala.lang = 'pt-BR';
+                    fala.voice = this.voz();
+                    fala.rate = 1.05;
+                    fala.onend = fala.onerror = ok;
+                    window.speechSynthesis.speak(fala);
+                });
+            },
             /** Mostra a pergunta no chat e o indicador de carregamento na hora, sem esperar a resposta do servidor. */
-            async enviar(texto) {
+            async enviar(texto, porVoz = false) {
                 const campo = this.$refs.campo;
                 texto = (texto ?? campo.value).trim().slice(0, 500);
                 if (!texto || this.pendente) return;
                 this.fechado = true; // não reabre a lista sozinha depois da resposta
-                if (this.ouvindo) this.rec.stop();
                 this.pendente = texto;
                 campo.value = '';
                 campo.dispatchEvent(new Event('input'));
-                try { await $wire.enviar(texto); } finally { this.pendente = null; }
+                try { await $wire.enviar(texto, porVoz); } finally { this.pendente = null; }
             },
         }">
     <header class="chatbot-head">
@@ -92,7 +138,7 @@
     </div>
 
     <form class="chatbot-form" x-on:submit.prevent="enviar()">
-        <div class="chatbot-composer" :class="{ 'ouvindo': ouvindo }">
+        <div class="chatbot-composer" :class="{ 'ouvindo': conversa }">
             <ul class="chatbot-prontas" id="chatbot-prontas" role="listbox" aria-label="Perguntas sugeridas" x-show="sugeridas.length" x-cloak>
                 <template x-for="(p, i) in sugeridas" :key="p">
                     <li role="option" :aria-selected="i === ativo">
@@ -108,9 +154,9 @@
                    x-on:keydown.arrow-down.prevent="fechado ? fechado = false : mover(1)" x-on:keydown.arrow-up.prevent="fechado ? fechado = false : mover(-1)"
                    x-on:keydown.escape="fechado = true; ativo = -1"
                    x-on:keydown.enter="if (ativo >= 0 && sugeridas[ativo]) { $event.preventDefault(); escolher(sugeridas[ativo]); }"
-                   :placeholder="ouvindo ? 'Ouvindo… pode falar' : @js($foco ? 'Pergunte algo sobre '.$foco->nome.'…' : 'Pergunte sobre a carteira…')" aria-label="Sua pergunta">
-            <button type="button" class="chatbot-mic" x-show="suportado" x-cloak x-on:click="alternar()" :aria-pressed="ouvindo"
-                    :aria-label="ouvindo ? 'Parar de ouvir' : 'Falar a pergunta'" :title="ouvindo ? 'Parar de ouvir' : 'Falar a pergunta'">
+                   :placeholder="falando ? 'Respondendo em voz alta…' : ouvindo ? 'Ouvindo… pode falar' : conversa ? 'Analisando…' : @js($foco ? 'Pergunte algo sobre '.$foco->nome.'…' : 'Pergunte sobre a carteira…')" aria-label="Sua pergunta">
+            <button type="button" class="chatbot-mic" x-show="suportado" x-cloak x-on:click="alternar()" :aria-pressed="conversa"
+                    :aria-label="conversa ? 'Encerrar conversa por voz' : 'Conversar por voz'" :title="conversa ? 'Encerrar conversa por voz' : 'Conversar por voz'">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             </button>
             <button type="submit" class="chatbot-send" :disabled="pendente" aria-label="Enviar pergunta" title="Enviar">

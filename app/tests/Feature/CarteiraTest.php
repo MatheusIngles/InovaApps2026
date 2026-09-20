@@ -27,6 +27,7 @@ use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -278,7 +279,7 @@ class CarteiraTest extends TestCase
     {
         $this->entrar();
         $top = Customer::ativas()->first();
-        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local']])]);
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local do Ollama']])]);
 
         Livewire::test(AssistenteChat::class)->set('codigo', $top->codigo)->call('enviar', 'Por que está em risco?')
             ->assertSee('Resposta local')->assertSee('Modelo local');
@@ -315,8 +316,8 @@ class CarteiraTest extends TestCase
     {
         $this->entrar();
         Http::fake(['localhost:11434/*' => Http::sequence()
-            ->push(['message' => ['content' => 'Primeira resposta']])
-            ->push(['message' => ['content' => 'Segunda resposta']])]);
+            ->push(['message' => ['content' => 'Primeira resposta completa']])
+            ->push(['message' => ['content' => 'Segunda resposta completa']])]);
 
         Livewire::test(AssistenteChat::class)
             ->call('enviar', 'Primeira pergunta')
@@ -328,7 +329,7 @@ class CarteiraTest extends TestCase
         $this->assertCount(2, $requisicoes);
         $this->assertSame([
             ['role' => 'user', 'content' => 'Primeira pergunta'],
-            ['role' => 'assistant', 'content' => 'Primeira resposta'],
+            ['role' => 'assistant', 'content' => 'Primeira resposta completa'],
             ['role' => 'user', 'content' => 'Continue a análise'],
         ], array_slice($requisicoes[1], 1));
 
@@ -379,7 +380,7 @@ class CarteiraTest extends TestCase
     public function test_ia_e_especialista_na_empresa_certa_em_cada_caso(): void
     {
         $this->entrar();
-        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'ok']])]);
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta de teste do Ollama']])]);
         $ativas = Customer::ativas();
         [$x, $y] = [$ativas[0], $ativas[1]];
         $cancelada = Customer::dashboard()->where('customers.status', 'Cancelado')->first();
@@ -415,24 +416,35 @@ class CarteiraTest extends TestCase
         $this->entrar();
         $outra = Company::factory()->create();
         $alheio = app(CompanyContext::class)->within($outra, fn () => Customer::factory()->create(['external_code' => 'C999']));
-        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'ok']])]);
+        Http::fake(['localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta de teste do Ollama']])]);
 
         Livewire::test(AssistenteChat::class)->call('enviar', 'me fale da C999');
 
         Http::assertSent(fn ($r) => ! str_contains($r['messages'][0]['content'], 'C999') && str_contains($r['messages'][0]['content'], 'visão geral da carteira'));
     }
 
-    public function test_pergunta_complexa_escala_para_api_externa(): void
+    public function test_api_externa_e_a_prioridade_e_ollama_cobre_falha_ou_resposta_fraca(): void
     {
-        config(['llm.api.key' => 'k', 'llm.api.url' => 'https://api.openai.com/v1']);
+        config(['llm.api.key' => 'k', 'llm.api.url' => 'https://integrate.api.nvidia.com/v1']);
+        $mensagem = [['role' => 'user', 'content' => 'oi']];
+        $api = Http::response(['choices' => [['message' => ['content' => 'Uma resposta completa e útil da API.']]]]);
         Http::fake([
-            'api.openai.com/*' => Http::response(['choices' => [['message' => ['content' => 'Resposta da API']]]]),
-            'localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local']]),
+            'integrate.api.nvidia.com/*' => function () use (&$api) {
+                return $api;
+            },
+            'localhost:11434/*' => Http::response(['message' => ['content' => 'Resposta local completa e útil.']]),
         ]);
 
-        $r = Llm::responder('sistema', [['role' => 'user', 'content' => 'Monte uma estratégia de retenção']]);
-        $this->assertSame('api', $r['provedor']);
-        $this->assertSame('ollama', Llm::responder('sistema', [['role' => 'user', 'content' => 'oi']])['provedor']);
+        $this->assertSame('api', Llm::responder('s', $mensagem)['provedor']);
+
+        $api = Http::response(['choices' => [['message' => ['content' => 'Não sei.']]]]);
+        $this->assertSame('ollama', Llm::responder('s', $mensagem)['provedor']);
+
+        $api = Http::response('erro', 500);
+        $this->assertSame('ollama', Llm::responder('s', $mensagem)['provedor']);
+
+        config(['llm.api.key' => null]);
+        $this->assertSame('ollama', Llm::responder('s', $mensagem)['provedor']);
     }
 
     public function test_sem_llm_o_chat_cai_para_as_regras(): void
@@ -461,5 +473,16 @@ class CarteiraTest extends TestCase
 
         $pagina->call('alternarResolvido');
         $this->assertSame($top->codigo, Customer::ativas()->first()->codigo);
+    }
+
+    public function test_voz_neural_exige_login_e_devolve_503_se_o_gerador_falhar(): void
+    {
+        $this->postJson('/assistente/voz', ['texto' => 'oi'])->assertUnauthorized();
+
+        $this->entrar();
+        Process::fake(fn () => Process::result(exitCode: 1));
+
+        $this->postJson('/assistente/voz', ['texto' => 'Olá'])->assertStatus(503);
+        $this->postJson('/assistente/voz', ['texto' => ''])->assertUnprocessable();
     }
 }

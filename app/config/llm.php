@@ -2,9 +2,9 @@
 
 return [
     /*
-    | Provedor padrão: modelos locais via Ollama. O provedor "api" (externo, formato OpenAI
-    | /chat/completions) só é usado quando a pergunta/contexto exige um modelo mais robusto
-    | ou quando o Ollama está indisponível. Sem nenhum dos dois, o chat cai nas respostas por regras.
+    | Cascata: 1) API externa da NVIDIA (build.nvidia.com, formato OpenAI /chat/completions), a prioridade;
+    | 2) Ollama local, se a API não estiver configurada, falhar ou devolver resposta fraca;
+    | 3) respostas pré-prontas por regras, se nenhuma das duas responder.
     */
     'habilitado' => env('LLM_ENABLED', true),
     'timeout' => (int) env('LLM_TIMEOUT', 60),
@@ -14,21 +14,19 @@ return [
         'model' => env('OLLAMA_MODEL', 'llama3.1'),
     ],
 
+    // Voz do modo conversa: Edge TTS (`pip install edge-tts`). `python` é o executável que tem o pacote.
+    'voz' => [
+        'python' => env('EDGE_TTS_PYTHON', 'python'),
+        'voz' => env('EDGE_TTS_VOZ', 'pt-BR-FranciscaNeural'),
+    ],
+
     'api' => [
-        'url' => env('LLM_API_URL', 'https://api.openai.com/v1'),
+        'url' => env('LLM_API_URL', 'https://integrate.api.nvidia.com/v1'),
         'key' => env('LLM_API_KEY'),
-        'model' => env('LLM_API_MODEL', 'gpt-4o'),
+        'model' => env('LLM_API_MODEL', 'meta/llama-3.3-70b-instruct'),
         // Windows sem curl.cainfo no php.ini: aponte para um cacert.pem (ex.: o do Git for Windows) em vez de desligar a verificação de TLS.
         'ca_bundle' => env('LLM_CA_BUNDLE'),
     ],
-
-    /*
-    | Quando escalar para o modelo maior (API externa):
-    |  - prompt estimado acima de `limite_tokens_local` (contexto grande demais para o modelo local);
-    |  - a pergunta contém alguma das `palavras_complexas` (análise/estratégia/comparação).
-    */
-    'limite_tokens_local' => (int) env('LLM_LOCAL_MAX_TOKENS', 3000),
-    'palavras_complexas' => ['estrateg', 'compar', 'plano de acao', 'plano de retencao', 'priorize', 'analise completa', 'toda a carteira', 'projec', 'negoci'],
 
     /*
     | Prompt de sistema base. {{contexto}} recebe, dinamicamente, os dados da empresa acessada
