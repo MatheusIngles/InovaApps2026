@@ -442,4 +442,24 @@ class CarteiraTest extends TestCase
 
         Livewire::test(AssistenteChat::class)->call('enviar', 'Resumo da carteira')->assertSee('Respostas por regras');
     }
+
+    public function test_marcar_como_resolvido_manda_para_baixo_e_pode_ser_reaberto(): void
+    {
+        $this->entrar();
+        $top = Customer::ativas()->first();
+
+        $pagina = Livewire::test(EmpresaResource::getPages()['view']->getPage(), ['record' => $top->codigo]);
+        $pagina->call('alternarResolvido');
+
+        $top->refresh();
+        $this->assertSame('Resolvido', $top->rotulo());
+        $this->assertSame('Baixo', $top->nivel);
+        $this->assertSame($top->codigo, Customer::ativas()->last()->codigo);
+
+        Livewire::test(ListEmpresas::class)->filterTable('nivel', ['Resolvido'])->assertCanSeeTableRecords(collect([$top]))
+            ->filterTable('nivel', ['Crítico', 'Alto', 'Médio', 'Baixo'])->assertCanNotSeeTableRecords(collect([$top]));
+
+        $pagina->call('alternarResolvido');
+        $this->assertSame($top->codigo, Customer::ativas()->first()->codigo);
+    }
 }

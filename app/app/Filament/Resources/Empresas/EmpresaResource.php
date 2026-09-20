@@ -61,7 +61,7 @@ class EmpresaResource extends Resource
             ->paginated([12, 24, 48, 'all'])
             ->defaultPaginationPageOption(24)
             ->searchPlaceholder('Buscar por nome, código ou segmento…')
-            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Cancelado' => 'canc'][$e->rotulo()])
+            ->recordClasses(fn (Customer $e) => 'nv-'.['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Resolvido' => 'baixo', 'Cancelado' => 'canc'][$e->rotulo()])
             ->columns([
                 Stack::make([
                     Split::make([
@@ -87,7 +87,7 @@ class EmpresaResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('nivel')->label('Nível de atenção')->multiple()
-                    ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Cancelado' => 'Cancelado'])
+                    ->options(['Crítico' => 'Crítico', 'Alto' => 'Alto', 'Médio' => 'Médio', 'Baixo' => 'Baixo', 'Resolvido' => 'Resolvido', 'Cancelado' => 'Cancelado'])
                     ->query(function (Builder $query, array $data) {
                         $niveis = array_filter($data['values'] ?? []);
                         $l = app(CompanyContext::class)->current()->limiares(); // limiares da empresa
@@ -96,10 +96,11 @@ class EmpresaResource extends Resource
                             foreach ($niveis as $nivel) {
                                 $query->orWhere(fn (Builder $q) => match ($nivel) {
                                     'Cancelado' => $q->where('customers.status', 'Cancelado'),
-                                    'Crítico' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['critico']),
-                                    'Alto' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
-                                    'Médio' => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),
-                                    default => $q->where('customers.status', 'Ativo')->where('assessment.health_score', '<', $l['medio']),
+                                    'Resolvido' => $q->where('customers.status', 'Ativo')->whereNotNull('customers.resolved_at'),
+                                    'Crítico' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '>=', $l['critico']),
+                                    'Alto' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '>=', $l['alto'])->where('assessment.health_score', '<', $l['critico']),
+                                    'Médio' => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '>=', $l['medio'])->where('assessment.health_score', '<', $l['alto']),
+                                    default => $q->where('customers.status', 'Ativo')->whereNull('customers.resolved_at')->where('assessment.health_score', '<', $l['medio']),
                                 });
                             }
                         }));
