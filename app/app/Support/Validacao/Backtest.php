@@ -75,12 +75,13 @@ class Backtest
                 continue; // o risco usa a janela dos 3 últimos meses
             }
             $janela = $metricas->slice(0, $i + 1)->map(fn ($x): array => [
+                'mes' => $x->reference_month->format('Y-m'),
                 'chamados_abertos' => $x->tickets_opened, 'chamados_reabertos' => $x->tickets_reopened, 'pct_sla_cumprido' => $x->sla_percentage,
                 'reclamacoes_formais' => $x->formal_complaints, 'uso_plataforma_pct' => $x->platform_usage_percentage,
                 'dias_atraso_pagamento' => $x->payment_delay_days, 'reunioes_previstas' => $x->meetings_expected, 'reunioes_realizadas' => $x->meetings_completed,
             ])->values()->all();
             $nps = $c->npsResponses->filter(fn ($r) => $r->reference_month->lte($m->reference_month))
-                ->map(fn ($r): array => ['respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
+                ->map(fn ($r): array => ['mes' => $r->reference_month->format('Y-m'), 'respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
             $r = Risco::calcular($janela, $nps, $pesos);
             $ult3 = $metricas->slice($i - 2, 3);
 

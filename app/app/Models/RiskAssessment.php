@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['customer_id', 'reference_month', 'health_score', 'risk_probability', 'priority_score', 'expected_revenue_at_risk', 'confidence', 'signals_json', 'recommended_action_json', 'model_version', 'calculated_at'])]
+#[Fillable(['customer_id', 'reference_month', 'health_score', 'risk_probability', 'exposure_indicator', 'expected_revenue_at_risk', 'confidence', 'signals_json', 'recommended_action_json', 'model_version', 'calculated_at'])]
 class RiskAssessment extends Model
 {
     /** @use HasFactory<RiskAssessmentFactory> */
@@ -26,7 +26,7 @@ class RiskAssessment extends Model
             'reference_month' => 'date',
             'health_score' => 'integer',
             'risk_probability' => 'decimal:6',
-            'priority_score' => 'decimal:2',
+            'exposure_indicator' => 'decimal:2',
             'expected_revenue_at_risk' => 'decimal:2',
             'signals_json' => 'array',
             'recommended_action_json' => 'array',

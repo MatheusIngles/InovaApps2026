@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Pages\Planilha;
 use App\Filament\Resources\Empresas\EmpresaResource;
 use App\Filament\Resources\Empresas\Pages\ListEmpresas;
+use App\Filament\Widgets\FilaTable;
 use App\Filament\Widgets\KpisWidget;
 use App\Livewire\AssistenteChat;
 use App\Models\Company;
@@ -81,7 +82,7 @@ class CarteiraTest extends TestCase
         $status = Customer::ordenar(Customer::dashboard())->pluck('status');
         $this->assertSame($status->sortBy(fn ($s) => $s === 'Cancelado')->values()->all(), $status->all());
         $ativas = Customer::ordenar(Customer::dashboard())->where('customers.status', 'Ativo')->get();
-        $prioridade = fn ($c) => $c->score * ($c->score + 50) * $c->monthly_value;
+        $prioridade = fn ($c) => Customer::ranking($c->score, (float) $c->monthly_value, 50);
         // duas camadas: em alerta (nível Médio, 25, ou mais) antes dos demais; em cada uma, por prioridade
         $esperada = $ativas->sortBy(fn ($c) => [$c->score >= 25 ? 0 : 1, -$prioridade($c)])->values()->pluck('codigo')->all();
         $this->assertSame($esperada, $ativas->pluck('codigo')->all());
@@ -209,6 +210,31 @@ class CarteiraTest extends TestCase
         $this->assertNotFalse($primeiroSemAlerta);
         $this->assertTrue($ativas->slice($primeiroSemAlerta)->every(fn ($c) => $c->score < $medio), 'depois do primeiro cliente sem alerta não pode vir ninguém em alerta');
         $this->assertTrue($ativas->slice(0, $primeiroSemAlerta)->every(fn ($c) => $c->score >= $medio));
+    }
+
+    public function test_fila_e_lista_mostram_por_que_o_que_fazer_e_urgencia_sem_abrir_o_cliente(): void
+    {
+        $this->entrar();
+        $top = Customer::ativas()->first();
+        $passo = $top->proximoPasso();
+
+        $this->assertNotNull($passo);
+        $this->assertStringStartsWith(Risco::prazoPorPosicao(1, $top->nivel), $passo);
+        $this->assertStringContainsString($top->sinais[0]['acao'], $passo);
+        $this->assertNull(Customer::dashboard()->where('customers.status', 'Cancelado')->first()->proximoPasso()); // cancelados não entram na fila de ação
+
+        Livewire::test(FilaTable::class)->assertSee($top->porQue())->assertSee($passo)->assertSee('O que fazer');
+        $this->get('/empresas')->assertOk()->assertSee('Por quê:', false)->assertSee(Risco::prazoPorPosicao(1, $top->nivel));
+    }
+
+    public function test_prazo_de_contato_segue_a_posicao_na_fila_e_nao_o_nivel(): void
+    {
+        $this->assertSame('Contato hoje', Risco::prazoPorPosicao(1, 'Médio')); // o topo da fila é hoje mesmo sendo nível Médio
+        $this->assertSame('Contato hoje', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA, 'Alto'));
+        $this->assertSame('Contato em até 3 dias', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA + 1, 'Crítico')); // crítico mais abaixo na fila espera mais
+        $this->assertSame('Contato esta semana', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA * 4, 'Médio'));
+        $this->assertSame('Acompanhar no ciclo normal', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA * 5 + 1, 'Alto'));
+        $this->assertSame('Acompanhar no ciclo normal', Risco::prazoPorPosicao(1, 'Baixo')); // sem alerta, sem prazo
     }
 
     public function test_chat_usa_ollama_com_contexto_da_empresa(): void

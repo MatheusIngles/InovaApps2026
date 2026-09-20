@@ -30,6 +30,7 @@ class RiskService
                     }
 
                     $history = $metrics->map(fn ($m): array => [
+                        'mes' => $m->reference_month->format('Y-m'),
                         'chamados_abertos' => $m->tickets_opened,
                         'chamados_reabertos' => $m->tickets_reopened,
                         'pct_sla_cumprido' => $m->sla_percentage,
@@ -40,7 +41,7 @@ class RiskService
                         'reunioes_realizadas' => $m->meetings_completed,
                     ])->values()->all();
                     $nps = $customer->npsResponses->filter(fn ($r) => $r->reference_month->lte($referenceMonth))
-                        ->map(fn ($r): array => ['respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
+                        ->map(fn ($r): array => ['mes' => $r->reference_month->format('Y-m'), 'respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
 
                     $results[$customer->id] = Risco::calcular($history, $nps, $pesos, $limiares) + ['customer' => $customer, 'reference_month' => $referenceMonth];
                 }
@@ -76,7 +77,7 @@ class RiskService
                         [
                             'health_score' => $result['score'],
                             'risk_probability' => null,
-                            'priority_score' => round($result['score'] / 100 * (float) $customer->monthly_value, 2),
+                            'exposure_indicator' => round($result['score'] / 100 * (float) $customer->monthly_value, 2),
                             'expected_revenue_at_risk' => null,
                             'confidence' => null,
                             'signals_json' => ['evidence' => $result['sinais'], 'severity' => $result['sev'], 'similar' => array_slice($similar, 0, 3)],

@@ -22,7 +22,7 @@ class RiskAssessmentFactory extends Factory
             'customer_id' => Customer::factory(),
             'reference_month' => now()->startOfMonth()->toDateString(),
             'risk_probability' => 0.5,
-            'priority_score' => 1500,
+            'exposure_indicator' => 1500,
             'expected_revenue_at_risk' => 1500,
             'confidence' => 'Media',
             'signals_json' => ['sla_below_target' => true],

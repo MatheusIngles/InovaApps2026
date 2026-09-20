@@ -43,14 +43,14 @@
     <p>{{ $alto['cancelados'] }} clientes cancelaram e {{ $alto['ativos'] }} seguem ativos. Este relatório olha para o passado dos que saíram para entender o que os diferenciava de quem ficou, e mostra onde ainda há clientes com o mesmo padrão.</p>
 
     <h2>2. O alerta funciona? (efeito de cada corte)</h2>
-    <p>Alerta = atenção igual ou acima do corte do nível. Corte baixo avisa cedo, mas gera mais alarme falso; corte alto quase não erra, mas avisa tarde ou não avisa. "Acerto" = dos alertas emitidos, quantos viraram cancelamento.</p>
+    <p>Alerta = atenção igual ou acima do corte do nível. Corte baixo avisa cedo, mas gera mais alertas em clientes que ficaram; corte alto quase não erra, mas avisa tarde ou não avisa. "Acerto" = dos alertas emitidos, quantos viraram cancelamento.</p>
     @if ($r['evidencia_suficiente'])
-        <p>Com o corte Alto (atenção ≥ {{ $alto['limiar'] }}), {{ $alto['detectados'] }} dos {{ $alto['cancelados'] }} clientes que cancelaram tinham sido alertados antes de sair{{ $alto['mediana_antecedencia'] !== null ? ', em geral '.$n($alto['mediana_antecedencia'], 1).' meses antes' : '' }}. O preço disso: {{ $n($alto['alarme_falso_pct'], 1) }}% dos meses de clientes que ficaram também passariam do corte (alarme falso), cerca de {{ $n($alto['alertas_por_mes'], 1) }} clientes por mês.</p>
+        <p>Com o corte Alto (atenção ≥ {{ $alto['limiar'] }}), {{ $alto['detectados'] }} dos {{ $alto['cancelados'] }} clientes que cancelaram tinham sido alertados antes de sair{{ $alto['mediana_antecedencia'] !== null ? ', em geral '.$n($alto['mediana_antecedencia'], 1).' meses antes' : '' }}. O preço disso: {{ $n($alto['alarme_falso_pct'], 1) }}% dos meses de clientes que ficaram também passariam do corte (alerta em quem ficou), cerca de {{ $n($alto['alertas_por_mes'], 1) }} clientes por mês.</p>
     @else
         <p>Ainda há poucos cancelamentos para tirar conclusões seguras; use a configuração padrão por enquanto.</p>
     @endif
     <table>
-        <tr><th>Corte</th><th>Cancelados alertados</th><th>Com 3+ meses de antecedência</th><th>Antecedência mediana</th><th>Alarme falso</th><th>Alertas por mês</th><th>Acerto do alerta</th><th>Ativos em alerta hoje</th></tr>
+        <tr><th>Corte</th><th>Cancelados alertados</th><th>Com 3+ meses de antecedência</th><th>Antecedência mediana</th><th>Alerta em quem ficou</th><th>Alertas por mês</th><th>Acerto do alerta</th><th>Ativos em alerta hoje</th></tr>
         @foreach ($r['limiares'] as $chave => $l)
             <tr>
                 <td>{{ $rotulos[$chave] }} (≥ {{ $l['limiar'] }})</td>
@@ -66,9 +66,9 @@
     </table>
 
     <h2>3. O que mais indica cancelamento</h2>
-    <p>"Separação" (AUC) diz o quanto a variável distingue quem cancelou de quem ficou: 0,50 = não distingue; 1,00 = distingue sempre. O peso sugerido é proporcional ao que passa de 0,50. "Cancelados" e "Retidos" são a severidade média (0 a 100%) no último mês antes da saída e no mês mais recente dos ativos; antecedência e alarme falso usam severidade ≥ 50%.</p>
+    <p>"Separação" (AUC) diz o quanto a variável distingue quem cancelou de quem ficou: 0,50 = não distingue; 1,00 = distingue sempre. O peso sugerido é proporcional ao que passa de 0,50. "Cancelados" e "Retidos" são a severidade média (0 a 100%) no último mês antes da saída e no mês mais recente dos ativos; antecedência e alerta em quem ficou usam severidade ≥ 50%.</p>
     <table>
-        <tr><th>Variável</th><th>Separação</th><th>Cancelados</th><th>Retidos</th><th>Antecedência</th><th>Alarme falso</th><th>Peso atual</th><th>Peso sugerido</th></tr>
+        <tr><th>Variável</th><th>Separação</th><th>Cancelados</th><th>Retidos</th><th>Antecedência</th><th>Alerta em quem ficou</th><th>Peso atual</th><th>Peso sugerido</th></tr>
         @foreach ($vars as $v)
             <tr>
                 <td>{{ $v['rotulo'] }}</td>
@@ -119,7 +119,7 @@
             <tr><td>Separação no período de teste, com pesos calibrados antes do corte</td><td><b>{{ $n($vt['auc']['teste_pesos_treino'], 2) }}</b></td></tr>
             <tr><td>Separação no período de teste, com os pesos padrão</td><td>{{ $n($vt['auc']['teste_pesos_padrao'], 2) }}</td></tr>
             <tr><td>Cancelados do teste alertados (corte calibrado antes: atenção ≥ {{ $vt['corte_alto'] ?? '—' }})</td><td><b>{{ $vt['detectados'] }} de {{ $vt['teste']['cancelados'] }}</b></td></tr>
-            <tr><td>Alarme falso entre os que nunca cancelaram</td><td>{{ $n($vt['alarme_falso_pct'], 1) }}%</td></tr>
+            <tr><td>Alerta entre os que nunca cancelaram</td><td>{{ $n($vt['alarme_falso_pct'], 1) }}%</td></tr>
         </table>
         <p class="muted">Quanto mais perto a separação do teste estiver da de calibração, menos o resultado depende de ter sido ajustado aos mesmos casos. Os clientes que saíram depois do corte contam como ativos na calibração, como na época, o que a torna mais difícil que o teste. Com poucos cancelamentos por período, os números são indicativos.</p>
     @else
@@ -131,7 +131,7 @@
         <ul>
             <li><b>Ordem das métricas:</b> {{ collect($recomendada['ordem'])->pluck('rotulo')->implode(' › ') }}.</li>
             <li><b>Desligar (não separam cancelados de retidos):</b> {{ $recomendada['desligadas'] ? implode(', ', $recomendada['desligadas']) : 'nenhuma' }}.</li>
-            <li><b>Cortes de alerta:</b> Médio ≥ {{ $recomendada['limiares']['medio'] }} (até 30% de alarme falso), Alto ≥ {{ $recomendada['limiares']['alto'] }} (até 8%), Crítico ≥ {{ $recomendada['limiares']['critico'] }} (até 2%).</li>
+            <li><b>Cortes de alerta:</b> Médio ≥ {{ $recomendada['limiares']['medio'] }} (até 30% de alerta em quem ficou), Alto ≥ {{ $recomendada['limiares']['alto'] }} (até 8%), Crítico ≥ {{ $recomendada['limiares']['critico'] }} (até 2%).</li>
             <li><b>Equilíbrio atenção × valor (K):</b> decisão de negócio, ajustável em Configurações.</li>
         </ul>
     @else

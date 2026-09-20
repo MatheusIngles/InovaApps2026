@@ -18,17 +18,19 @@ class FilaTable extends TableWidget
     {
         return $table
             ->heading('Fila de atendimento: com quem falar primeiro')
-            ->description('Mesma ordem da lista de clientes: risco × valor do contrato (equilíbrio em Configurações). Ordena a fila; não prevê cancelamento ou perda.')
+            ->description('Mesma ordem da lista de clientes: quem já está em alerta primeiro e, em cada grupo, atenção × valor do contrato (equilíbrio em Configurações). Ordena a fila; não prevê cancelamento ou perda.')
             ->query(Customer::ordenar(Customer::dashboard()->where('customers.status', 'Ativo'))->limit(8))
             ->paginated(false)
             ->recordUrl(fn (Customer $e) => EmpresaResource::getUrl('view', ['record' => $e]))
             ->columns([
+                TextColumn::make('ordem')->label('#')->rowIndex(),
                 TextColumn::make('nome')->weight('semibold')->description(fn (Customer $e) => $e->codigo),
                 TextColumn::make('nivel')->label('Nível')->badge()
                     ->color(fn (string $state) => ['Crítico' => 'danger', 'Alto' => 'warning', 'Médio' => 'info'][$state] ?? 'success'),
                 TextColumn::make('score')->label('Atenção')->tooltip(fn (Customer $e) => $e->resumoScore()),
                 TextColumn::make('valor')->label('Contrato/mês')->formatStateUsing(fn ($state) => Customer::brl($state)),
-                TextColumn::make('motivo')->label('Principal motivo')->state(fn (Customer $e) => $e->sinais[0]['label'] ?? 'Sem sinal forte'),
+                TextColumn::make('motivo')->label('Por quê')->state(fn (Customer $e) => $e->porQue())->wrap(),
+                TextColumn::make('proximo_passo')->label('O que fazer')->state(fn (Customer $e) => $e->proximoPasso())->wrap(),
             ]);
     }
 }

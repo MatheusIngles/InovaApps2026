@@ -230,4 +230,36 @@ class ConfiguracaoEmpresaTest extends TestCase
         $r = collect(CompanyConfig::pesosPorPosicao([$metricas[1], $metricas[0], $metricas[2]]))->pluck('peso', 'k')->all();
         $this->assertEquals(['uso' => 40.0, 'sla' => 25.0, 'nps' => 0], $r);
     }
+
+    public function test_nps_usa_os_ultimos_3_meses_do_calendario_e_nao_as_3_ultimas_pesquisas(): void
+    {
+        $mes = fn (int $i) => date('Y-m', strtotime("2026-01-01 +$i month"));
+        $historico = collect(range(0, 5))->map(fn (int $i) => ['mes' => $mes($i), 'chamados_abertos' => 0, 'chamados_reabertos' => 0, 'pct_sla_cumprido' => 100, 'reclamacoes_formais' => 0,
+            'uso_plataforma_pct' => 90, 'dias_atraso_pagamento' => 0, 'reunioes_previstas' => 1, 'reunioes_realizadas' => 1])->all();
+        // única pesquisa é de janeiro (nota 0): fora da janela mar–mai/jun do mês de referência
+        $antigo = [['mes' => $mes(0), 'respondeu' => 1, 'nota_nps' => 0]];
+        // pesquisa recente respondida com nota máxima: entra
+        $recente = [['mes' => $mes(0), 'respondeu' => 1, 'nota_nps' => 0], ['mes' => $mes(5), 'respondeu' => 1, 'nota_nps' => 10]];
+
+        $semJanela = Risco::calcular($historico, $antigo, Risco::PESOS)['score'];
+        $comRecente = Risco::calcular($historico, $recente, Risco::PESOS)['score'];
+
+        $this->assertSame(0, $semJanela); // NPS antigo não pesa; sem pesquisa recente, o sinal fica neutro
+        $this->assertSame(0, $comRecente); // nota 10 recente, sem silêncio: sem risco de NPS
+        $notaBaixa = [['mes' => $mes(5), 'respondeu' => 1, 'nota_nps' => 0]];
+        $this->assertGreaterThan(0, Risco::calcular($historico, $notaBaixa, Risco::PESOS)['score']);
+    }
+
+    public function test_historico_do_detalhe_para_no_mes_anterior_a_saida(): void
+    {
+        $company = Company::factory()->create();
+        app(CompanyContext::class)->within($company, function () use ($company) {
+            $c = Customer::factory()->create(['company_id' => $company->id, 'status' => 'Cancelado', 'cancelled_at' => '2026-03-01']);
+            foreach (['2026-01', '2026-02', '2026-03', '2026-04'] as $mes) {
+                CustomerMetric::factory()->create(['customer_id' => $c->id, 'reference_month' => $mes.'-01']);
+            }
+
+            $this->assertSame(['2026-01', '2026-02'], array_column($c->hist, 'mes'));
+        });
+    }
 }

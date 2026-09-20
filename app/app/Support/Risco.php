@@ -33,6 +33,27 @@ class Risco
         return self::ACOES[$k] ?? null;
     }
 
+    /** Quantos clientes da fila a equipe consegue contatar por dia útil (define os prazos por posição). */
+    public const CONTATOS_POR_DIA = 3;
+
+    /**
+     * Prazo de contato pela posição na fila de atendimento (1 = primeiro): as primeiras posições cabem no dia, as
+     * seguintes em 3 dias e em 5 dias úteis, na capacidade de CONTATOS_POR_DIA. Quem está abaixo do corte de alerta
+     * (nível Baixo) não tem prazo: segue o acompanhamento normal.
+     */
+    public static function prazoPorPosicao(int $posicao, string $nivel): string
+    {
+        $porDia = self::CONTATOS_POR_DIA;
+
+        return match (true) {
+            $nivel === 'Baixo' => 'Acompanhar no ciclo normal',
+            $posicao <= $porDia => 'Contato hoje',
+            $posicao <= $porDia * 3 => 'Contato em até 3 dias',
+            $posicao <= $porDia * 5 => 'Contato esta semana',
+            default => 'Acompanhar no ciclo normal',
+        };
+    }
+
     public const LIMIARES = ['critico' => 55, 'alto' => 40, 'medio' => 25];
 
     /**
@@ -97,6 +118,26 @@ class Risco
         return (int) round(100 * (1 - $d / sqrt(count($a))));
     }
 
+    /**
+     * Pesquisas de NPS dos 3 últimos meses do calendário (até o mês de referência), e não as 3 últimas pesquisas:
+     * com lacunas, as 3 últimas podem ser de muito tempo atrás. Sem datas nos dados, cai nas 3 últimas pesquisas.
+     *
+     * @param  list<array<string, mixed>>  $hist  linhas mensais (a última traz 'mes' = Y-m)
+     * @param  list<array<string, mixed>>  $nps
+     * @return list<array<string, mixed>>
+     */
+    private static function pesquisasDosUltimosMeses(array $hist, array $nps): array
+    {
+        $ref = $hist ? ($hist[array_key_last($hist)]['mes'] ?? null) : null;
+
+        if ($ref === null || ! $nps || ! isset($nps[0]['mes'])) {
+            return array_slice($nps, -3);
+        }
+        $desde = date('Y-m', strtotime($ref.'-01 -2 month'));
+
+        return array_values(array_filter($nps, fn (array $r): bool => $r['mes'] >= $desde && $r['mes'] <= $ref));
+    }
+
     private static function sinais(array $hist, array $nps): array
     {
         $w = array_slice($hist, -3);
@@ -104,7 +145,7 @@ class Risco
         $col = fn (array $rows, string $c, $vazio = 0) => array_map(fn ($r) => (float) ($r[$c] ?? $vazio), $rows);
         $abertos = array_sum($col($w, 'chamados_abertos'));
         $previstas = array_sum($col($w, 'reunioes_previstas'));
-        $n = array_slice($nps, -3);
+        $n = self::pesquisasDosUltimosMeses($hist, $nps);
         $resp = array_values(array_filter($n, fn ($r) => (int) $r['respondeu'] === 1));
 
         return [
