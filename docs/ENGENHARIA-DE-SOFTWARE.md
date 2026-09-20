@@ -288,7 +288,102 @@ sequenceDiagram
     C-->>U: resposta (texto, voz e/ou Libras)
 ```
 
-## 5. Decisões de projeto
+## 5. Rotas principais
+
+Todas passam pelo middleware `SetCompanyContext`, que define a empresa a partir do **usuário logado** (nunca de dados da requisição) e encerra a sessão se ela estiver ligada a outra empresa. O middleware `CabecalhosDeSeguranca` vale para todas as respostas.
+
+### Mapa das rotas
+
+```mermaid
+flowchart TD
+    V([Visitante]) --> RAIZ["GET /"]
+    RAIZ -->|sem login| LOGIN["GET /login<br/>POST Livewire: entrar"]
+    V --> REG["GET /register<br/>cadastro de empresa"]
+    REG --> PLAN
+    LOGIN -->|10 erros em 15 min: bloqueio| LOGIN
+    LOGIN --> OK{"empresa tem dados?"}
+    OK -->|não| PLAN["GET /planilha<br/>importar"]
+    OK -->|sim| CLI["GET /empresas<br/>lista e fila"]
+
+    subgraph PF["Painel Filament (exige login)"]
+        CLI --> DET["GET /empresas/{id}<br/>detalhe do cliente"]
+        CLI --> PNL["GET /painel<br/>abas: Visão geral, Gráficos, Segmentos"]
+        CLI --> ASS["GET /assistente<br/>chat"]
+        CLI --> CFG["GET /configuracoes<br/>métricas, níveis, fila, IA, tema"]
+        PLAN
+    end
+
+    subgraph AX["Auxiliares (exigem login)"]
+        MOD["GET /modelo/planilha.xlsx<br/>GET /modelo/planilha (CSV)"]
+        REL["GET /relatorios/{uuid}/baixar<br/>PDF gerado após o pedido"]
+        VOZ["POST /assistente/voz<br/>áudio neural, 20 por minuto"]
+    end
+
+    PLAN -.baixa o modelo.-> MOD
+    DET -.gera relatório.-> REL
+    ASS -.modo conversa.-> VOZ
+
+    subgraph IN["Infra"]
+        UP["GET /up<br/>saúde"]
+        LW["POST /livewire-*/update<br/>ações dos componentes"]
+        ST["GET /storage/...<br/>logos enviados"]
+    end
+```
+
+### Regras de acesso por rota
+
+| Rota | Login | Observação |
+|---|---|---|
+| `/` | não | Redireciona: sem login para `/login`; com login para a planilha (empresa sem dados) ou a lista de clientes |
+| `/login`, `/register` | não | Login com bloqueio por e-mail; o cadastro cria empresa e primeiro usuário |
+| `/painel`, `/empresas`, `/empresas/{id}`, `/planilha`, `/configuracoes`, `/assistente` | sim | Páginas do Filament; empresa sem dados só acessa `/planilha` |
+| `/modelo/planilha`, `/modelo/planilha.xlsx` | sim | Modelo com os dados da empresa logada |
+| `/relatorios/{arquivo}/baixar` | sim | O nome é um UUID e o arquivo fica na pasta da empresa e do usuário: não dá para baixar o de outro |
+| `POST /assistente/voz` | sim | CSRF, máximo de 1.500 caracteres, 20 por minuto |
+| `/up` | não | Só a página de saúde, sem versão nem configuração |
+| `POST /livewire-*/update` | conforme o componente | Propriedades sensíveis são bloqueadas (`#[Locked]`) |
+
+### Sequência: entrar no sistema
+
+```mermaid
+sequenceDiagram
+    actor U as Usuário
+    participant L as /login (Livewire)
+    participant RL as Limitador (por e-mail)
+    participant M as SetCompanyContext
+    participant P as Painel
+    U->>L: e-mail e senha
+    L->>RL: já houve 10 erros em 15 min?
+    alt bloqueado
+        RL-->>U: aguarde alguns minutos
+    else liberado
+        L->>L: confere a senha
+        L->>M: sessão iniciada
+        M->>M: empresa = empresa do usuário
+        M->>P: redireciona (planilha ou clientes)
+    end
+```
+
+### Sequência: relatório em PDF
+
+```mermaid
+sequenceDiagram
+    actor U as Usuário
+    participant C as Componente RelatorioEmpresa
+    participant J as GerarRelatorioEmpresaJob
+    participant S as Storage (local)
+    participant R as GET /relatorios/{uuid}/baixar
+    U->>C: pede o relatório
+    C->>J: dispara o job logo após a resposta (empresa, usuário, uuid)
+    J->>J: monta os números; IA escreve o texto, ou regras se a IA estiver desligada
+    J->>S: grava o PDF na pasta da empresa e do usuário
+    C-->>U: mostra o link quando o arquivo existe
+    U->>R: baixa
+    R->>S: só encontra se for da empresa e do usuário logados
+    R-->>U: relatorio.pdf
+```
+
+## 6. Decisões de projeto
 
 | Decisão | Por quê |
 |---|---|
@@ -301,6 +396,6 @@ sequenceDiagram
 | IA em cascata com reserva por regras | O sistema nunca fica sem resposta e a IA é opcional. |
 | Filament + Livewire | Painel administrativo completo com pouco código de front. |
 
-## 6. Testes
+## 7. Testes
 
 A suíte PHPUnit cobre isolamento entre empresas, importação (inclusive várias abas e dicionário), cálculo da atenção, configurações, fila, relatório, notificações, segurança (login, cabeçalhos, proxy) e o assistente. Rodar: `composer test` (dentro de `app/`).

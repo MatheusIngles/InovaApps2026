@@ -49,7 +49,8 @@ Route::get('/relatorios/{arquivo}/baixar', function (string $arquivo) {
 // Voz neural do modo conversa do assistente (Edge TTS, pacote Python `edge-tts`). Sem ela, o navegador lê com a voz local.
 Route::post('/assistente/voz', function (Request $request) {
     $texto = trim($request->validate(['texto' => ['required', 'string', 'max:1500']])['texto']);
-    $arquivo = tempnam(sys_get_temp_dir(), 'voz').'.mp3';
+    $base = tempnam(sys_get_temp_dir(), 'voz'); // tempnam já cria o arquivo: os dois são apagados no fim
+    $arquivo = $base.'.mp3';
 
     try {
         $r = Process::timeout(30)->run([config('llm.voz.python'), '-m', 'edge_tts', '--voice='.config('llm.voz.voz'), '--rate=+5%', '--text='.$texto, '--write-media='.$arquivo]);
@@ -58,5 +59,6 @@ Route::post('/assistente/voz', function (Request $request) {
         return response(file_get_contents($arquivo), 200, ['Content-Type' => 'audio/mpeg']);
     } finally {
         @unlink($arquivo);
+        @unlink($base);
     }
 })->middleware(['web', 'auth', SetCompanyContext::class, 'throttle:20,1'])->name('assistente.voz');

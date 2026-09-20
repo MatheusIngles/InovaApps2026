@@ -84,7 +84,11 @@ O `.env` nunca vai para o Git (está no `.gitignore`). O modelo está em [`.env.
 
 ### IA do chat
 
-A ordem é: API da NVIDIA → Ollama → respostas por regras. Para o Ollama local:
+A ordem é: API da NVIDIA → Ollama → respostas por regras.
+
+> **Ressalva sobre a API da NVIDIA.** O Seer usa a API do [build.nvidia.com](https://build.nvidia.com), que é **gratuita para desenvolvimento, testes e prototipagem**, com limite de requisições e sem garantia de disponibilidade. Por isso ela é a primeira opção, mas nunca a única: se a chave não existir, o limite estourar ou a resposta vier fraca, o sistema usa o Ollama e, por último, respostas por regras. Para uso comercial em produção, confirme os termos e os planos da NVIDIA antes de depender dela, ou use só o Ollama local (sem custo e sem enviar dados para fora).
+
+Para conseguir a chave gratuita, crie uma conta em https://build.nvidia.com, gere uma API key e coloque em `LLM_API_KEY` no `.env`. Para o Ollama local:
 
 ```bash
 ollama pull llama3.1
@@ -93,12 +97,38 @@ ollama serve
 
 ### Voz neural (opcional)
 
+O modo conversa do chat lê as respostas em voz alta. A voz neural vem do **Edge TTS**, um pacote Python que o servidor chama (`python -m edge_tts`). Sem ele, nada quebra: o navegador lê com a voz do próprio sistema, mais robótica.
+
+O que precisa:
+- **Python 3** no servidor e **internet de saída** (o Edge TTS gera o áudio nos serviços da Microsoft; é gratuito, mas não é um serviço oficial e pode mudar).
+- O pacote `edge-tts` instalado em um ambiente virtual (o Ubuntu 24.04 não deixa instalar direto com `pip`).
+
+**Linux (Ubuntu/Debian):**
+
 ```bash
-python3 -m venv /opt/edge-tts
-/opt/edge-tts/bin/pip install edge-tts
+sudo apt install -y python3 python3-venv
+sudo python3 -m venv /opt/edge-tts
+sudo /opt/edge-tts/bin/pip install edge-tts
 ```
 
-Depois defina `EDGE_TTS_PYTHON=/opt/edge-tts/bin/python` no `.env`.
+Depois, no `.env`:
+
+```
+EDGE_TTS_PYTHON=/opt/edge-tts/bin/python
+# EDGE_TTS_VOZ=pt-BR-FranciscaNeural   (opcional; outras: pt-BR-AntonioNeural, pt-BR-ThalitaMultilingualNeural)
+```
+
+Rode `php artisan optimize:clear`. Para testar, o comando abaixo deve criar um MP3 em `/tmp`:
+
+```bash
+/opt/edge-tts/bin/python -m edge_tts --voice pt-BR-FranciscaNeural --text "Olá, eu sou o Seer" --write-media /tmp/teste.mp3 && ls -l /tmp/teste.mp3
+```
+
+**Windows (desenvolvimento):** `pip install edge-tts` e `EDGE_TTS_PYTHON=python` (o padrão). O usuário do PHP precisa conseguir executar esse Python.
+
+Se o áudio não tocar, abra o chat, ligue o microfone e veja no navegador (F12 › Rede) a resposta de `/assistente/voz`: `503` significa que o Python ou o pacote não foi encontrado, ou que o servidor está sem internet.
+
+Requisitos do navegador: o reconhecimento de fala (microfone) funciona no Chrome e no Edge, em HTTPS ou `localhost`.
 
 ## Como guardar e compartilhar o `.env` sem vazar
 

@@ -15,6 +15,8 @@ A IA **não decide nada**: não altera dados, não muda pesos e não roda açõe
 
 ## 2. Quanto custa
 
+> **Ressalva sobre a API da NVIDIA.** O Seer usa a API do [build.nvidia.com](https://build.nvidia.com), que é **gratuita para desenvolvimento, testes e prototipagem**, com limite de requisições e sem garantia de disponibilidade. Por isso ela é a primeira opção, mas nunca a única: se a chave não existir, o limite estourar ou a resposta vier fraca, o sistema usa o Ollama e, por último, respostas por regras. Para uso comercial em produção, confirme os termos e os planos da NVIDIA antes de depender dela, ou use só o Ollama local (sem custo e sem enviar dados para fora).
+
 O custo depende de quantas perguntas são feitas, não de quantos clientes a empresa tem, porque o contexto enviado é um resumo (top 10 da fila ou um cliente).
 
 **Como estimar** (o preço é hipótese, confirme na tabela do provedor):

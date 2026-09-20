@@ -67,6 +67,9 @@ return [
 
     'timezone' => 'UTC',
 
+    // Proxies confiáveis (Nginx Proxy Manager, Cloudflare...): IPs separados por vírgula ou "*". Vazio = só a rede privada.
+    'trusted_proxies' => env('TRUSTED_PROXIES'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
