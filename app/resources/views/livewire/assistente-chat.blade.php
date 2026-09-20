@@ -22,8 +22,8 @@
             /** Modo conversa: ouve, envia quando a pessoa para de falar, lê a resposta em voz alta e volta a ouvir, até clicar de novo. */
             conversa: false, falando: false, audio: null,
             alternar() { this.conversa ? this.parar() : this.iniciar(); },
-            iniciar() { this.conversa = true; this.erro = ''; this.ouvir(); },
-            parar() { this.conversa = false; this.ouvindo = false; this.falando = false; window.speechSynthesis?.cancel(); this.audio?.pause(); this.rec?.abort(); },
+            iniciar() { window.dispatchEvent(new Event('voz-pausar')); /* a navegação por voz usa o mesmo reconhecimento */ this.conversa = true; this.erro = ''; this.ouvir(); },
+            parar() { this.conversa = false; this.ouvindo = false; this.falando = false; window.speechSynthesis?.cancel(); this.audio?.pause(); this.rec?.abort(); window.dispatchEvent(new Event('voz-retomar')); },
             ouvir() {
                 if (!this.conversa) return;
                 const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -43,7 +43,7 @@
                     dito.trim() ? this.responder(dito) : setTimeout(() => this.ouvir(), 300); // silêncio: continua ouvindo
                 };
                 this.rec.onerror = (e) => {
-                    if (['not-allowed', 'service-not-allowed'].includes(e.error)) { this.erro = 'Permita o uso do microfone no navegador para falar com o assistente.'; this.conversa = false; }
+                    if (['not-allowed', 'service-not-allowed'].includes(e.error)) { this.erro = 'Permita o uso do microfone no navegador para falar com o assistente.'; this.parar(); }
                 };
                 this.rec.start();
                 this.ouvindo = true;
