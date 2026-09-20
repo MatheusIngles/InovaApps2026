@@ -3,6 +3,7 @@
             suportado: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
             alternar() {
                 if (this.ouvindo) { this.rec.stop(); return; }
+                window.dispatchEvent(new Event('voz-pausar')); // a navegação por voz usa o mesmo reconhecimento
                 const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const campo = this.$refs.campo, base = campo.value.trim() ? campo.value.trim() + ' ' : '';
                 this.rec = new Reconhecimento();
@@ -12,7 +13,7 @@
                     campo.value = (base + [...e.results].map(r => r[0].transcript).join('')).slice(0, 500);
                     campo.dispatchEvent(new Event('input')); // avisa o Livewire
                 };
-                this.rec.onend = () => { this.ouvindo = false; campo.focus(); };
+                this.rec.onend = () => { this.ouvindo = false; campo.focus(); window.dispatchEvent(new Event('voz-retomar')); };
                 this.rec.onerror = (e) => { this.erro = e.error === 'not-allowed' ? 'Permita o uso do microfone no navegador para falar com o assistente.' : 'Não consegui ouvir. Tente de novo.'; };
                 this.erro = '';
                 this.rec.start();
