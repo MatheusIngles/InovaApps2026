@@ -615,27 +615,42 @@ class MetricasDinamicasTest extends TestCase
             ->assertSee('25,0%');
     }
 
-    public function test_aba_prioridades_lista_as_metricas_da_empresa_por_peso_e_salva_o_peso(): void
+    public function test_prioridades_da_empresa_base_reune_sinais_e_metricas_e_muda_pela_ordem_ou_pela_outra_tela(): void
     {
-        $company = Company::factory()->create(); // sem os 8 sinais padrão: só métricas próprias
-        $this->actingAs(User::factory()->for($company)->create());
+        $company = Company::factory()->create();
+        $user = User::factory()->for($company)->create();
         $ids = [];
         app(CompanyContext::class)->within($company, function () use ($company, &$ids): void {
-            foreach ([['pedidos', 10], ['reclamacoes', 30]] as [$code, $peso]) {
+            $cliente = Customer::factory()->create(['company_id' => $company->id]); // tem métricas dos 8 sinais: é a empresa base
+            CustomerMetric::factory()->for($cliente)->create();
+            foreach ([['pedidos', 30], ['reclamacoes', 10]] as [$code, $peso]) {
                 $ids[$code] = $company->metricDefinitions()->create(['code' => $code, 'label' => ucfirst($code), 'description' => 'x', 'value_type' => 'decimal', 'direction' => 'higher',
                     'healthy_value' => 0, 'critical_value' => 10, 'weight' => $peso, 'enabled' => true])->id;
             }
         });
+        $this->actingAs($user);
 
-        $this->assertSame(['Reclamacoes', 'Pedidos'], array_column(CompanyConfig::propriasEmOrdem($company), 'label'));
+        $chaves = fn (): array => array_column(CompanyConfig::listaUnificada($company->fresh()), 'k');
+        $lista = CompanyConfig::listaUnificada($company);
+        $this->assertCount(10, $lista); // 8 sinais padrão + 2 métricas
+        $this->assertSame('custom:'.$ids['pedidos'], $lista[0]['k']); // peso 30: acima do sinal mais pesado (20)
 
-        Livewire::test(Configuracoes::class)->assertSee('Métricas da empresa');
-        $d = CompanyConfig::ler($company);
-        $d['proprias'] = [['id' => $ids['pedidos'], 'label' => 'Pedidos', 'peso' => 50, 'ativa' => true], ['id' => $ids['reclamacoes'], 'label' => 'Reclamacoes', 'peso' => 30, 'ativa' => false]];
-        $this->assertTrue(CompanyConfig::salvar($company, $d));
+        // arrastar: as métricas trocam de lugar com o primeiro sinal; o peso acompanha a posição
+        $ordem = $chaves();
+        [$ordem[0], $ordem[1]] = [$ordem[1], $ordem[0]];
+        $pesos = collect($lista)->pluck('peso', 'k'); // como na tela: cada item chega com o peso atual
+        $itens = collect($ordem)->map(fn (string $k): array => ['k' => $k, 'ativa' => true, 'peso' => $pesos[$k], 'label' => ''])->all();
+        Livewire::test(Configuracoes::class)->set('data.metricas', $itens)->call('salvar')->assertHasNoErrors();
+        $this->assertSame($ordem, $chaves());
+        $this->assertSame(20.0, (float) $company->metricDefinitions()->find($ids['pedidos'])->weight); // foi para a 2ª posição: peso da 2ª posição da escala
 
-        $this->assertSame(['Pedidos', 'Reclamacoes'], array_column(CompanyConfig::propriasEmOrdem($company), 'label'));
-        $this->assertSame(50.0, (float) $company->metricDefinitions()->find($ids['pedidos'])->weight);
-        $this->assertFalse((bool) $company->metricDefinitions()->find($ids['reclamacoes'])->enabled);
+        // mudar o peso na aba Métricas devolve a métrica à posição do novo peso
+        Livewire::test(MetricDefinitions::class)->set("edits.{$ids['reclamacoes']}.weight", 100)->call('saveDefinition', $ids['reclamacoes'])->assertHasNoErrors();
+        $this->assertSame('custom:'.$ids['reclamacoes'], $chaves()[0]);
+
+        // empresas sem os 8 sinais não têm a aba: usam só a aba Métricas
+        $outra = Company::factory()->create();
+        $this->actingAs(User::factory()->for($outra)->create());
+        app(CompanyContext::class)->within($outra, fn () => Livewire::test(Configuracoes::class)->assertDontSee('Prioridade das métricas'));
     }
 }

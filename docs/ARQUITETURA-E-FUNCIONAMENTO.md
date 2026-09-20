@@ -451,7 +451,7 @@ Widgets registrados em [app/Filament/Widgets](../app/app/Filament/Widgets):
 - **KPIs** ([KpisWidget.php](../app/app/Filament/Widgets/KpisWidget.php))
   - clientes ativos;
   - receita mensal ativa;
-  - quantidade de ativos com atenção alta ou crítica;
+  - quantidade de ativos com atenção ≥ 40 (corte fixo);
   - receita já perdida, calculada a partir do valor mensal dos cancelados.
 - **Clientes ativos por nível** ([NiveisChart.php](../app/app/Filament/Widgets/NiveisChart.php))
   - gráfico doughnut com Baixo, Médio, Alto e Crítico.

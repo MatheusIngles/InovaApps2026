@@ -75,7 +75,7 @@ INSTRUÇÕES DA EMPRESA:
         }
 
         foreach ($company->metricDefinitions()->orderBy('code')->get() as $definition) {
-            $state = ! $definition->enabled ? 'desativada' : (MetricDefinition::semScore($definition->value_type) ? 'textual; fora do score' : "peso {$definition->weight}; piora quando ".($definition->direction === 'higher' ? 'aumenta' : 'diminui')."; saudável {$definition->healthy_value}; crítico {$definition->critical_value}");
+            $state = ! $definition->enabled ? 'desativada' : (MetricDefinition::semScore($definition->value_type) ? 'textual; fora do cálculo da atenção' : "peso {$definition->weight}; piora quando ".($definition->direction === 'higher' ? 'aumenta' : 'diminui')."; saudável {$definition->healthy_value}; crítico {$definition->critical_value}");
             $linhas[] = "- {$definition->label} ({$definition->code}, {$definition->value_type}): {$definition->description}; {$state}.";
         }
 

@@ -18,7 +18,7 @@ class BacktestWidget extends StatsOverviewWidget
 
     protected int|array|null $columns = ['default' => 1, 'md' => 3];
 
-    protected ?string $heading = 'Comparação exploratória do score';
+    protected ?string $heading = 'Comparação exploratória da atenção';
 
     protected ?string $description = 'Médias aritméticas da atenção por regras (0–100). Cancelados: avaliação anterior à saída; ativos: última avaliação. Não valida previsão de churn.';
 

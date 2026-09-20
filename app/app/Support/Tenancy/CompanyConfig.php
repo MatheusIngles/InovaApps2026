@@ -37,22 +37,65 @@ class CompanyConfig
             'tema' => $company->tema(),
             'prioridade' => $company->prioridadeK(),
             'ia' => $company->chat()['enabled'],
-            'proprias' => self::propriasEmOrdem($company),
         ];
     }
 
     /**
-     * Métricas da empresa que entram na atenção, da maior para a menor prioridade (o peso define a ordem).
+     * Lista única de prioridade (a da aba Prioridades): os 8 sinais padrão (se a empresa os tem) e as métricas da
+     * empresa que entram na atenção, na ordem salva. Métricas sem posição salva entram pelo peso: antes da primeira
+     * que pesa menos que elas (desligadas vão para o fim).
      *
-     * @return list<array{id: int, label: string, peso: float, ativa: bool}>
+     * @return list<array{k: string, label: string, peso: float, ativa: bool}>
      */
-    public static function propriasEmOrdem(Company $company): array
+    public static function listaUnificada(Company $company): array
     {
-        return $company->metricDefinitions()->withoutGlobalScopes()->where('company_id', $company->id)->get()
-            ->reject(fn (MetricDefinition $definicao): bool => MetricDefinition::semScore($definicao->value_type))
-            ->sortBy([['enabled', 'desc'], [fn (MetricDefinition $a, MetricDefinition $b): int => (float) $b->weight <=> (float) $a->weight], ['label', 'asc']])
-            ->map(fn (MetricDefinition $definicao): array => ['id' => $definicao->id, 'label' => $definicao->label, 'peso' => (float) $definicao->weight, 'ativa' => (bool) $definicao->enabled])
-            ->values()->all();
+        $legacy = $company->hasLegacyMetrics();
+        $pesos = $company->pesos();
+        $definicoes = $company->metricDefinitions()->withoutGlobalScopes()->where('company_id', $company->id)->get()
+            ->reject(fn (MetricDefinition $d): bool => MetricDefinition::semScore($d->value_type))->keyBy('id');
+        $sinal = fn (string $k): array => ['k' => $k, 'label' => Risco::ROTULOS[$k], 'peso' => (float) $pesos[$k], 'ativa' => $pesos[$k] > 0];
+        $propria = fn (MetricDefinition $d): array => ['k' => 'custom:'.$d->id, 'label' => $d->label, 'peso' => (float) $d->weight, 'ativa' => $d->enabled && (float) $d->weight > 0];
+
+        $itens = [];
+        $vistos = [];
+        foreach ($company->metric_weights ?? [] as $e) {
+            $k = (string) ($e['k'] ?? '');
+            if (isset($vistos[$k])) {
+                continue;
+            }
+            if ($legacy && isset(Risco::PESOS[$k])) {
+                $itens[] = $sinal($k);
+                $vistos[$k] = true;
+            } elseif (str_starts_with($k, 'custom:') && isset($definicoes[(int) substr($k, 7)])) {
+                $itens[] = $propria($definicoes[(int) substr($k, 7)]);
+                $vistos[$k] = true;
+            }
+        }
+        foreach ($legacy ? array_keys($pesos) : [] as $k) {
+            if (! isset($vistos[$k])) {
+                $itens[] = $sinal($k);
+                $vistos[$k] = true;
+            }
+        }
+        foreach ($definicoes->sortByDesc(fn (MetricDefinition $d): float => (float) $d->weight) as $d) {
+            if (isset($vistos['custom:'.$d->id])) {
+                continue;
+            }
+            $item = $propria($d);
+            $posicao = $item['ativa'] ? collect($itens)->search(fn (array $i): bool => ! $i['ativa'] || $i['peso'] < $item['peso']) : false;
+            array_splice($itens, $posicao === false ? count($itens) : $posicao, 0, [$item]);
+        }
+
+        return $itens;
+    }
+
+    /** Depois de mudar o peso ou o estado de uma métrica em outra tela, ela volta a ser posicionada pelo peso na lista. */
+    public static function esquecerPosicao(Company $company, int $definicaoId): void
+    {
+        if ($company->metric_weights === null) {
+            return;
+        }
+        $company->update(['metric_weights' => array_values(array_filter($company->metric_weights, fn ($e): bool => ($e['k'] ?? '') !== 'custom:'.$definicaoId))]);
     }
 
     /** Liga ou desliga a IA da empresa. Desligada, o chat, o relatório e o configurador usam só respostas por regras, sem enviar nada a provedores externos. */
@@ -77,6 +120,8 @@ class CompanyConfig
             'limiares.alto' => 'required|integer|between:1,100|lt:limiares.critico',
             'limiares.medio' => 'required|integer|between:1,100|lt:limiares.alto',
             'prioridade' => 'required|integer|between:0,500',
+            'ordem' => 'sometimes|array',
+            'ordem.*' => 'string|max:40',
             'proprias' => 'sometimes|array',
             'proprias.*.id' => 'required|integer',
             'proprias.*.peso' => 'required|numeric|min:0|max:100',
@@ -107,7 +152,8 @@ class CompanyConfig
         $pesos = array_map(fn ($m) => ['k' => $m['k'], 'peso' => (float) $m['peso']], array_values($d['metricas']));
         $limiares = array_map('intval', $d['limiares']);
         // != (não !==): 100 e 100.0 são o mesmo peso; a ordem da lista continua contando (desempate de sinais)
-        $recalcular = ($legacy && $pesos != ($company->metric_weights ?? self::padrao())) || $limiares != $company->limiares();
+        $atuais = array_values(array_filter($company->metric_weights ?? [], fn ($e): bool => isset(Risco::PESOS[$e['k'] ?? ''])));
+        $recalcular = ($legacy && $pesos != ($atuais ?: self::padrao())) || $limiares != $company->limiares();
 
         $mudouProprias = false;
         foreach ($d['proprias'] ?? [] as $m) {
@@ -122,8 +168,25 @@ class CompanyConfig
         $recalcular = $recalcular || $mudouProprias;
 
         $settings = ['level_thresholds' => $limiares, 'theme' => $d['tema'], 'priority_balance' => (int) $d['prioridade']];
-        if ($legacy) {
-            $settings['metric_weights'] = $pesos;
+        $ordem = $d['ordem'] ?? null;
+        if ($legacy || $ordem) {
+            $sinais = collect($pesos)->keyBy('k');
+            $proprias = collect($d['proprias'] ?? [])->keyBy(fn ($m) => 'custom:'.$m['id']);
+            $lista = [];
+            foreach ($ordem ?? [] as $k) {
+                if ($legacy && isset($sinais[$k])) {
+                    $lista[] = $sinais[$k];
+                } elseif (isset($proprias[$k])) {
+                    $lista[] = ['k' => $k, 'peso' => (float) $proprias[$k]['peso']];
+                }
+            }
+            if ($legacy) {
+                $lista = [...$lista, ...array_filter($pesos, fn ($p) => ! in_array($p['k'], array_column($lista, 'k'), true))];
+                if (! $ordem) { // sem a lista unificada: preserva a posição já salva das métricas da empresa
+                    $lista = [...$lista, ...array_filter($company->metric_weights ?? [], fn ($e) => str_starts_with((string) ($e['k'] ?? ''), 'custom:'))];
+                }
+            }
+            $settings['metric_weights'] = array_values($lista);
         }
         $company->update($settings);
 
@@ -144,7 +207,7 @@ class CompanyConfig
     public static function pesosPorPosicao(array $metricas): array
     {
         $escala = collect($metricas)->filter(fn ($m) => $m['ativa'] ?? true)
-            ->map(fn ($m) => ($m['peso'] ?? 0) > 0 ? (float) $m['peso'] : Risco::PESOS[$m['k']])
+            ->map(fn ($m) => ($m['peso'] ?? 0) > 0 ? (float) $m['peso'] : (Risco::PESOS[$m['k']] ?? 10))
             ->sortDesc()->values();
         $i = 0;
 

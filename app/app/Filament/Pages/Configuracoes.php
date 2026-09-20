@@ -51,32 +51,22 @@ class Configuracoes extends Page implements HasSchemas
 
     public function mount(): void
     {
-        $this->form->fill(CompanyConfig::ler(app(CompanyContext::class)->current()));
+        $company = app(CompanyContext::class)->current();
+        $this->form->fill($company->hasLegacyMetrics() ? [...CompanyConfig::ler($company), 'metricas' => CompanyConfig::listaUnificada($company)] : CompanyConfig::ler($company)); // só a empresa base tem a aba Prioridades
     }
 
     public function form(Schema $schema): Schema
     {
         return $schema->statePath('data')->components([
             Tabs::make('Configurações')->tabs([
-                Tab::make('Prioridades')->schema([
+                Tab::make('Prioridades')->visible($this->hasLegacyMetrics())->schema([
                     Section::make('Prioridade das métricas')
-                        ->description(fn (): string => ($this->hasLegacyMetrics() ? 'Arraste os oito sinais padrão para ordenar: o que fica no topo pesa mais. Use "Editar pesos" para definir o peso de cada um. ' : '')
-                            .(count($this->data['proprias'] ?? []) > 0 ? 'As métricas da empresa vêm em seguida, da maior para a menor prioridade: mude o peso ou desligue e clique em Salvar; a ordem se ajusta sozinha.' : 'Envie uma planilha ou cadastre métricas na aba Métricas: elas aparecem aqui, da maior para a menor prioridade.'))
-                        ->headerActions($this->hasLegacyMetrics() ? [$this->editarPesosAction()] : [])
+                        ->description('Arraste para ordenar: o que fica no topo pesa mais. A lista reúne os sinais padrão e as métricas acrescentadas depois; use "Editar pesos" para definir o peso de cada posição. Mudar o peso de uma métrica na aba Métricas também reposiciona ela aqui.')
+                        ->headerActions([$this->editarPesosAction()])
                         ->schema([
-                            Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()->visible($this->hasLegacyMetrics())
-                                ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
-                                ->schema([Hidden::make('k'), Hidden::make('peso'), Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)]),
-                            Repeater::make('proprias')->hiddenLabel()->addable(false)->deletable(false)->reorderable(false)
-                                ->visible(fn (): bool => count($this->data['proprias'] ?? []) > 0)
-                                ->itemLabel(fn (array $state): ?string => $state['label'] ?? null)
-                                ->schema([
-                                    Hidden::make('id'), Hidden::make('label'),
-                                    Grid::make(['default' => 1, 'md' => 2])->schema([
-                                        TextInput::make('peso')->label('Peso (0 a 100)')->numeric()->minValue(0)->maxValue(100)->required(),
-                                        Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)->inline(false),
-                                    ]),
-                                ]),
+                            Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()
+                                ->itemLabel(fn (array $state): ?string => ($state['label'] ?? null) ?: (Risco::ROTULOS[$state['k'] ?? ''] ?? null))
+                                ->schema([Hidden::make('k'), Hidden::make('peso'), Hidden::make('label'), Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)]),
                             View::make('filament.components.salvar-configuracao'),
                         ]),
                 ]),
@@ -173,11 +163,18 @@ class Configuracoes extends Page implements HasSchemas
     public function salvar(): void
     {
         $company = app(CompanyContext::class)->current();
-        $dados = array_replace_recursive(CompanyConfig::ler($company), $this->form->getState());
-        if ($this->hasLegacyMetrics()) {
-            $dados['metricas'] = CompanyConfig::pesosPorPosicao($dados['metricas']); // o peso vem da posição na lista
+        $estado = $this->form->getState();
+        $dados = array_replace_recursive(CompanyConfig::ler($company), Arr::except($estado, ['metricas']));
+        $lista = array_values($estado['metricas'] ?? []); // sinais padrão e métricas da empresa, na ordem da lista
+        if ($lista) {
+            $porPosicao = CompanyConfig::pesosPorPosicao($lista); // o peso vem da posição na lista
+            $ehSinal = fn (array $m): bool => isset(Risco::PESOS[$m['k']]);
+            if ($this->hasLegacyMetrics()) {
+                $dados['metricas'] = array_values(array_filter($porPosicao, $ehSinal));
+            }
+            $dados['proprias'] = collect($porPosicao)->reject($ehSinal)->map(fn (array $m): array => ['id' => (int) substr($m['k'], 7), 'peso' => $m['peso'], 'ativa' => $m['peso'] > 0])->values()->all();
+            $dados['ordem'] = array_column($porPosicao, 'k');
         }
-        $dados['proprias'] = array_values($this->form->getState()['proprias'] ?? $dados['proprias']); // o repeater usa chaves próprias: sem mesclar com as da leitura
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {

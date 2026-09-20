@@ -377,7 +377,7 @@ sequenceDiagram
     C->>J: dispara o job logo após a resposta (empresa, usuário, uuid)
     J->>J: monta os números; IA escreve o texto, ou regras se a IA estiver desligada
     J->>S: grava o PDF na pasta da empresa e do usuário
-    C-->>U: mostra o link quando o arquivo existe
+    J-->>U: notificação com o link do PDF
     U->>R: baixa
     R->>S: só encontra se for da empresa e do usuário logados
     R-->>U: relatorio.pdf

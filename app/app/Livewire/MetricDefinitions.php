@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\MetricDefinition;
 use App\Support\Risco;
 use App\Support\RiskService;
+use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Validacao\Backtest;
 use Filament\Notifications\Notification;
@@ -82,6 +83,7 @@ class MetricDefinitions extends Component
         }
 
         $definition->update($data);
+        CompanyConfig::esquecerPosicao($company, $definition->id); // o novo peso volta a definir a posição na lista de prioridades
         Backtest::invalidar($company);
         RiskService::recalcular($company);
         Notification::make()->title('Métrica atualizada e atenção recalculada.')->success()->send();

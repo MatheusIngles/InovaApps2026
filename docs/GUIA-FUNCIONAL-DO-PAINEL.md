@@ -82,7 +82,7 @@ Os níveis **padrão** são:
 
 Em **Configurações**, a aba **Prioridades** tem um controle de **0 a 20** para cada métrica, em passos de 0,1. Zero a desativa; números maiores dão mais influência relativa ao sinal. Os valores são normalizados pela soma dos pesos ativos, então 20 é o peso configurado, não necessariamente 20 pontos finais. As abas **Níveis de risco** e **Identidade visual** separam os outros ajustes. Os limites precisam seguir `médio < alto < crítico`. Salvar pesos ou limites recalcula a carteira; restaurar os padrões também recalcula.
 
-**Atenção à diferença de critérios:** o cartão “Atenção alta ou crítica” e os cartões da comparação exploratória usam o corte **fixo de 40 pontos**, mesmo quando os limites personalizados de Alto e Crítico mudam. Já o gráfico por nível, o rótulo do cliente e o filtro “Nível” usam os limites configurados. Assim, após uma personalização, a quantidade no cartão pode diferir da soma de Alto e Crítico no gráfico.
+**Atenção à diferença de critérios:** o cartão “Atenção ≥ 40” e os cartões da comparação exploratória usam o corte **fixo de 40 pontos**, mesmo quando os limites personalizados de Alto e Crítico mudam. Já o gráfico por nível, o rótulo do cliente e o filtro “Nível” usam os limites configurados. Assim, após uma personalização, a quantidade no cartão pode diferir da soma de Alto e Crítico no gráfico.
 
 ## Exposição e ordem de atendimento
 
@@ -92,7 +92,7 @@ exposição mensal indicativa = atenção ÷ 100 × valor mensal do contrato
 
 O resultado é arredondado para centavos e armazenado na avaliação. Se a atenção é 60 e o contrato vale R$ 10.000/mês, a exposição indicativa é R$ 6.000. Esse valor não é a receita efetivamente perdida nem uma probabilidade.
 
-A fila no Painel mostra **até oito clientes ativos**, em ordem decrescente de exposição. A lista Clientes coloca os ativos primeiro, também por exposição, e os cancelados ao final. Clientes sem avaliação podem aparecer com atenção e exposição zero. O filtro por nível considera apenas ativos, exceto pela opção “Cancelada”. O filtro por situação permite selecionar ativos ou cancelados; filtros por atenção e valor mensal aceitam limites mínimo e máximo.
+A fila no Painel mostra **até oito clientes ativos**, na mesma ordem da lista Clientes: primeiro quem já está em alerta (nível Médio ou acima) e, dentro de cada grupo, `atenção × (atenção + K) × valor mensal do contrato` (K = 50 por padrão, ajustável em Configurações › Fila de prioridade). Clientes marcados como resolvidos vão para o fim dos ativos, e os cancelados ficam por último. O prazo de contato vem da posição na fila. Clientes sem avaliação podem aparecer com atenção e exposição zero. O filtro por nível considera apenas ativos, exceto pela opção “Cancelada”. O filtro por situação permite selecionar ativos ou cancelados; filtros por atenção e valor mensal aceitam limites mínimo e máximo.
 
 ## O que cada área do Painel mostra
 
@@ -100,13 +100,13 @@ A fila no Painel mostra **até oito clientes ativos**, em ordem decrescente de e
 |---|---|
 | **Clientes ativos** | Contagem dos registros com situação `Ativo`. O subtítulo conta os registros `Cancelado` na base; “no período” se refere ao conjunto importado, sem filtro de datas. |
 | **Receita mensal ativa** | Soma dos valores mensais dos contratos ativos. |
-| **Atenção alta ou crítica** | Contagem dos ativos com atenção **≥ 40**, independentemente dos limites personalizados. O subtítulo “R$/mês em jogo” soma o **valor integral dos contratos** desses clientes, não a exposição ponderada. |
+| **Atenção ≥ 40** | Contagem dos ativos com atenção **≥ 40**, independentemente dos limites personalizados. O subtítulo “R$/mês em jogo” soma o **valor integral dos contratos** desses clientes, não a exposição ponderada. |
 | **Receita já perdida** | Soma dos valores mensais registrados para clientes cancelados. O subtítulo anual multiplica essa soma por 12; não mede faturamento perdido mês a mês. |
 | **Clientes ativos por nível** | Contagem de ativos em cada faixa definida pelos limites atuais da empresa. |
 | **Risco médio por segmento** | Média aritmética das atenções dos ativos de cada segmento, arredondada para inteiro. Grupos pequenos podem oscilar bastante. |
 | **Uso da plataforma × SLA cumprido** | Para cada mês, média aritmética dos percentuais registrados dos clientes **atualmente ativos**. Valores ausentes de SLA não entram na média SQL do mês. O gráfico arredonda os pontos para inteiros; se todos os SLA de um mês estiverem ausentes, a conversão atual mostra **0** no gráfico, que não deve ser interpretado como 0% de cumprimento. |
 | **Comparação exploratória da atenção** | Média das atenções de cancelados na última avaliação anterior à saída contra a média dos ativos na avaliação mais recente. As contagens “≥ 40” também usam corte fixo. É uma descrição da base, não validação de previsão futura. |
-| **Fila de atendimento** | Até oito ativos com maior exposição indicativa. O “principal motivo” é o sinal visível com mais pontos; pode aparecer “Sem sinal forte” mesmo quando a atenção inclui parcelas pequenas. |
+| **Fila de atendimento** | Até oito ativos, na ordem da fila (alerta primeiro e, em cada grupo, atenção × (atenção + K) × valor). O “principal motivo” é o sinal visível com mais pontos; pode aparecer “Sem sinal forte” mesmo quando a atenção inclui parcelas pequenas. |
 
 ## Como ler a página de um cliente
 
