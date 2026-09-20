@@ -13,12 +13,12 @@ class UserSeeder extends Seeder
     /** Duas empresas de demonstração: "demo" (com a base do desafio) e "beta" (vazia, para testar o envio de planilha e o tema próprio). */
     public function run(): void
     {
-        // "demo" é a Globalsys, dona da base do desafio. A logo (dados/globalsys-logo.png) é copiada para o disco público se existir.
+        // "demo" é a Globalsys, dona da base do desafio. A logo (dados/globalsys-logo.jpg) é copiada para o disco público se existir.
         $tema = ['primary' => '#0a9bdc', 'secondary' => '#58595b', 'font' => 'Plus Jakarta Sans'];
-        $logo = base_path('../dados/globalsys-logo.png');
+        $logo = base_path('../dados/globalsys-logo.jpg');
         if (is_file($logo)) {
-            Storage::disk('public')->put('logos/globalsys.png', file_get_contents($logo));
-            $tema['logo'] = 'logos/globalsys.png';
+            Storage::disk('public')->put('logos/globalsys.jpg', file_get_contents($logo));
+            $tema['logo'] = 'logos/globalsys.jpg';
         }
         $demo = Company::updateOrCreate(['slug' => 'demo'], ['name' => 'Globalsys', 'theme' => $tema]);
         $beta = Company::firstOrCreate(['slug' => 'beta'], [

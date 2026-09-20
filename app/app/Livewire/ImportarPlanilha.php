@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Jobs\ImportarPlanilhaJob;
 use App\Models\Customer;
 use App\Support\Import\DynamicImportService;
+use App\Support\Import\ImportService;
 use App\Support\Import\PlanilhaReader;
 use App\Support\Tenancy\CompanyContext;
 use Filament\Notifications\Notification;
@@ -34,6 +35,10 @@ class ImportarPlanilha extends Component
 
     #[Locked]
     public ?string $extensao = null;
+
+    /** A planilha é a base do desafio: entra pelo importador dos 8 sinais padrão, com o mesmo resultado da base de demonstração. */
+    #[Locked]
+    public bool $baseDoDesafio = false;
 
     /** @var list<string> */
     public array $cabecalhos = [];
@@ -67,7 +72,10 @@ class ImportarPlanilha extends Component
 
         try {
             $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $extensao, previa: 5);
-            $suggestions = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
+            $this->baseDoDesafio = ImportService::ehBaseDoDesafio($company, $tabela['cabecalhos']);
+            $suggestions = $this->baseDoDesafio
+                ? ['structure' => [], 'metrics' => []]
+                : DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
         } catch (\Throwable $e) {
             $this->descartar();
             Notification::make()->title('Não foi possível ler a planilha')->body($e->getMessage())->danger()->send();
@@ -114,7 +122,10 @@ class ImportarPlanilha extends Component
         }
 
         if (Storage::size($this->caminho) > self::LIMITE_SINCRONO) {
-            ImportarPlanilhaJob::dispatch($company->id, auth()->id(), $this->caminho, $this->extensao, [], false, $this->structuralMapping, $this->metricMappings);
+            $grande = $this->baseDoDesafio
+                ? [ImportService::sugerirMapeamento($this->cabecalhos), false, null, null]
+                : [[], false, $this->structuralMapping, $this->metricMappings];
+            ImportarPlanilhaJob::dispatch($company->id, auth()->id(), $this->caminho, $this->extensao, ...$grande);
             $this->caminho = null; // o job apaga o arquivo ao terminar
             $this->descartar();
             Notification::make()->title('Importação em andamento')->body('A planilha é grande e está sendo processada. Avisamos pelas notificações quando terminar.')->info()->send();
@@ -124,7 +135,9 @@ class ImportarPlanilha extends Component
 
         try {
             $tabela = PlanilhaReader::lerModelo(Storage::path($this->caminho), $this->extensao);
-            $this->resultado = DynamicImportService::importar($company, $tabela, $this->structuralMapping, $this->metricMappings);
+            $this->resultado = $this->baseDoDesafio
+                ? ImportService::importar($company, $tabela['linhas'], ImportService::sugerirMapeamento($tabela['cabecalhos'])) + ['valores_metricas' => 0, 'novas_metricas' => 0]
+                : DynamicImportService::importar($company, $tabela, $this->structuralMapping, $this->metricMappings);
         } catch (\Throwable $e) {
             Notification::make()->title('Importação não concluída')->body($e->getMessage())->danger()->send();
 
@@ -144,7 +157,7 @@ class ImportarPlanilha extends Component
         if ($this->caminho) {
             Storage::delete($this->caminho);
         }
-        $this->reset('caminho', 'extensao', 'cabecalhos', 'previa', 'dicionario', 'structuralMapping', 'metricMappings', 'arquivo');
+        $this->reset('caminho', 'extensao', 'baseDoDesafio', 'cabecalhos', 'previa', 'dicionario', 'structuralMapping', 'metricMappings', 'arquivo');
     }
 
     public function render()

@@ -16,8 +16,9 @@ Cada empresa faz login no seu próprio contexto, envia sua planilha de clientes,
 
 **Dados e métricas**
 - **Importação de planilhas** (XLSX/CSV) com várias abas ligadas por `cliente_id`, dicionário de campos e tela de confirmação em cartões. Arquivos grandes (> 2 MB) rodam em fila.
+- **Base do desafio reconhecida:** se a planilha tem as colunas dos 8 sinais padrão (como a `INOVAAPPS_base_de_dados.xlsx`), a tela pula o mapeamento e importa com as mesmas regras da base de demonstração. O resultado sai **idêntico** ao do seed (80 clientes, 22 cancelados, mesma atenção e mesmo nível em cada um), o que é conferido por teste. Empresas que já têm métricas próprias seguem pelo importador de métricas.
 - **Modelo de planilha em XLSX** (Leia-me, dicionário e abas de dados) para baixar.
-- **Métricas próprias por empresa,** com tela de cartões e participação de cada fator na atenção, e 8 tipos (decimal, inteiro, percentual, monetário, binário, nota, data e texto), direção de piora, faixas, peso e ativação. Mudar qualquer valor recalcula a carteira.
+- **Métricas próprias por empresa,** com tela de cartões recolhíveis e 8 tipos (decimal, inteiro, percentual, monetário, binário, nota, data e texto), direção de piora, faixas, peso e ativação. Mudar qualquer valor recalcula a carteira.
 - **Colunas opcionais:** `segmento` e `plano` (viram "Não informado"), `situacao`, `mes_cancelamento` e `inicio_contrato` (reconhecem quem cancelou).
 - **Sinais extras do desafio** (chamados críticos, tempo de resolução e volume de chamados) entram no cálculo quando a base tem esses dados.
 
@@ -39,7 +40,7 @@ Cada empresa tem o seu próprio conjunto de métricas, definido a partir da base
 
 Em **Configurações › Prioridades** (só na empresa base, a que tem os 8 sinais padrão do desafio, a Globalsys) fica **uma lista única** de prioridade: os 8 sinais padrão e as métricas acrescentadas depois, todos arrastáveis. O que fica no topo pesa mais, e **"Editar pesos"** define o peso de cada posição (11 posições com as 3 métricas extras). Mudar o peso de uma métrica na aba **Métricas** também a reposiciona nessa lista. As demais empresas usam só a aba **Métricas**.
 
-Em **Configurações › Métricas**, as métricas aparecem em cartões recolhíveis (nome, tipo, estado, participação e resumo da faixa) e o painel **Participação de cada fator na atenção** mostra, em %, quanto cada um pesa. Os sinais padrão e as métricas da empresa entram na **mesma conta**: a participação é o peso de cada fator dividido pela soma de todos os pesos, então ligar uma métrica nova reduz a participação relativa dos demais.
+Em **Configurações › Métricas**, as métricas cadastradas aparecem em cartões recolhíveis (nome, tipo, estado e resumo da faixa): é só abrir o cartão para editar. Os sinais padrão e as métricas da empresa entram na **mesma conta** (média ponderada pelos pesos), então ligar uma métrica nova reduz a participação relativa dos demais.
 
 Chamados críticos, tempo médio de resolução e volume de chamados abertos foram **acrescentados depois** dos 8 sinais padrão, como métricas da empresa. Eles vêm da base do desafio e são ativados na importação (ou com `php artisan seer:ativar-sinais-extras`, para bases já importadas), com faixas e pesos iniciais editáveis.
 
@@ -99,12 +100,12 @@ A **Atenção** é um índice de **0 a 100** que diz o quanto um cliente precisa
 
 Detalhes e exemplos numéricos: [Guia funcional do painel](docs/GUIA-FUNCIONAL-DO-PAINEL.md).
 
-## 🤖 IA: custo, segurança e como desligar
+## 🤖 IA: consumo, segurança e como desligar
 
 - **A IA não calcula a atenção.** Ela só explica os resultados em texto (chat, relatório e configuração recomendada). Sem IA, o núcleo do produto funciona igual.
 - **Ordem de uso:** API da NVIDIA → Ollama (modelo local no servidor) → respostas por regras.
 - **Ressalva sobre a API da NVIDIA.** O Seer usa a API do [build.nvidia.com](https://build.nvidia.com), que é **gratuita para desenvolvimento, testes e prototipagem**, com limite de requisições e sem garantia de disponibilidade. Por isso ela é a primeira opção, mas nunca a única: se a chave não existir, o limite estourar ou a resposta vier fraca, o sistema usa o Ollama e, por último, respostas por regras. Para uso comercial em produção, confirme os termos e os planos da NVIDIA antes de depender dela, ou use só o Ollama local (sem custo e sem enviar dados para fora).
-- **Custo:** depende do número de perguntas, não do tamanho da carteira, porque só um resumo vai ao modelo. Com uma empresa de 20 usuários, a estimativa fica na casa de poucas dezenas de dólares por mês, e é zero com o Ollama local ou com a IA desligada. A conta e as hipóteses estão em [docs/IA-CUSTO-E-SEGURANCA.md](docs/IA-CUSTO-E-SEGURANCA.md).
+- **Consumo:** baixo por desenho. O Seer é feito para poucas pessoas usando o assistente ao mesmo tempo, e cada pergunta leva só um resumo da carteira. Um servidor comum, sem nada de sofisticado, já sustenta a IA local (Ollama), sem depender de serviço pago. Detalhes em [docs/IA-CUSTO-E-SEGURANCA.md](docs/IA-CUSTO-E-SEGURANCA.md).
 - **Segurança:** só um resumo dos dados da própria empresa é enviado; a IA não escreve nem executa nada; tentativas de manipular o assistente são barradas; a resposta é sanitizada; a chave da API fica só no servidor; a conversa não é gravada no banco.
 - **A empresa pode desligar a IA** em **Configurações › Assistente de IA**. Desligada, nada sai do servidor e o chat responde às **perguntas prontas por regras**, usando os dados reais da carteira da empresa, calculados localmente (não são dados de exemplo). O operador também pode desligar para todas com `LLM_ENABLED=false`.
 
@@ -161,12 +162,13 @@ InovaApps2026/
 ├── dados/                              # dados do desafio e de teste
 │   ├── Desafio - INOVAAPPS 2026.pdf    # enunciado
 │   ├── INOVAAPPS_base_de_dados.xlsx    # base de exemplo (seeder e testes)
-│   └── exemplo_planilha.csv            # planilha pequena para testar a importação
+│   ├── exemplo_planilha.csv            # planilha pequena para testar a importação
+│   └── globalsys-logo.jpg              # logo da Globalsys (aplicada pelo seed)
 ├── docs/
 │   ├── ARQUITETURA-E-FUNCIONAMENTO.md  # camadas, modelo de dados, limitações
 │   ├── GUIA-FUNCIONAL-DO-PAINEL.md     # como cada número do painel é calculado
 │   ├── ENGENHARIA-DE-SOFTWARE.md       # requisitos, casos de uso, diagramas de classes e fluxos
-│   ├── IA-CUSTO-E-SEGURANCA.md         # custo da IA, segurança e como desligar
+│   ├── IA-CUSTO-E-SEGURANCA.md         # consumo da IA, segurança e como desligar
 │   ├── MODELO-DE-NEGOCIO.md
 │   ├── checklist-do-desafio.md
 │   └── imagens/                        # foto do servidor
@@ -194,7 +196,7 @@ InovaApps2026/
 - [Arquitetura e funcionamento](docs/ARQUITETURA-E-FUNCIONAMENTO.md): camadas, modelo de dados, limitações conhecidas.
 - [Guia funcional do painel](docs/GUIA-FUNCIONAL-DO-PAINEL.md): como cada métrica, peso e nível é calculado.
 - [Engenharia de software](docs/ENGENHARIA-DE-SOFTWARE.md): requisitos, casos de uso, diagramas de classes e fluxos.
-- [IA: custo e segurança](docs/IA-CUSTO-E-SEGURANCA.md): custo estimado, riscos e como desligar.
+- [IA: consumo e segurança](docs/IA-CUSTO-E-SEGURANCA.md): consumo, riscos e como desligar.
 - [Modelo de negócio](docs/MODELO-DE-NEGOCIO.md)
 - [Checklist do desafio](docs/checklist-do-desafio.md): requisitos e status.
 

@@ -15,7 +15,15 @@
         @error('arquivo')<p class="pl-erro" role="alert">{{ $message }}</p>@enderror
     </section>
 
-    @if ($cabecalhos)
+    @if ($cabecalhos && $baseDoDesafio)
+        <section class="ui-card ui-pad">
+            <h2>Base do desafio reconhecida</h2>
+            <p class="ui-muted">As colunas dos oito sinais padrão (uso, SLA, NPS, reuniões, reincidência, reclamações, atraso e tendência) e as de cliente e mês foram encontradas. Nada precisa ser mapeado: a planilha entra com as mesmas regras da base de demonstração, e chamados críticos, tempo de resolução e volume de chamados são acrescentados como métricas da empresa. Situação e mês de cancelamento, quando existirem, marcam quem cancelou.</p>
+            <form wire:submit="importar" class="pl-form">
+                <div class="ui-actions"><x-filament::button type="submit" wire:loading.attr="disabled" wire:target="importar">Importar base do desafio</x-filament::button></div>
+            </form>
+        </section>
+    @elseif ($cabecalhos)
         <section class="ui-card ui-pad">
             <h2>Confirmar colunas</h2>
             <p class="ui-muted">Confira o mapeamento antes de importar. Nenhuma métrica nova será cadastrada até você confirmar.</p>

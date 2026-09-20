@@ -522,14 +522,4 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 
 /* Selo "opcional" ao lado do nome do campo, na mesma linha */
 .pl-opc { display: inline-block; margin: 0 0 0 .4rem; padding: .05rem .5rem; border-radius: 999px; background: color-mix(in srgb, var(--panel-muted) 22%, transparent); color: var(--panel-muted); font-size: .7rem; font-weight: 600; vertical-align: middle; }
-
-/* Métricas cadastradas: participação de cada fator na atenção */
-.mp-part { list-style: none; margin: .25rem 0 1rem; padding: 0; display: flex; flex-direction: column; gap: .45rem; }
-.mp-part li { display: grid; grid-template-columns: minmax(9rem, 16rem) 1fr 3.5rem; align-items: center; gap: .75rem; font-size: .85rem; }
-.mp-part-nome { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-weight: 600; min-width: 0; }
-.mp-part-barra { height: .55rem; border-radius: 999px; background: color-mix(in srgb, var(--panel-muted) 22%, transparent); overflow: hidden; }
-.mp-part-barra i { display: block; height: 100%; border-radius: 999px; background: var(--primary-600); }
-.mp-part-pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--panel-muted); }
 .mp + .mp { margin-top: .6rem; }
-.mp-titulo + .ui-muted { margin-top: .25rem; }
-@media (max-width: 640px) { .mp-part li { grid-template-columns: 1fr 3.5rem; } .mp-part-barra { grid-column: 1 / -1; grid-row: 2; } }

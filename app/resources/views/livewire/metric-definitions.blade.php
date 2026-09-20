@@ -25,27 +25,12 @@
         </form>
     </section>
 
-    @if ($definitions->isNotEmpty() || $padrao->isNotEmpty())
+    @if ($definitions->isNotEmpty())
         <section class="ui-card ui-pad">
             <div class="mp-cab">
                 <h2>Métricas cadastradas</h2>
                 <p class="ui-muted">Toque em uma métrica para editar. Após alterar peso, faixa ou estado, a atenção da carteira é recalculada. Desativar uma métrica mantém seus valores históricos.</p>
             </div>
-
-            <h3 class="mp-titulo">Participação de cada fator na atenção</h3>
-            <p class="ui-muted">Os sinais padrão e as métricas da empresa entram na mesma conta: a participação é o peso de cada um dividido pela soma dos pesos.</p>
-            <ul class="mp-part" aria-label="Participação de cada fator na atenção">
-                @foreach ($padrao as $fator)
-                    <li><span class="mp-part-nome">{{ $fator['rotulo'] }} <span class="mp-chip tipo">Sinal padrão</span></span><span class="mp-part-barra" aria-hidden="true"><i style="width: {{ $fator['pct'] }}%"></i></span><span class="mp-part-pct">{{ number_format($fator['pct'], 1, ',', '') }}%</span></li>
-                @endforeach
-                @foreach ($definitions as $definition)
-                    @continue(! isset($participacao[$definition->id]))
-                    <li><span class="mp-part-nome">{{ $definition->label }}</span><span class="mp-part-barra" aria-hidden="true"><i style="width: {{ $participacao[$definition->id] }}%"></i></span><span class="mp-part-pct">{{ number_format($participacao[$definition->id], 1, ',', '') }}%</span></li>
-                @endforeach
-            </ul>
-            @if ($padrao->isNotEmpty())
-                <p class="ui-muted">A ordem e o peso dos sinais padrão se ajustam na aba <strong>Prioridades</strong>.</p>
-            @endif
 
             @foreach ($definitions as $definition)
                 @php
@@ -65,7 +50,7 @@
                         @if ($semScore)
                             <span class="mp-chip">Fora do cálculo</span>
                         @elseif ($definition->enabled)
-                            <span class="mp-chip ok">Na atenção{{ isset($participacao[$definition->id]) ? ' · '.number_format($participacao[$definition->id], 1, ',', '').'%' : '' }}</span>
+                            <span class="mp-chip ok">Na atenção</span>
                         @else
                             <span class="mp-chip aviso">Desativada</span>
                         @endif

@@ -19,7 +19,7 @@ Diagramas e decisões de projeto. Os diagramas usam [Mermaid](https://mermaid.js
 | RF09 | A empresa pode desligar a IA e continuar usando o sistema. |
 | RF10 | Notificar quando um cliente sobe de nível. |
 
-**Não funcionais:** isolamento entre empresas, cálculo determinístico e explicável, acessibilidade (VLibras, texto ajustável, voz), custo de IA controlado, segurança dos dados (veja [IA: custo e segurança](IA-CUSTO-E-SEGURANCA.md)).
+**Não funcionais:** isolamento entre empresas, cálculo determinístico e explicável, acessibilidade (VLibras, texto ajustável, voz), consumo de IA baixo, segurança dos dados (veja [IA: consumo e segurança](IA-CUSTO-E-SEGURANCA.md)).
 
 ## 2. Casos de uso
 
