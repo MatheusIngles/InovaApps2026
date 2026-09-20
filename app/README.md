@@ -45,9 +45,9 @@ Importa a base do desafio (`../dados/INOVAAPPS_base_de_dados.xlsx`) e cria as em
 
 | Usuário | Senha | Empresa |
 |---|---|---|
-| `admin@inova.com` | `senha123` | Globalsys (base do desafio) |
-| `demo@inova.com` | `senha123` | Globalsys (base do desafio) |
-| `admin@beta.com` | `senha123` | Beta |
+| `admin@inova.com` | `senha12345senha` | Globalsys (base do desafio) |
+| `demo@inova.com` | `senha12345senha` | Globalsys (base do desafio) |
+| `admin@beta.com` | `senha12345senha` | Beta |
 
 Essas senhas valem só para desenvolvimento. Não rode o seeder em produção.
 

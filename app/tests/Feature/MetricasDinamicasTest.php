@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\Configuracoes;
 use App\Jobs\ImportarPlanilhaJob;
 use App\Livewire\ImportarPlanilha;
 use App\Livewire\MetricDefinitions;
@@ -16,6 +17,7 @@ use App\Support\Import\TemplateImportService;
 use App\Support\Import\TemplateLayout;
 use App\Support\Relatorio\RelatorioService;
 use App\Support\RiskService;
+use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Validacao\Backtest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -611,5 +613,29 @@ class MetricasDinamicasTest extends TestCase
             ->assertSee('Participação de cada fator na atenção')
             ->assertSee('75,0%')
             ->assertSee('25,0%');
+    }
+
+    public function test_aba_prioridades_lista_as_metricas_da_empresa_por_peso_e_salva_o_peso(): void
+    {
+        $company = Company::factory()->create(); // sem os 8 sinais padrão: só métricas próprias
+        $this->actingAs(User::factory()->for($company)->create());
+        $ids = [];
+        app(CompanyContext::class)->within($company, function () use ($company, &$ids): void {
+            foreach ([['pedidos', 10], ['reclamacoes', 30]] as [$code, $peso]) {
+                $ids[$code] = $company->metricDefinitions()->create(['code' => $code, 'label' => ucfirst($code), 'description' => 'x', 'value_type' => 'decimal', 'direction' => 'higher',
+                    'healthy_value' => 0, 'critical_value' => 10, 'weight' => $peso, 'enabled' => true])->id;
+            }
+        });
+
+        $this->assertSame(['Reclamacoes', 'Pedidos'], array_column(CompanyConfig::propriasEmOrdem($company), 'label'));
+
+        Livewire::test(Configuracoes::class)->assertSee('Métricas da empresa');
+        $d = CompanyConfig::ler($company);
+        $d['proprias'] = [['id' => $ids['pedidos'], 'label' => 'Pedidos', 'peso' => 50, 'ativa' => true], ['id' => $ids['reclamacoes'], 'label' => 'Reclamacoes', 'peso' => 30, 'ativa' => false]];
+        $this->assertTrue(CompanyConfig::salvar($company, $d));
+
+        $this->assertSame(['Pedidos', 'Reclamacoes'], array_column(CompanyConfig::propriasEmOrdem($company), 'label'));
+        $this->assertSame(50.0, (float) $company->metricDefinitions()->find($ids['pedidos'])->weight);
+        $this->assertFalse((bool) $company->metricDefinitions()->find($ids['reclamacoes'])->enabled);
     }
 }

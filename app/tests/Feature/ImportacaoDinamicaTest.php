@@ -251,7 +251,7 @@ class ImportacaoDinamicaTest extends TestCase
         );
         $this->actingAs(User::factory()->for($company)->create());
 
-        $this->get('/configuracoes')->assertOk()->assertDontSee('Prioridade dos sinais padrão')->assertSee('Equilíbrio da fila');
+        $this->get('/configuracoes')->assertOk()->assertDontSee('oito sinais padrão')->assertSee('Equilíbrio da fila');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->set('data.prioridade', 25)->call('salvar')->assertHasNoErrors();
 
         $this->assertSame(70, $company->fresh()->limiares()['critico']);

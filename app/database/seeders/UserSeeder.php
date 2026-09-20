@@ -28,7 +28,7 @@ class UserSeeder extends Seeder
 
         foreach ([['admin@inova.com', 'Administrador', $demo], ['demo@inova.com', 'Usuário Demonstração', $demo], ['admin@beta.com', 'Administrador Beta', $beta]] as [$email, $nome, $empresa]) {
             User::updateOrCreate(['email' => $email], [
-                'name' => $nome, 'company_id' => $empresa->id, 'password' => Hash::make('senha123'), 'email_verified_at' => now(),
+                'name' => $nome, 'company_id' => $empresa->id, 'password' => Hash::make('senha12345senha'), 'email_verified_at' => now(),
             ]);
         }
     }

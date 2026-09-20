@@ -151,7 +151,7 @@ class ConfiguracaoEmpresaTest extends TestCase
         });
 
         $this->get('/configuracoes')->assertOk()->assertSee('Prioridades')->assertSee('Fila de prioridade')->assertSee('Níveis de atenção')->assertSee('Identidade visual')
-            ->assertSee('Prioridade dos sinais padrão')->assertSee('Métricas da empresa')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
+            ->assertSee('Prioridade das métricas')->assertSee('Métricas da empresa')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
             ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->call('salvar')->assertHasNoErrors();
         $this->assertSame(70, $company->fresh()->limiares()['critico']);

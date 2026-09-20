@@ -58,17 +58,28 @@ class Configuracoes extends Page implements HasSchemas
     {
         return $schema->statePath('data')->components([
             Tabs::make('Configurações')->tabs([
-                ...($this->hasLegacyMetrics() ? [Tab::make('Prioridades')->schema([
-                    Section::make('Prioridade dos sinais padrão')
-                        ->description('Arraste os oito sinais padrão para ordenar: o que fica no topo pesa mais. Use "Editar pesos" para definir o peso de cada um. As métricas próprias têm pesos na aba ao lado.')
-                        ->headerActions([$this->editarPesosAction()])
+                Tab::make('Prioridades')->schema([
+                    Section::make('Prioridade das métricas')
+                        ->description(fn (): string => ($this->hasLegacyMetrics() ? 'Arraste os oito sinais padrão para ordenar: o que fica no topo pesa mais. Use "Editar pesos" para definir o peso de cada um. ' : '')
+                            .(count($this->data['proprias'] ?? []) > 0 ? 'As métricas da empresa vêm em seguida, da maior para a menor prioridade: mude o peso ou desligue e clique em Salvar; a ordem se ajusta sozinha.' : 'Envie uma planilha ou cadastre métricas na aba Métricas: elas aparecem aqui, da maior para a menor prioridade.'))
+                        ->headerActions($this->hasLegacyMetrics() ? [$this->editarPesosAction()] : [])
                         ->schema([
-                            Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()
+                            Repeater::make('metricas')->hiddenLabel()->addable(false)->deletable(false)->reorderable()->visible($this->hasLegacyMetrics())
                                 ->itemLabel(fn (array $state): ?string => Risco::ROTULOS[$state['k'] ?? ''] ?? null)
                                 ->schema([Hidden::make('k'), Hidden::make('peso'), Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)]),
+                            Repeater::make('proprias')->hiddenLabel()->addable(false)->deletable(false)->reorderable(false)
+                                ->visible(fn (): bool => count($this->data['proprias'] ?? []) > 0)
+                                ->itemLabel(fn (array $state): ?string => $state['label'] ?? null)
+                                ->schema([
+                                    Hidden::make('id'), Hidden::make('label'),
+                                    Grid::make(['default' => 1, 'md' => 2])->schema([
+                                        TextInput::make('peso')->label('Peso (0 a 100)')->numeric()->minValue(0)->maxValue(100)->required(),
+                                        Toggle::make('ativa')->label('Considerar no cálculo da atenção')->default(true)->inline(false),
+                                    ]),
+                                ]),
                             View::make('filament.components.salvar-configuracao'),
                         ]),
-                ])] : []),
+                ]),
                 Tab::make('Métricas')->schema([
                     View::make('filament.components.metricas-proprias'),
                 ]),
@@ -166,6 +177,7 @@ class Configuracoes extends Page implements HasSchemas
         if ($this->hasLegacyMetrics()) {
             $dados['metricas'] = CompanyConfig::pesosPorPosicao($dados['metricas']); // o peso vem da posição na lista
         }
+        $dados['proprias'] = array_values($this->form->getState()['proprias'] ?? $dados['proprias']); // o repeater usa chaves próprias: sem mesclar com as da leitura
         $dados['tema']['logo'] = is_array($dados['tema']['logo'] ?? null) ? Arr::first($dados['tema']['logo']) : ($dados['tema']['logo'] ?? null);
 
         try {

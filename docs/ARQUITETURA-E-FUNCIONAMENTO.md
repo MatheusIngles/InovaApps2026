@@ -544,7 +544,7 @@ Quando a intenção não é reconhecida, o assistente devolve uma mensagem de or
 - `admin@inova.com`
 - `demo@inova.com`
 
-Ambos usam a senha fixa `senha123` no ambiente de demonstração. Essas credenciais devem ser substituídas ou removidas antes de qualquer ambiente real.
+Ambos usam a senha fixa `senha12345senha` no ambiente de demonstração. Essas credenciais devem ser substituídas ou removidas antes de qualquer ambiente real.
 
 As factories em [database/factories](../app/database/factories) existem para testes e geração de dados, mas não necessariamente reproduzem a distribuição e a integridade da planilha oficial.
 

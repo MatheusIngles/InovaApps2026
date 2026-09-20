@@ -3,6 +3,7 @@
 namespace App\Support\Tenancy;
 
 use App\Models\Company;
+use App\Models\MetricDefinition;
 use App\Support\Risco;
 use App\Support\RiskService;
 use App\Support\Validacao\Backtest;
@@ -36,7 +37,22 @@ class CompanyConfig
             'tema' => $company->tema(),
             'prioridade' => $company->prioridadeK(),
             'ia' => $company->chat()['enabled'],
+            'proprias' => self::propriasEmOrdem($company),
         ];
+    }
+
+    /**
+     * Métricas da empresa que entram na atenção, da maior para a menor prioridade (o peso define a ordem).
+     *
+     * @return list<array{id: int, label: string, peso: float, ativa: bool}>
+     */
+    public static function propriasEmOrdem(Company $company): array
+    {
+        return $company->metricDefinitions()->withoutGlobalScopes()->where('company_id', $company->id)->get()
+            ->reject(fn (MetricDefinition $definicao): bool => MetricDefinition::semScore($definicao->value_type))
+            ->sortBy([['enabled', 'desc'], [fn (MetricDefinition $a, MetricDefinition $b): int => (float) $b->weight <=> (float) $a->weight], ['label', 'asc']])
+            ->map(fn (MetricDefinition $definicao): array => ['id' => $definicao->id, 'label' => $definicao->label, 'peso' => (float) $definicao->weight, 'ativa' => (bool) $definicao->enabled])
+            ->values()->all();
     }
 
     /** Liga ou desliga a IA da empresa. Desligada, o chat, o relatório e o configurador usam só respostas por regras, sem enviar nada a provedores externos. */
@@ -61,6 +77,10 @@ class CompanyConfig
             'limiares.alto' => 'required|integer|between:1,100|lt:limiares.critico',
             'limiares.medio' => 'required|integer|between:1,100|lt:limiares.alto',
             'prioridade' => 'required|integer|between:0,500',
+            'proprias' => 'sometimes|array',
+            'proprias.*.id' => 'required|integer',
+            'proprias.*.peso' => 'required|numeric|min:0|max:100',
+            'proprias.*.ativa' => 'sometimes|boolean',
             'tema.primary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'tema.secondary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'tema.font' => 'sometimes|in:'.implode(',', self::FONTES),
@@ -75,7 +95,9 @@ class CompanyConfig
                 $v->errors()->add('tema.primary', 'A cor primária é clara demais: o texto branco dos botões ficaria ilegível. Escolha uma cor mais escura.');
             }
 
-            $customWeight = $company->metricDefinitions()->where('enabled', true)->sum('weight');
+            $customWeight = isset($dados['proprias'])
+                ? collect($dados['proprias'])->filter(fn ($m) => $m['ativa'] ?? true)->sum(fn ($m) => (float) ($m['peso'] ?? 0))
+                : $company->metricDefinitions()->where('enabled', true)->sum('weight');
             if (array_sum(array_column($dados['metricas'] ?? [], 'peso')) + $customWeight <= 0) {
                 $v->errors()->add('metricas', 'Pelo menos uma métrica precisa ter peso maior que zero.');
             }
@@ -86,6 +108,18 @@ class CompanyConfig
         $limiares = array_map('intval', $d['limiares']);
         // != (não !==): 100 e 100.0 são o mesmo peso; a ordem da lista continua contando (desempate de sinais)
         $recalcular = ($legacy && $pesos != ($company->metric_weights ?? self::padrao())) || $limiares != $company->limiares();
+
+        $mudouProprias = false;
+        foreach ($d['proprias'] ?? [] as $m) {
+            $definicao = $company->metricDefinitions()->withoutGlobalScopes()->where('company_id', $company->id)->find($m['id']);
+            $peso = (float) $m['peso'];
+            $ativa = (bool) ($m['ativa'] ?? true);
+            if ($definicao && ! MetricDefinition::semScore($definicao->value_type) && ((float) $definicao->weight !== $peso || (bool) $definicao->enabled !== $ativa)) {
+                $definicao->update(['weight' => $peso, 'enabled' => $ativa]);
+                $mudouProprias = true;
+            }
+        }
+        $recalcular = $recalcular || $mudouProprias;
 
         $settings = ['level_thresholds' => $limiares, 'theme' => $d['tema'], 'priority_balance' => (int) $d['prioridade']];
         if ($legacy) {
