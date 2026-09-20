@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
 use App\Models\CustomerNps;
+use App\Models\MetricValue;
 use App\Models\RiskAssessment;
 use App\Models\User;
 use App\Support\Assistente;
@@ -21,6 +22,7 @@ use App\Support\Llm\Llm;
 use App\Support\Llm\PerguntasProntas;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyContext;
+use App\Support\Validacao\Backtest;
 use Database\Seeders\CustomerDataSeeder;
 use Database\Seeders\RiskAssessmentSeeder;
 use Database\Seeders\UserSeeder;
@@ -114,7 +116,7 @@ class CarteiraTest extends TestCase
         $cliente = Customer::ordenar(Customer::dashboard())->first();
         $parcelas = $cliente->contribuicoesScore();
 
-        $this->assertCount(8, $parcelas);
+        $this->assertCount(11, $parcelas); // 8 sinais padrão + chamados críticos, tempo de resolução e volume de chamados
         $this->assertSame($cliente->score, (int) round(array_sum(array_column($parcelas, 'pontos'))));
         foreach ($parcelas as $parcela) {
             $this->assertEqualsWithDelta($parcela['pontos'], $parcela['base'] + $parcela['ajuste_prioridade'], 0.001);
@@ -131,7 +133,7 @@ class CarteiraTest extends TestCase
             ->assertSee('Como a exposição é calculada')
             ->assertSee('não uma perda prevista');
 
-        $this->assertCount(8, $parcelas);
+        $this->assertCount(11, $parcelas);
         $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'contribuiu para a atenção'));
         $this->assertSame(count($cliente->sinais), substr_count($resposta->getContent(), 'class="ui-tip ui-tip-valor"'));
 
@@ -484,5 +486,18 @@ class CarteiraTest extends TestCase
 
         $this->postJson('/assistente/voz', ['texto' => 'Olá'])->assertStatus(503);
         $this->postJson('/assistente/voz', ['texto' => ''])->assertUnprocessable();
+    }
+
+    public function test_base_do_desafio_usa_chamados_criticos_tempo_de_resolucao_e_volume_na_atencao(): void
+    {
+        $demo = Company::firstWhere('slug', 'demo');
+
+        $this->assertEqualsCanonicalizing(['chamados_criticos', 'tempo_medio_resolucao_h', 'chamados_abertos'], $demo->metricDefinitions()->pluck('code')->all());
+        $this->assertCount(0, Backtest::resumo($demo)['extras']); // já entram na atenção: saem da lista de "variáveis que ela não usa"
+        $this->assertEqualsCanonicalizing(['Chamados críticos', 'Tempo médio de resolução (h)', 'Chamados abertos'], collect(Backtest::resumo($demo)['metricas_proprias'])->pluck('rotulo')->map(fn ($r) => $r === 'Volume de chamados abertos' ? 'Chamados abertos' : $r)->all());
+
+        $antes = MetricValue::count();
+        $this->artisan('seer:ativar-sinais-extras')->assertSuccessful();
+        $this->assertSame($antes, MetricValue::count()); // rodar de novo não duplica
     }
 }

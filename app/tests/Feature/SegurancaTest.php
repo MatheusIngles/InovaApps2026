@@ -47,4 +47,22 @@ class SegurancaTest extends TestCase
         $this->expectException(CannotUpdateLockedPropertyException::class);
         Livewire::test(ImportarPlanilha::class)->set('caminho', 'imports/1/de-outra-empresa.csv');
     }
+
+    private function esquemaDoCss(string $origem): ?string
+    {
+        $html = $this->withServerVariables(['REMOTE_ADDR' => $origem])->withHeaders(['X-Forwarded-Proto' => 'https'])->get('/login')->assertOk()->getContent();
+
+        return preg_match('#(https?)://[^\s"]*css/panel\.css#', $html, $m) ? $m[1] : null;
+    }
+
+    public function test_atras_de_proxy_da_rede_privada_os_assets_saem_em_https(): void
+    {
+        $this->assertSame('https', $this->esquemaDoCss('192.168.0.5'));
+    }
+
+    /** Origem pública: o X-Forwarded-Proto é ignorado (não dá para forjar HTTPS nem o IP de quem acessa). */
+    public function test_cabecalho_de_proxy_de_origem_publica_e_ignorado(): void
+    {
+        $this->assertSame('http', $this->esquemaDoCss('203.0.113.7'));
+    }
 }

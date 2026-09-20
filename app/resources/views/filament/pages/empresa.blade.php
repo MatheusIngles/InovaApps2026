@@ -31,7 +31,7 @@
         <section class="ui-card">
                 <div class="ui-banner" role="img" aria-label="Banner do cliente"></div>
                 <div class="ui-head">
-                    <div class="ui-logo" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->segmento, 0, 1)).ltrim(substr($e->codigo, 1), '0') }}</div>
+                    <div class="ui-logo" aria-hidden="true">{{ mb_strtoupper(mb_substr($e->segmento, 0, 1)).(ltrim(preg_replace('/\D/', '', $e->codigo), '0') ?: mb_strtoupper(mb_substr($e->codigo, 0, 2))) }}</div>
                     <div class="ui-title">
                         <h1>{{ $e->nome }}</h1>
                         <p class="ui-headline">{{ $e->segmento }}, porte {{ $e->porte }}, plano {{ $e->plano }}. Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ', cancelou em '.$e->mes_cancel : '' }}.</p>
@@ -130,7 +130,7 @@
                     @foreach ($e->similares as $s)
                         <li>
                             <a href="{{ EmpresaResource::getUrl('view', ['record' => $s['codigo']]) }}">
-                                <span class="ui-mini" aria-hidden="true">{{ mb_strtoupper(mb_substr($s['nome'], 0, 1)).ltrim(substr($s['codigo'], 1), '0') }}</span>
+                                <span class="ui-mini" aria-hidden="true">{{ mb_strtoupper(mb_substr($s['nome'], 0, 1)).(ltrim(preg_replace('/\D/', '', $s['codigo']), '0') ?: mb_strtoupper(mb_substr($s['codigo'], 0, 2))) }}</span>
                                 <span><strong>{{ $s['nome'] }}</strong><small>Cancelou em {{ $s['mes_cancel'] }} · {{ $s['sim'] }}% de semelhança</small></span>
                             </a>
                         </li>

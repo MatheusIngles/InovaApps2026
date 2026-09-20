@@ -46,6 +46,7 @@ class RelatorioService
         return Pdf::loadView('relatorios.carteira', [
             'empresa' => $company->name ?? 'Carteira',
             'r' => Backtest::resumo($company),
+            'padrao' => $company->hasLegacyMetrics(), // só empresas com os sinais padrão (base do desafio) têm a tabela deles
             'recomendada' => Configurador::recomendada($company),
             'geradoEm' => now(),
         ])->setPaper('a4', 'landscape')->output();

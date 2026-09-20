@@ -254,10 +254,139 @@ class MetricasDinamicasTest extends TestCase
         $this->assertSame('percentage', $tipos['pct_sla_cumprido']);
         $this->assertSame('binary', $tipos['reunioes_previstas']);
         $this->assertSame('grade', $tipos['nota_nps']);
-        $this->assertSame('date', $tipos['inicio_contrato']);
+        foreach (['inicio_contrato', 'situacao', 'mes_cancelamento'] as $reconhecida) {
+            $this->assertArrayNotHasKey($reconhecida, $tipos); // viram dados do cliente, não métricas
+        }
         $this->assertSame('text', $tipos['classificacao_nps']);
         $descricoes = array_column($sugestao['metrics'], 'description', 'column');
         $this->assertNotSame('', $descricoes['chamados_abertos']);
+    }
+
+    public function test_situacao_e_mes_cancelamento_marcam_o_cliente_como_cancelado_e_o_historico_para_no_cancelamento(): void
+    {
+        $company = Company::factory()->create();
+        $path = $this->xlsx([
+            'clientes' => [
+                ['cliente_id', 'segmento', 'porte', 'plano', 'valor_mensal', 'inicio_contrato', 'situacao', 'mes_cancelamento'],
+                ['R1', 'Pizzaria', 'Pequeno', 'Basico', 100, '2024-05-01', 'Cancelado', '2026-03'],
+                ['R2', 'Pizzaria', 'Pequeno', 'Basico', 100, '2024-06-01', 'Ativo', null],
+            ],
+            'metricas' => [
+                ['cliente_id', 'mes_ref', 'pedidos'],
+                ['R1', '2026-01', 900], ['R1', '2026-02', 700], ['R1', '2026-03', 50],
+                ['R2', '2026-01', 900], ['R2', '2026-02', 910], ['R2', '2026-03', 905],
+            ],
+        ]);
+        $tabela = PlanilhaReader::lerModelo($path, 'xlsx');
+        $sugestao = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
+        $this->assertSame(['pedidos'], array_column($sugestao['metrics'], 'column'));
+
+        DynamicImportService::importar($company, $tabela, $sugestao['structure'], array_map(fn (array $m): array => ['direction' => 'lower', 'healthy_value' => 800, 'critical_value' => 100, 'weight' => 20, 'description' => 'Pedidos'] + $m, $sugestao['metrics']));
+
+        app(CompanyContext::class)->within($company, function (): void {
+            $r1 = Customer::where('external_code', 'R1')->firstOrFail();
+            $this->assertSame('Cancelado', $r1->status);
+            $this->assertSame('2026-03', $r1->cancelled_at->format('Y-m'));
+            $this->assertSame('2024-05-01', $r1->contract_started_at->toDateString());
+            $this->assertSame('Ativo', Customer::where('external_code', 'R2')->firstOrFail()->status);
+            $this->assertSame(['R2'], Customer::ativas()->pluck('external_code')->all());
+            $this->assertSame('2026-02', $r1->currentAssessment->reference_month->format('Y-m')); // o mês do cancelamento fica de fora
+        });
+    }
+
+    public function test_situacao_invalida_ou_cancelado_sem_mes_e_recusada(): void
+    {
+        $company = Company::factory()->create();
+        foreach ([['Talvez', null, 'situacao deve ser'], ['Cancelado', null, 'informe o mes_cancelamento'], ['Ativo', '2026-03', 'não pode ter mes_cancelamento']] as [$situacao, $mes, $mensagem]) {
+            $path = $this->xlsx([
+                'clientes' => [['cliente_id', 'segmento', 'porte', 'plano', 'valor_mensal', 'situacao', 'mes_cancelamento'], ['R1', 'P', 'P', 'B', 100, $situacao, $mes]],
+                'metricas' => [['cliente_id', 'mes_ref', 'pedidos'], ['R1', '2026-01', 900]],
+            ]);
+            $tabela = PlanilhaReader::lerModelo($path, 'xlsx');
+            $sugestao = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
+            try {
+                DynamicImportService::importar($company, $tabela, $sugestao['structure'], array_map(fn (array $m): array => ['direction' => 'lower', 'healthy_value' => 800, 'critical_value' => 100, 'weight' => 20, 'description' => 'Pedidos'] + $m, $sugestao['metrics']));
+                $this->fail("Aceitou situação {$situacao}.");
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString($mensagem, $e->getMessage());
+            }
+        }
+    }
+
+    public function test_tela_de_confirmacao_mostra_cartoes_por_metrica_e_permite_vincular_a_uma_existente(): void
+    {
+        $company = Company::factory()->create();
+        $this->definition($company);
+        $this->actingAs(User::factory()->for($company)->create());
+        $path = $this->xlsx([
+            'clientes' => [['cliente_id', 'segmento', 'porte', 'plano', 'valor_mensal', 'situacao', 'mes_cancelamento'], ['R1', 'P', 'P', 'B', 100, 'Ativo', null]],
+            'metricas' => [['cliente_id', 'mes_ref', 'pedidos'], ['R1', '2026-01', 900]],
+        ]);
+
+        Livewire::test(ImportarPlanilha::class)
+            ->set('arquivo', UploadedFile::fake()->createWithContent('ifood.xlsx', file_get_contents($path)))
+            ->assertSee('Colunas obrigatórias')->assertSee('Métricas encontradas (1)')->assertSee('Criar métrica nova')->assertSee('Vincular a uma existente')
+            ->assertSee('situacao, mes_cancelamento')
+            ->assertSet('metricMappings.0.target', (string) $company->metricDefinitions()->value('id')) // "pedidos" já existe: vem vinculada
+            ->assertSee('Métrica existente')
+            ->set('metricMappings.0.target', 'new')->assertSee('Tipo do valor')->assertSee('Quando piora')
+            ->call('usarExistente', 0)->assertSet('metricMappings.0.target', (string) $company->metricDefinitions()->value('id'));
+    }
+
+    public function test_segmento_e_plano_sao_opcionais_e_ficam_como_nao_informado(): void
+    {
+        $company = Company::factory()->create();
+        $path = $this->xlsx([
+            'dados' => [['cliente_id', 'mes_ref', 'porte', 'valor_mensal', 'pedidos'], ['R1', '2026-01', 'Pequeno', 100, 900], ['R1', '2026-02', 'Pequeno', 100, 800]],
+        ]);
+        $tabela = PlanilhaReader::lerModelo($path, 'xlsx');
+        $sugestao = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
+        $metricas = array_map(fn (array $m): array => ['direction' => 'lower', 'healthy_value' => 800, 'critical_value' => 100, 'weight' => 20, 'description' => 'Pedidos'] + $m, $sugestao['metrics']);
+
+        DynamicImportService::importar($company, $tabela, $sugestao['structure'], $metricas);
+
+        app(CompanyContext::class)->within($company, function (): void {
+            $cliente = Customer::firstOrFail();
+            $this->assertSame('Não informado', $cliente->segment);
+            $this->assertSame('Não informado', $cliente->plan);
+        });
+
+        // porte continua obrigatório
+        $semPorte = ['cliente_id' => 'cliente_id', 'mes_ref' => 'mes_ref', 'segmento' => null, 'porte' => null, 'plano' => null, 'valor_mensal' => 'valor_mensal'];
+        $this->expectException(InvalidArgumentException::class);
+        DynamicImportService::importar($company, $tabela, $semPorte, $metricas);
+    }
+
+    public function test_relatorio_de_evidencias_e_gerado_para_empresa_so_com_metricas_proprias_com_ou_sem_cancelamentos(): void
+    {
+        foreach ([true, false] as $comCancelados) {
+            $company = Company::factory()->create();
+            $clientes = [['cliente_id', 'segmento', 'porte', 'plano', 'valor_mensal', 'situacao', 'mes_cancelamento']];
+            $mensal = [['cliente_id', 'mes_ref', 'pedidos']];
+            foreach (range(1, 6) as $i) {
+                $cancelou = $comCancelados && $i <= 3;
+                $clientes[] = ["C{$i}", 'Pizzaria', 'Pequeno', 'Basico', 100, $cancelou ? 'Cancelado' : 'Ativo', $cancelou ? '2026-04' : null];
+                foreach (['2026-01', '2026-02', '2026-03'] as $mes) {
+                    $mensal[] = ["C{$i}", $mes, $cancelou ? 200 : 900];
+                }
+            }
+            $tabela = PlanilhaReader::lerModelo($this->xlsx(['clientes' => $clientes, 'metricas' => $mensal]), 'xlsx');
+            $sugestao = DynamicImportService::sugerir($company, $tabela['cabecalhos'], $tabela['linhas'], $tabela['dicionario']);
+            DynamicImportService::importar($company, $tabela, $sugestao['structure'], array_map(fn (array $m): array => ['direction' => 'lower', 'healthy_value' => 800, 'critical_value' => 100, 'weight' => 20, 'description' => 'Pedidos'] + $m, $sugestao['metrics']));
+
+            $pdf = app(CompanyContext::class)->within($company, fn (): string => RelatorioService::carteira($company));
+            $this->assertStringStartsWith('%PDF', $pdf);
+        }
+    }
+
+    public function test_painel_tem_abas_de_visao_geral_e_graficos_e_o_botao_do_relatorio_em_qualquer_empresa(): void
+    {
+        $company = Company::factory()->create();
+        $this->definition($company);
+        TemplateImportService::importar($company, ['cabecalhos' => TemplateLayout::headers($company), 'linhas' => [$this->row('A', '2026-06', '20')]]);
+        $this->actingAs(User::factory()->for($company)->create());
+
+        $this->get('/painel')->assertOk()->assertSee('Visão geral')->assertSee('Gráficos')->assertSee('Gerar relatório de evidências');
     }
 
     public function test_abas_de_dados_sem_cliente_id_ou_com_coluna_repetida_sao_recusadas(): void

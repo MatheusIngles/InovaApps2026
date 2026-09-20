@@ -53,7 +53,9 @@ class Configurador
         }
         $linhas[] = '';
         $linhas[] = 'VARIÁVEIS FORA DO SCORE: são colunas guardadas da planilha que o cálculo da atenção não usa (ele só soma os sinais acima). A separação é o AUC, calculado com a média dos 3 últimos meses de cada cliente, comparando cancelados (mês antes da saída) e retidos (mês mais recente); mostra correlação, não causa.';
-        $linhas[] = 'VARIÁVEIS FORA DO SCORE (separação): '.collect($r['extras'])->map(fn ($v) => $v['rotulo'].' '.number_format($v['auc'], 2, ',', ''))->implode('; ').'.';
+        if ($r['extras']) {
+            $linhas[] = 'VARIÁVEIS FORA DO SCORE (separação): '.collect($r['extras'])->map(fn ($v) => $v['rotulo'].' '.number_format($v['auc'], 2, ',', ''))->implode('; ').'.';
+        }
         $linhas[] = '';
         $linhas[] = 'EFEITO DE CADA CORTE ATUAL (cancelados alertados / antecedência mediana / alerta em quem ficou entre retidos):';
         foreach ($r['limiares'] as $chave => $x) {

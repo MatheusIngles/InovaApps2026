@@ -8,6 +8,7 @@ use App\Models\CustomerMetric;
 use App\Models\MetricDefinition;
 use App\Models\MetricValue;
 use App\Support\Metricas\MetricRisk;
+use App\Support\Metricas\SinaisExtras;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyContext;
 use Carbon\Carbon;
@@ -48,6 +49,9 @@ class Backtest
     /** @var array<string, string> */
     private array $customLabels = [];
 
+    /** @var list<string> códigos das métricas da empresa que já entram na atenção */
+    private array $emUso = [];
+
     /** @param array<string, float|int> $pesos */
     public function __construct(array $pesos)
     {
@@ -61,6 +65,7 @@ class Backtest
         $definitions = app(CompanyContext::class)->current()?->metricDefinitions()->get();
         $this->customWeights = $definitions?->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type))
             ->mapWithKeys(fn ($definition): array => ['custom:'.$definition->code => (float) $definition->weight])->all() ?? [];
+        $this->emUso = $definitions?->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type) && (float) $definition->weight > 0)->pluck('code')->all() ?? [];
         $this->customLabels = $definitions?->filter(fn ($definition) => $definition->enabled && ! MetricDefinition::semScore($definition->value_type))
             ->mapWithKeys(fn ($definition): array => ['custom:'.$definition->code => $definition->label])->all() ?? [];
 
@@ -421,6 +426,12 @@ class Backtest
         return $r;
     }
 
+    /** As variáveis candidatas que ainda não viraram métrica da empresa (as que viraram entram na atenção e saem daqui). */
+    private function extrasSemUso(): array
+    {
+        return array_filter(self::EXTRAS, fn (string $rotulo, string $coluna): bool => ! in_array(SinaisExtras::codigo($coluna), $this->emUso, true), ARRAY_FILTER_USE_BOTH);
+    }
+
     /** Variáveis candidatas que o risco não usa, na mesma régua (AUC). */
     public function extras(): array
     {
@@ -428,7 +439,7 @@ class Backtest
         $ret = array_map(fn ($s) => end($s['meses']), $this->retidos());
         $out = [];
 
-        foreach (self::EXTRAS as $col => $rotulo) {
+        foreach ($this->extrasSemUso() as $col => $rotulo) {
             $vc = array_values(array_map(fn ($m) => $m['extra'][$col], $canc));
             $vr = array_values(array_map(fn ($m) => $m['extra'][$col], $ret));
             $out[$col] = ['rotulo' => $rotulo, 'auc' => $this->auc($vc, $vr), 'media_cancelados' => round(array_sum($vc) / max(1, count($vc)), 1), 'media_retidos' => round(array_sum($vr) / max(1, count($vr)), 1)];
@@ -462,7 +473,7 @@ class Backtest
                 $itens[] = ['k' => $k, 'rotulo' => $rotulo, 'extra' => false, 'cancelados' => $mc, 'retidos' => $mr, 'efeito' => $mc - $mr,
                     'texto' => sprintf('gravidade %d%% nos cancelados contra %d%% nos que ficaram', round($mc * 100), round($mr * 100))];
             }
-            foreach (self::EXTRAS as $col => $rotulo) {
+            foreach ($this->extrasSemUso() as $col => $rotulo) {
                 $mc = $media($canc, fn ($s) => end($s['meses'])['extra'][$col]);
                 $mr = $media($ret, fn ($s) => end($s['meses'])['extra'][$col]);
                 $itens[] = ['k' => $col, 'rotulo' => $rotulo, 'extra' => true, 'cancelados' => $mc, 'retidos' => $mr,

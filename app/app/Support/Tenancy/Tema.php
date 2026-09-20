@@ -106,6 +106,8 @@ class Tema
             ? asset('storage/'.$t['logo']) // asset() usa o host da requisição (Storage::url usa APP_URL, que pode não ser o domínio real)
             : asset('images/seer-logo.png');
 
-        $painel->brandLogo($logo)->brandLogoHeight('3rem');
+        // No tema escuro o painel usa outra logo: sem logo própria, a do Seer com o texto branco; com logo própria, a mesma.
+        $painel->brandLogo($logo)->brandLogoHeight('3rem')
+            ->darkModeBrandLogo($t['logo'] && Storage::disk('public')->exists($t['logo']) ? $logo : asset('images/seer-logo-branco.png'));
     }
 }

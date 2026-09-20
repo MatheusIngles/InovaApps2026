@@ -29,6 +29,29 @@ class DynamicImportService
         return ModeloPlanilha::gerar($company);
     }
 
+    /** Colunas com significado próprio: não viram métrica. Ligam-se ao cliente (situação, cancelamento e início do contrato). */
+    /** Campos da estrutura que a planilha pode omitir: ficam como "Não informado". */
+    public const ESTRUTURA_OPCIONAL = ['segmento', 'plano'];
+
+    public const NAO_INFORMADO = 'Não informado';
+
+    public const OPCIONAIS = ['inicio_contrato', 'situacao', 'mes_cancelamento'];
+
+    /** @return array<string, string> campo => cabeçalho encontrado na planilha */
+    public static function colunasOpcionais(array $headers): array
+    {
+        $mapa = [];
+        foreach ($headers as $header) {
+            foreach (self::OPCIONAIS as $campo) {
+                if (self::normalizar((string) $header) === self::normalizar($campo)) {
+                    $mapa[$campo] ??= $header;
+                }
+            }
+        }
+
+        return $mapa;
+    }
+
     public static function csvModelo(): string
     {
         $stream = fopen('php://temp', 'w+');
@@ -46,7 +69,7 @@ class DynamicImportService
         self::validarCabecalhos($headers);
         $suggestions = ImportService::sugerirMapeamento($headers);
         $structure = array_intersect_key($suggestions, self::STRUCTURE);
-        $used = array_filter($structure);
+        $used = [...array_filter($structure), ...array_values(self::colunasOpcionais($headers))];
         $metrics = [];
 
         foreach ($headers as $header) {
@@ -83,7 +106,7 @@ class DynamicImportService
             'column' => $header,
             'target' => $existing ? (string) $existing->id : 'new',
             'code' => substr($code, 0, 40),
-            'label' => $existing?->label ?? $name,
+            'label' => $existing?->label ?? Str::headline($name),
             'description' => $existing?->description ?? ($dic['descricao'] ?? ''),
             'value_type' => $existing?->value_type ?? $type,
             'direction' => $existing?->direction ?? self::direcaoDoDicionario($dic['pioraquando'] ?? ''),
@@ -115,6 +138,7 @@ class DynamicImportService
                             'latest_month' => $record['month'],
                             'segment' => $record['segment'], 'size' => $record['size'], 'plan' => $record['plan'],
                             'monthly_value' => $record['monthly_value'],
+                            'status' => $record['status'], 'cancelled' => $record['cancelled_month'], 'inicio' => $record['started_at'],
                             'started' => min($record['month'], $customers[$code]['started'] ?? $record['month']),
                         ];
                     } else {
@@ -122,18 +146,24 @@ class DynamicImportService
                     }
                 }
                 $now = now();
+                $temSituacao = collect($records)->contains(fn (array $r): bool => $r['status'] !== null);
+                $temInicio = collect($records)->contains(fn (array $r): bool => $r['started_at'] !== null);
                 $customerRows = [];
                 foreach ($customers as $code => $customer) {
                     $customerRows[] = [
                         'company_id' => $company->id, 'external_code' => $code,
                         'segment' => $customer['segment'], 'size' => $customer['size'], 'plan' => $customer['plan'],
                         'monthly_value' => $customer['monthly_value'], 'contracted_sla_hours' => 0,
-                        'contract_started_at' => $customer['started'].'-01', 'status' => 'Ativo', 'cancelled_at' => null,
+                        'contract_started_at' => $customer['inicio'] ?? $customer['started'].'-01', 'status' => $customer['status'] ?? 'Ativo',
+                        'cancelled_at' => isset($customer['cancelled']) ? $customer['cancelled'].'-01' : null,
                         'created_at' => $now, 'updated_at' => $now,
                     ];
                 }
                 foreach (array_chunk($customerRows, 250) as $batch) {
-                    DB::table('customers')->upsert($batch, ['company_id', 'external_code'], ['segment', 'size', 'plan', 'monthly_value', 'updated_at']);
+                    DB::table('customers')->upsert($batch, ['company_id', 'external_code'], [
+                        'segment', 'size', 'plan', 'monthly_value', 'updated_at',
+                        ...($temSituacao ? ['status', 'cancelled_at'] : []), ...($temInicio ? ['contract_started_at'] : []),
+                    ]);
                 }
                 $ids = DB::table('customers')->where('company_id', $company->id)
                     ->whereIn('external_code', array_keys($customers))->pluck('id', 'external_code');
@@ -190,17 +220,24 @@ class DynamicImportService
         if (! $table['linhas']) {
             throw new InvalidArgumentException('A planilha não contém linhas de dados.');
         }
-        if (count($structure) !== count(self::STRUCTURE)
-            || array_keys($structure) !== array_keys(self::STRUCTURE)
-            || count(array_unique(array_values($structure))) !== count(self::STRUCTURE)) {
-            throw new InvalidArgumentException('Confirme as seis colunas estruturais sem repetições.');
+        foreach (self::ESTRUTURA_OPCIONAL as $campo) {
+            if (($structure[$campo] ?? '') === '') {
+                $structure[$campo] = null; // segmento e plano são opcionais
+            }
         }
-        foreach ($structure as $column) {
+        $usadas = array_filter($structure, fn ($coluna): bool => $coluna !== null && $coluna !== '');
+        if (array_keys($structure) !== array_keys(self::STRUCTURE)
+            || count(array_diff_key(self::STRUCTURE, $usadas, array_flip(self::ESTRUTURA_OPCIONAL))) > 0
+            || count(array_unique($usadas)) !== count($usadas)) {
+            throw new InvalidArgumentException('Confirme as colunas obrigatórias (todas, menos segmento e plano) sem repetições.');
+        }
+        foreach ($usadas as $column) {
             if (! in_array($column, $headers, true)) {
                 throw new InvalidArgumentException('Uma coluna estrutural não foi encontrada na planilha.');
             }
         }
-        $metricHeaders = array_values(array_diff($headers, array_values($structure)));
+        $opcionais = self::colunasOpcionais($headers);
+        $metricHeaders = array_values(array_diff($headers, array_values($usadas), array_values($opcionais)));
         $mappedHeaders = array_column($metrics, 'column');
         if (! $metricHeaders || count($metricHeaders) !== count($mappedHeaders)
             || array_diff($metricHeaders, $mappedHeaders) || array_diff($mappedHeaders, $metricHeaders)
@@ -267,7 +304,10 @@ class DynamicImportService
             $line = $index + 2;
             $context = [];
             foreach ($structure as $field => $column) {
-                $context[$field] = trim((string) ($row[$column] ?? ''));
+                $context[$field] = $column === null ? '' : trim((string) ($row[$column] ?? ''));
+                if (in_array($field, self::ESTRUTURA_OPCIONAL, true) && $context[$field] === '') {
+                    $context[$field] = self::NAO_INFORMADO;
+                }
                 if ($context[$field] === '' || mb_strlen($context[$field]) > 255) {
                     throw new InvalidArgumentException("Linha {$line}: {$field} é obrigatório e deve ter até 255 caracteres.");
                 }
@@ -281,6 +321,7 @@ class DynamicImportService
             if ($monthlyValue === null || $monthlyValue < 0 || $monthlyValue > 9999999999.99 || round($monthlyValue, 2) !== $monthlyValue) {
                 throw new InvalidArgumentException("Linha {$line}: valor_mensal deve ser um valor financeiro não negativo, com até duas casas decimais.");
             }
+            [$status, $cancelado, $inicio] = self::cadastro($row, $opcionais, $line);
             $key = $context['cliente_id'].':'.$month;
             if (isset($seen[$key])) {
                 throw new InvalidArgumentException("Linha {$line}: cliente e mês repetidos no mesmo arquivo.");
@@ -295,6 +336,7 @@ class DynamicImportService
                 'code' => $context['cliente_id'], 'month' => $month,
                 'segment' => $context['segmento'], 'size' => $context['porte'], 'plan' => $context['plano'],
                 'monthly_value' => $monthlyValue,
+                'status' => $status, 'cancelled_month' => $cancelado, 'started_at' => $inicio,
                 'values' => $values,
             ];
         }
@@ -303,6 +345,34 @@ class DynamicImportService
         }
 
         return [$structure, $definitions, $records];
+    }
+
+    /**
+     * Situação (Ativo/Cancelado), mês de cancelamento e início do contrato, quando a planilha traz essas colunas.
+     *
+     * @param  array<string, string>  $opcionais
+     * @return array{0: ?string, 1: ?string, 2: ?string} [status, AAAA-MM do cancelamento, AAAA-MM-DD do início]
+     */
+    private static function cadastro(array $row, array $opcionais, int $line): array
+    {
+        $ler = fn (string $campo): string => isset($opcionais[$campo]) ? trim((string) ($row[$opcionais[$campo]] ?? '')) : '';
+        $situacao = Str::lower(Str::ascii($ler('situacao')));
+        $status = match ($situacao) {
+            '' => null, 'ativo' => 'Ativo', 'cancelado' => 'Cancelado',
+            default => throw new InvalidArgumentException("Linha {$line}: situacao deve ser Ativo ou Cancelado."),
+        };
+        $mes = $ler('mes_cancelamento');
+        $cancelado = $mes === '' ? null : (self::month($mes) ?? throw new InvalidArgumentException("Linha {$line}: mes_cancelamento deve ser AAAA-MM."));
+        if ($status === 'Cancelado' && $cancelado === null) {
+            throw new InvalidArgumentException("Linha {$line}: informe o mes_cancelamento de quem está Cancelado.");
+        }
+        if ($status === 'Ativo' && $cancelado !== null) {
+            throw new InvalidArgumentException("Linha {$line}: cliente Ativo não pode ter mes_cancelamento.");
+        }
+        $inicio = $ler('inicio_contrato');
+        $iniciado = $inicio === '' ? null : (self::data($inicio) ?? throw new InvalidArgumentException("Linha {$line}: inicio_contrato deve ser uma data (AAAA-MM-DD ou DD/MM/AAAA)."));
+
+        return [$status, $cancelado, $iniciado];
     }
 
     /** Tipo escrito no dicionário ("Decimal (%)", "Inteiro 0-10", "Binario 0/1", "Data"...) para o tipo da métrica. */

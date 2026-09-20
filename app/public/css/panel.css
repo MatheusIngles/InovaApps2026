@@ -471,3 +471,53 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .fi-loading-section::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--primary-400) 22%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: esqueleto-brilho 1.4s ease-in-out infinite; }
 @keyframes esqueleto-brilho { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .fi-loading-section::after { animation: none; } }
+
+/* Importação: cada coluna de métrica é um cartão recolhível, com controles segmentados */
+.mp-titulo { font-size: 1rem; font-weight: 700; margin: .5rem 0 -.25rem; }
+.mp-cab h3 { font-size: 1rem; font-weight: 700; }
+.mp-cab .ui-muted { margin: .35rem 0 0; line-height: 1.7; }
+.mp { border: 1px solid var(--panel-border); border-radius: .75rem; background: var(--panel-raised); overflow: hidden; }
+.mp.falta { border-color: #f59e0b; }
+.mp-topo { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .6rem; width: 100%; padding: .8rem 1rem; text-align: left; color: var(--panel-text); }
+.mp-topo:hover { background: color-mix(in srgb, var(--primary-500) 8%, transparent); }
+.mp-topo:focus-visible { outline: 3px solid var(--primary-300); outline-offset: -3px; }
+.mp-nome { font-weight: 700; font-size: .95rem; }
+.mp-resumo { flex: 1 1 14rem; min-width: 0; color: var(--panel-muted); font-size: .82rem; }
+.mp-seta { margin-left: auto; color: var(--panel-muted); transition: transform .2s; }
+.mp-seta.gira { transform: rotate(180deg); }
+.mp-chip { display: inline-flex; align-items: center; padding: .1rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 700; background: color-mix(in srgb, var(--primary-500) 18%, transparent); color: var(--primary-700); }
+.fi.dark .mp-chip { color: var(--primary-200); }
+.mp-chip.tipo { background: color-mix(in srgb, var(--panel-muted) 20%, transparent); color: var(--panel-text); }
+.mp-chip.vinc { background: color-mix(in srgb, #16a34a 20%, transparent); color: #166534; }
+.fi.dark .mp-chip.vinc { color: #86efac; }
+.mp-chip.aviso { background: color-mix(in srgb, #f59e0b 25%, transparent); color: #92400e; }
+.fi.dark .mp-chip.aviso { color: #fcd34d; }
+.mp-chip.ok { background: color-mix(in srgb, #16a34a 20%, transparent); color: #166534; }
+.fi.dark .mp-chip.ok { color: #86efac; }
+.mp-corpo { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; border-top: 1px solid var(--panel-border); }
+.mp-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.mp-linha.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mp-campo { display: flex; flex-direction: column; gap: .4rem; min-width: 0; font-size: .85rem; font-weight: 600; }
+.mp-campo input, .mp-campo select, .mp-campo textarea { width: 100%; }
+.mp-grupo { border: 0; margin: 0; padding: 0; min-width: 0; }
+.mp-grupo legend { margin-bottom: .4rem; font-size: .85rem; font-weight: 600; }
+.mp-seg { display: inline-flex; flex-wrap: wrap; padding: .2rem; gap: .2rem; border-radius: 999px; background: color-mix(in srgb, var(--panel-muted) 16%, transparent); align-self: flex-start; }
+.mp-seg button { padding: .4rem .95rem; border-radius: 999px; font-size: .85rem; font-weight: 600; color: var(--panel-text); }
+.mp-seg button.on { background: var(--primary-600); color: #fff; }
+.mp-seg button:disabled { opacity: .5; cursor: not-allowed; }
+.mp-seg button:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 2px; }
+.mp-tipos { display: flex; flex-wrap: wrap; gap: .4rem; }
+.mp-tipos label { position: relative; padding: .35rem .85rem; border: 1.5px solid var(--panel-border); border-radius: 999px; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.mp-tipos label.on { border-color: var(--primary-600); background: color-mix(in srgb, var(--primary-600) 16%, transparent); }
+.mp-tipos input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.mp-tipos label:has(input:focus-visible) { outline: 3px solid var(--primary-300); outline-offset: 2px; }
+@media (max-width: 700px) { .mp-linha, .mp-linha.tres { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .mp-seta { transition: none; } }
+
+/* Cartões de métrica na importação: campos com borda e fundo visíveis (os .fi-input soltos não têm) */
+.mp-campo input:not([type="checkbox"]), .mp-campo select, .mp-campo textarea { min-height: 2.5rem; padding: .5rem .7rem; border: 1.5px solid color-mix(in srgb, var(--panel-muted) 55%, transparent); border-radius: .5rem; background: var(--panel-surface); color: var(--panel-text); font: inherit; font-weight: 500; }
+.mp-campo input:focus-visible, .mp-campo select:focus-visible, .mp-campo textarea:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 1px; }
+.mp-campo textarea { resize: vertical; }
+
+/* Selo "opcional" ao lado do nome do campo, na mesma linha */
+.pl-opc { display: inline-block; margin: 0 0 0 .4rem; padding: .05rem .5rem; border-radius: 999px; background: color-mix(in srgb, var(--panel-muted) 22%, transparent); color: var(--panel-muted); font-size: .7rem; font-weight: 600; vertical-align: middle; }

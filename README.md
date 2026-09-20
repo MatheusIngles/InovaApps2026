@@ -37,6 +37,8 @@ Cada empresa tem o seu próprio conjunto de métricas, definido a partir da base
 
 Em **Planilha** há o modelo completo em XLSX, no formato da base do desafio: uma aba **Leia-me** com as instruções, um **dicionário** dos campos e abas de dados (`clientes` e `metricas_mensais`). Dá para usar quantas abas quiser, desde que todas tenham a coluna `cliente_id`: abas com `mes_ref` são mensais e abas sem ele valem para todos os meses do cliente (a mesma coluna não pode aparecer em duas abas).
 
+Colunas obrigatórias: `cliente_id`, `mes_ref`, `porte` e `valor_mensal`. **`segmento` e `plano` são opcionais** (sem eles, ficam como "Não informado"). As colunas `situacao` (Ativo ou Cancelado), `mes_cancelamento` (AAAA-MM) e `inicio_contrato` não viram métricas: definem quem cancelou (o histórico e o cálculo param no mês anterior ao cancelamento) e o início do contrato. Sem elas, todos entram como ativos e a validação com cancelados não funciona.
+
 Se o dicionário vier preenchido (`campo`, `tipo`, `descricao` e, para métricas que entram na atenção, `piora_quando`, `valor_saudavel`, `valor_critico` e `peso`), as métricas já chegam configuradas na tela de confirmação. O dicionário da base do desafio também funciona: os tipos (Inteiro, Decimal (%), Binario 0/1, Data...) e as descrições são lidos dele.
 
 Valores vazios são aceitos: o mês fica no histórico sem aquela métrica. Métricas de tipo Data e Texto aparecem no histórico do cliente, mas ficam fora do cálculo.

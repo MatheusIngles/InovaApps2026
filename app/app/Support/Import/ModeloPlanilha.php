@@ -26,7 +26,7 @@ class ModeloPlanilha
             '',
             'Use esta pasta de trabalho para enviar ao Seer os dados dos seus clientes. Cada aba tem um papel:',
             '',
-            'clientes: uma linha por cliente, com segmento, porte, plano e valor mensal do contrato.',
+            'clientes: uma linha por cliente, com porte e valor mensal do contrato (obrigatórios) e segmento e plano (opcionais).',
             'metricas_mensais: uma linha por cliente e por mês (mes_ref no formato AAAA-MM), com uma coluna para cada métrica que você acompanha.',
             'dicionario: descreve cada campo. Preencha e o Seer configura as métricas sozinho no envio.',
             '',
@@ -35,7 +35,7 @@ class ModeloPlanilha
             '2. Você pode criar quantas abas quiser, cada uma com a coluna cliente_id. Abas com mes_ref são mensais; abas sem mes_ref valem para todos os meses do cliente.',
             '3. Não repita a mesma coluna em duas abas.',
             '4. Deixe a célula vazia quando não houver valor naquele mês. Não apague a linha de cabeçalho.',
-            '5. Toda coluna fora de cliente_id, mes_ref, segmento, porte, plano e valor_mensal vira uma métrica da sua empresa.',
+            '5. Toda coluna fora de cliente_id, mes_ref, segmento, porte, plano, valor_mensal, situacao, mes_cancelamento e inicio_contrato vira uma métrica da sua empresa. Segmento e plano são opcionais; situacao (Ativo ou Cancelado) e mes_cancelamento (AAAA-MM) indicam quem cancelou.',
             '',
             'Dicionário',
             'Uma linha por campo, com o nome do campo (igual ao cabeçalho da coluna) e o tipo. Tipos aceitos: '.$tipos.'.',
@@ -51,9 +51,9 @@ class ModeloPlanilha
     {
         $linhas = [
             ['clientes', 'cliente_id', 'Texto', 'Identificador do cliente. Chave para as demais abas.', 'C007'],
-            ['clientes', 'segmento', 'Texto', 'Setor de atuação.', 'Logística'],
+            ['clientes', 'segmento', 'Texto', 'Setor de atuação. Opcional: sem ele, fica "Não informado".', 'Logística'],
             ['clientes', 'porte', 'Texto', 'Tamanho do cliente.', 'Médio'],
-            ['clientes', 'plano', 'Texto', 'Plano contratado.', 'Avançado'],
+            ['clientes', 'plano', 'Texto', 'Plano contratado. Opcional: sem ele, fica "Não informado".', 'Avançado'],
             ['clientes', 'valor_mensal', 'Monetário', 'Receita mensal recorrente do contrato.', 3848],
             ['metricas_mensais', 'mes_ref', 'Texto AAAA-MM', 'Mês de referência. Uma linha por cliente por mês.', '2026-01'],
         ];

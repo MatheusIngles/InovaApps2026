@@ -19,12 +19,14 @@
         <section class="ui-card ui-pad">
             <h2>Confirmar colunas</h2>
             <p class="ui-muted">Confira o mapeamento antes de importar. Nenhuma métrica nova será cadastrada até você confirmar.</p>
+            <h3 class="mp-titulo">Colunas obrigatórias</h3>
             <form wire:submit="importar" class="pl-form">
                 <div class="metric-grid">
                     @foreach (\App\Support\Import\DynamicImportService::STRUCTURE as $field => $label)
-                        <label>{{ $label }}
-                            <select class="fi-input" wire:model.change="structuralMapping.{{ $field }}" required>
-                                <option value="">Selecione uma coluna</option>
+                        @php $opcional = in_array($field, \App\Support\Import\DynamicImportService::ESTRUTURA_OPCIONAL, true); @endphp
+                        <label><span>{{ $label }}@if ($opcional) <small class="pl-opc">opcional</small>@endif</span>
+                            <select class="fi-input" wire:model.change="structuralMapping.{{ $field }}" @required(! $opcional)>
+                                <option value="">{{ $opcional ? 'Não informar (fica como "Não informado")' : 'Selecione uma coluna' }}</option>
                                 @foreach ($cabecalhos as $header)
                                     <option value="{{ $header }}">{{ $header }}</option>
                                 @endforeach
@@ -33,48 +35,110 @@
                     @endforeach
                 </div>
 
+                @php
+                    $definicoes = app(\App\Support\Tenancy\CompanyContext::class)->current()->metricDefinitions()->orderBy('code')->get();
+                    $reconhecidas = \App\Support\Import\DynamicImportService::colunasOpcionais($cabecalhos);
+                    $precisamAjuste = collect($metricMappings)->filter(function ($m) {
+                        $semScore = \App\Models\MetricDefinition::semScore($m['value_type'] ?? 'decimal');
+
+                        return ($m['target'] ?? 'new') === 'new' && (trim((string) ($m['description'] ?? '')) === ''
+                            || (! $semScore && ((string) ($m['direction'] ?? '') === '' || (string) ($m['healthy_value'] ?? '') === '' || (string) ($m['critical_value'] ?? '') === '')));
+                    })->count();
+                @endphp
+
+                <div class="mp-cab">
+                    <h3>Métricas encontradas ({{ count($metricMappings) }})</h3>
+                    <p class="ui-muted">
+                        @if ($precisamAjuste)
+                            <span class="mp-chip aviso">{{ $precisamAjuste }} {{ $precisamAjuste === 1 ? 'precisa' : 'precisam' }} de ajuste</span>
+                        @else
+                            <span class="mp-chip ok">Tudo preenchido</span>
+                        @endif
+                        Clique em uma métrica para ver ou editar.
+                        @if ($reconhecidas)
+                            Reconhecidas como dados do cliente, e não como métrica: <strong>{{ implode(', ', array_values($reconhecidas)) }}</strong>.
+                        @endif
+                    </p>
+                </div>
+
                 @foreach ($metricMappings as $index => $metric)
-                    <fieldset class="metric-entry pl-form" wire:key="metric-column-{{ $index }}">
-                        <legend><strong>{{ $metric['column'] }}</strong></legend>
-                        <label>Vincular a
-                            <select class="fi-input" wire:model.change="metricMappings.{{ $index }}.target">
-                                <option value="new">Nova métrica</option>
-                                @foreach (app(\App\Support\Tenancy\CompanyContext::class)->current()->metricDefinitions()->orderBy('code')->get() as $definition)
-                                    <option value="{{ $definition->id }}">{{ $definition->label }} ({{ $definition->code }})</option>
-                                @endforeach
-                            </select>
-                        </label>
-                        @if (($metric['target'] ?? 'new') === 'new')
-                            <div class="metric-grid">
-                                <label>Nome<input class="fi-input" wire:model="metricMappings.{{ $index }}.label" required maxlength="100"></label>
-                                <label>Código<input class="fi-input" wire:model="metricMappings.{{ $index }}.code" required maxlength="40" pattern="[a-z][a-z0-9_]*"></label>
-                                <label>Tipo
-                                    <select class="fi-input" wire:model.change="metricMappings.{{ $index }}.value_type">
-                                        @foreach (\App\Models\MetricDefinition::TYPES as $type => $typeLabel)
-                                            <option value="{{ $type }}">{{ $typeLabel }}</option>
+                    @php
+                        $nova = ($metric['target'] ?? 'new') === 'new';
+                        $tipo = $metric['value_type'] ?? 'decimal';
+                        $semScore = \App\Models\MetricDefinition::semScore($tipo);
+                        $vinculada = $nova ? null : $definicoes->firstWhere('id', (int) $metric['target']);
+                        $faltaAlgo = $nova && (trim((string) ($metric['description'] ?? '')) === ''
+                            || (! $semScore && ((string) ($metric['direction'] ?? '') === '' || (string) ($metric['healthy_value'] ?? '') === '' || (string) ($metric['critical_value'] ?? '') === '')));
+                        $resumo = $nova
+                            ? ($semScore ? 'Fica só no histórico, fora do cálculo' : trim(
+                                (($metric['direction'] ?? '') === 'lower' ? 'Piora quando diminui' : (($metric['direction'] ?? '') === 'higher' ? 'Piora quando aumenta' : 'Defina quando piora'))
+                                .((string) ($metric['healthy_value'] ?? '') !== '' && (string) ($metric['critical_value'] ?? '') !== '' ? ' · saudável '.(float) $metric['healthy_value'].' · crítico '.(float) $metric['critical_value'] : '')
+                                .' · peso '.(float) ($metric['weight'] ?? 0)))
+                            : 'Os valores entram na métrica já cadastrada';
+                    @endphp
+                    <div class="mp {{ $faltaAlgo ? 'falta' : '' }}" wire:key="metric-column-{{ $index }}" x-data="{ aberto: @js($faltaAlgo) }">
+                        <button type="button" class="mp-topo" x-on:click="aberto = ! aberto" :aria-expanded="aberto" aria-controls="mp-corpo-{{ $index }}">
+                            <span class="mp-nome">{{ $metric['column'] }}</span>
+                            <span class="mp-chip {{ $nova ? '' : 'vinc' }}">{{ $nova ? 'Nova métrica' : 'Vinculada a '.($vinculada->label ?? '—') }}</span>
+                            <span class="mp-chip tipo">{{ \App\Models\MetricDefinition::TYPES[$tipo] ?? $tipo }}</span>
+                            @if ($faltaAlgo)<span class="mp-chip aviso">Falta preencher</span>@endif
+                            <span class="mp-resumo">{{ $resumo }}</span>
+                            <svg class="mp-seta" :class="{ 'gira': aberto }" viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5-1-1L10 10 6.5 6.5z"/></svg>
+                        </button>
+
+                        <div class="mp-corpo" id="mp-corpo-{{ $index }}" x-show="aberto" x-cloak>
+                            <div class="mp-seg" role="group" aria-label="O que fazer com a coluna {{ $metric['column'] }}">
+                                <button type="button" :class="{ 'on': {{ $nova ? 'true' : 'false' }} }" aria-pressed="{{ $nova ? 'true' : 'false' }}" wire:click="$set('metricMappings.{{ $index }}.target', 'new')">Criar métrica nova</button>
+                                <button type="button" :class="{ 'on': {{ $nova ? 'false' : 'true' }} }" aria-pressed="{{ $nova ? 'false' : 'true' }}" wire:click="usarExistente({{ $index }})" @disabled($definicoes->isEmpty())>Vincular a uma existente</button>
+                            </div>
+
+                            @if (! $nova)
+                                <label class="mp-campo">Métrica existente
+                                    <select class="fi-input" wire:model.change="metricMappings.{{ $index }}.target">
+                                        @foreach ($definicoes as $definition)
+                                            <option value="{{ $definition->id }}">{{ $definition->label }} ({{ $definition->code }})</option>
                                         @endforeach
                                     </select>
                                 </label>
-                            </div>
-                            <label>Descrição<textarea class="fi-input" wire:model="metricMappings.{{ $index }}.description" rows="2" maxlength="1000" required></textarea></label>
-                            @if (! \App\Models\MetricDefinition::semScore($metric['value_type'] ?? 'decimal'))
-                                <div class="metric-grid">
-                                    <label>Quando piora
-                                        <select class="fi-input" wire:model="metricMappings.{{ $index }}.direction" required>
-                                            <option value="">Selecione</option>
-                                            <option value="lower">Quando diminui</option>
-                                            <option value="higher">Quando aumenta</option>
-                                        </select>
-                                    </label>
-                                    <label>Valor saudável<input class="fi-input" type="number" step="any" wire:model="metricMappings.{{ $index }}.healthy_value" required></label>
-                                    <label>Valor crítico<input class="fi-input" type="number" step="any" wire:model="metricMappings.{{ $index }}.critical_value" required></label>
-                                    <label>Peso<input class="fi-input" type="number" min="0" max="100" step="0.01" wire:model="metricMappings.{{ $index }}.weight" required></label>
-                                </div>
                             @else
-                                <p class="ui-muted">Valores textuais e datas ficam armazenados no histórico, mas não entram no cálculo da atenção.</p>
+                                <div class="mp-linha">
+                                    <label class="mp-campo">Nome<input class="fi-input" wire:model="metricMappings.{{ $index }}.label" maxlength="100"></label>
+                                    <label class="mp-campo">Código<input class="fi-input" wire:model="metricMappings.{{ $index }}.code" maxlength="40" pattern="[a-z][a-z0-9_]*"></label>
+                                </div>
+
+                                <fieldset class="mp-grupo">
+                                    <legend>Tipo do valor</legend>
+                                    <div class="mp-tipos">
+                                        @foreach (\App\Models\MetricDefinition::TYPES as $chave => $rotuloTipo)
+                                            <label class="{{ $tipo === $chave ? 'on' : '' }}">
+                                                <input type="radio" wire:model.live="metricMappings.{{ $index }}.value_type" value="{{ $chave }}" name="tipo-{{ $index }}">
+                                                {{ preg_replace('/ \(.*/', '', $rotuloTipo) }}
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
+
+                                <label class="mp-campo">Descrição<textarea class="fi-input" wire:model="metricMappings.{{ $index }}.description" rows="2" maxlength="1000" placeholder="O que essa métrica mede?"></textarea></label>
+
+                                @if ($semScore)
+                                    <p class="ui-muted">Datas e textos ficam guardados no histórico do cliente, mas não entram no cálculo da atenção.</p>
+                                @else
+                                    <fieldset class="mp-grupo">
+                                        <legend>Quando piora</legend>
+                                        <div class="mp-seg" role="radiogroup">
+                                            <button type="button" role="radio" :class="{ 'on': {{ ($metric['direction'] ?? '') === 'lower' ? 'true' : 'false' }} }" aria-checked="{{ ($metric['direction'] ?? '') === 'lower' ? 'true' : 'false' }}" wire:click="$set('metricMappings.{{ $index }}.direction', 'lower')">Quando diminui</button>
+                                            <button type="button" role="radio" :class="{ 'on': {{ ($metric['direction'] ?? '') === 'higher' ? 'true' : 'false' }} }" aria-checked="{{ ($metric['direction'] ?? '') === 'higher' ? 'true' : 'false' }}" wire:click="$set('metricMappings.{{ $index }}.direction', 'higher')">Quando aumenta</button>
+                                        </div>
+                                    </fieldset>
+                                    <div class="mp-linha tres">
+                                        <label class="mp-campo">Valor saudável<input class="fi-input" type="number" step="any" wire:model="metricMappings.{{ $index }}.healthy_value"></label>
+                                        <label class="mp-campo">Valor crítico<input class="fi-input" type="number" step="any" wire:model="metricMappings.{{ $index }}.critical_value"></label>
+                                        <label class="mp-campo">Peso (0 a 100)<input class="fi-input" type="number" min="0" max="100" step="0.01" wire:model="metricMappings.{{ $index }}.weight"></label>
+                                    </div>
+                                @endif
                             @endif
-                        @endif
-                    </fieldset>
+                        </div>
+                    </div>
                 @endforeach
 
                 <div class="ui-table-wrap">

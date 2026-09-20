@@ -35,6 +35,10 @@
     $alto = $r['limiares']['alto'];
     $vars = collect($r['variaveis'])->sortByDesc('auc')->values();
     $segs = collect($r['segmentos'])->sortByDesc('pct_cancelou')->values();
+    $mostrarExtras = $padrao && count($r['extras']) > 0; // as variáveis extras que já viraram métrica saem desta lista
+    $proprias = collect($r['metricas_proprias'])->filter(fn ($v) => $v['auc'] !== null)->sortByDesc('auc')->values();
+    $fortes = $proprias->filter(fn ($v) => $v['auc'] >= 0.65);
+    $fracas = $proprias->filter(fn ($v) => $v['auc'] < 0.55);
 @endphp
     <h1>Relatório de evidências</h1>
     <p class="muted">{{ $empresa }} · gerado em {{ $geradoEm->format('d/m/Y H:i') }}</p>
@@ -67,6 +71,7 @@
 
     <h2>3. O que mais indica cancelamento</h2>
     <p>"Separação" (AUC) diz o quanto a variável distingue quem cancelou de quem ficou: 0,50 = não distingue; 1,00 = distingue sempre. O peso sugerido para os sinais padrão é proporcional ao que passa de 0,50. "Cancelados" e "Retidos" são a severidade média (0 a 100%) no último mês antes da saída e no mês mais recente dos ativos; antecedência e alerta em quem ficou usam severidade ≥ 50%.</p>
+    @if ($padrao)
     <h3>Sinais padrão</h3>
     <table>
         <tr><th>Variável</th><th>Separação</th><th>Cancelados</th><th>Retidos</th><th>Antecedência</th><th>Alerta em quem ficou</th><th>Peso atual</th><th>Peso sugerido</th></tr>
@@ -83,6 +88,7 @@
             </tr>
         @endforeach
     </table>
+    @endif
     @if ($r['metricas_proprias'])
         <h3>Métricas próprias</h3>
         <p class="muted">Resultados calculados apenas para clientes com observação recente. Sem clientes nos dois grupos, a separação não pode ser estimada.</p>
@@ -101,12 +107,22 @@
             @endforeach
         </table>
     @endif
+    @if ($padrao)
     <p>Atenção completa (sinais padrão e métricas próprias): separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais e <b>{{ $n($r['auc_sugerido'], 3) }}</b> com pesos sugeridos para os sinais padrão e atuais para as métricas próprias.</p>
+    @else
+    <p>Atenção completa: separação <b>{{ $n($r['auc_atual'], 3) }}</b> com os pesos atuais das métricas.</p>
+    @endif
 
+    @if ($mostrarExtras)
     <h2>4. Variáveis que a atenção ainda não usa</h2>
     <p>São colunas da planilha que não entram no cálculo da atenção hoje. Testadas na mesma régua: as que separam bem podem valer a pena entrar nele.</p>
+    @else
+    <h2>4. Perfil de quem cancelou</h2>
+    <p>Em que grupos da carteira o cancelamento se concentra. Todas as métricas numéricas da planilha já são testadas no item 3.</p>
+    @endif
     <table class="grade">
         <tr>
+            @if ($mostrarExtras)
             <td style="width: 55%">
                 <table>
                     <tr><th>Variável</th><th>Separação</th><th>Cancelados</th><th>Retidos</th></tr>
@@ -115,7 +131,8 @@
                     @endforeach
                 </table>
             </td>
-            <td style="width: 45%">
+            @endif
+            <td style="width: {{ $mostrarExtras ? '45%' : '100%' }}">
                 <h3 style="margin-top: 0">Perfil de quem cancelou (% da carteira que cancelou)</h3>
                 @foreach ($r['perfis'] as $titulo => $grupos)
                     <div style="margin-bottom: 5px"><b>{{ $titulo }}:</b>
@@ -146,7 +163,14 @@
     @endif
 
     <h2>5. Configuração recomendada</h2>
-    @if ($r['evidencia_suficiente'])
+    @if ($r['evidencia_suficiente'] && ! $padrao)
+        <ul>
+            <li><b>Métricas que mais indicam cancelamento:</b> {{ $fortes->isNotEmpty() ? $fortes->map(fn ($v) => $v['rotulo'].' ('.$n($v['auc'], 2).')')->implode(', ') : 'nenhuma passa de 0,65 de separação' }}. Vale dar mais peso a elas.</li>
+            <li><b>Métricas que quase não separam:</b> {{ $fracas->isNotEmpty() ? $fracas->map(fn ($v) => $v['rotulo'].' ('.$n($v['auc'], 2).')')->implode(', ') : 'nenhuma' }}. Considere reduzir o peso ou desligar.</li>
+            <li><b>Cortes de alerta:</b> veja a tabela do item 2. Compare "Alerta em quem ficou" com "Cancelados alertados" antes de mudar.</li>
+            <li><b>Equilíbrio atenção × valor (K):</b> decisão de negócio, ajustável em Configurações.</li>
+        </ul>
+    @elseif ($r['evidencia_suficiente'])
         <ul>
             <li><b>Ordem das métricas:</b> {{ collect($recomendada['ordem'])->pluck('rotulo')->implode(' › ') }}.</li>
             <li><b>Desligar (não separam cancelados de retidos):</b> {{ $recomendada['desligadas'] ? implode(', ', $recomendada['desligadas']) : 'nenhuma' }}.</li>

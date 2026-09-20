@@ -8,10 +8,12 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Str;
 
 /** Dashboard em /painel: visão geral e análise por segmento (abas); a evidência completa vai no relatório em PDF. */
@@ -25,10 +27,6 @@ class Painel extends Dashboard
 
     protected function getHeaderActions(): array
     {
-        if (! app(CompanyContext::class)->current()->hasLegacyMetrics()) {
-            return [];
-        }
-
         return [
             Action::make('relatorioCarteira')->label('Gerar relatório de evidências')->icon('heroicon-o-document-arrow-down')
                 ->action(function (): void {
@@ -39,17 +37,28 @@ class Painel extends Dashboard
         ];
     }
 
+    /** Visão geral (indicadores e fila), gráficos e, para quem tem os sinais padrão, a análise por segmento. */
     public function content(Schema $schema): Schema
     {
-        if (! app(CompanyContext::class)->current()->hasLegacyMetrics()) {
-            return $schema->components([$this->getWidgetsContentComponent()]);
+        $abas = [
+            Tab::make('Visão geral')->icon('heroicon-o-squares-2x2')->schema([$this->grade(graficos: false)]),
+            Tab::make('Gráficos')->icon('heroicon-o-chart-bar')->schema([$this->grade(graficos: true)]),
+        ];
+        if (app(CompanyContext::class)->current()->hasLegacyMetrics()) {
+            $abas[] = Tab::make('Por segmento')->schema([View::make('filament.components.painel-segmentos')]);
         }
 
-        return $schema->components([
-            Tabs::make('Painel')->tabs([
-                Tab::make('Visão geral')->schema([$this->getWidgetsContentComponent()]),
-                Tab::make('Por segmento')->schema([View::make('filament.components.painel-segmentos')]),
-            ])->persistTabInQueryString('aba')->columnSpanFull(),
-        ]);
+        return $schema->components([Tabs::make('Painel')->tabs($abas)->persistTabInQueryString('aba')->columnSpanFull()]);
+    }
+
+    /** Os widgets do painel, separados entre gráficos e o restante (indicadores, fila, evidências). */
+    private function grade(bool $graficos): Grid
+    {
+        $widgets = array_values(array_filter(
+            $this->getWidgets(),
+            fn ($widget): bool => is_subclass_of(is_string($widget) ? $widget : $widget->widget, ChartWidget::class) === $graficos,
+        ));
+
+        return Grid::make($this->getColumns())->schema(fn (): array => $this->getWidgetsSchemaComponents($widgets));
     }
 }

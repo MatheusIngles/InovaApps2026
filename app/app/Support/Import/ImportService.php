@@ -3,6 +3,7 @@
 namespace App\Support\Import;
 
 use App\Models\Company;
+use App\Support\Metricas\SinaisExtras;
 use App\Support\RiskService;
 use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
@@ -89,6 +90,7 @@ class ImportService
         });
 
         $company->update(['imported_at' => now(), 'column_mapping' => $mapa]);
+        SinaisExtras::ativar($company); // chamados críticos, tempo de resolução e volume passam a entrar na atenção
         Backtest::invalidar($company);
         RiskService::recalcular($company);
 

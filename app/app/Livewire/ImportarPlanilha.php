@@ -86,11 +86,20 @@ class ImportarPlanilha extends Component
     public function updatedStructuralMapping(): void
     {
         $company = app(CompanyContext::class)->current();
-        $used = array_filter(array_values($this->structuralMapping));
+        $used = [...array_filter(array_values($this->structuralMapping)), ...array_values(DynamicImportService::colunasOpcionais($this->cabecalhos))];
         $current = collect($this->metricMappings)->keyBy('column');
         $this->metricMappings = collect($this->cabecalhos)->reject(fn ($header) => in_array($header, $used, true))
             ->map(fn ($header) => $current->get($header) ?? DynamicImportService::sugerirMetrica($company, $header, $this->previa, $this->dicionario))
             ->values()->all();
+    }
+
+    /** Troca a coluna de "nova métrica" para uma métrica que a empresa já tem (a primeira, para a pessoa escolher depois). */
+    public function usarExistente(int $indice): void
+    {
+        $primeira = app(CompanyContext::class)->current()->metricDefinitions()->orderBy('code')->value('id');
+        if ($primeira && isset($this->metricMappings[$indice])) {
+            $this->metricMappings[$indice]['target'] = (string) $primeira;
+        }
     }
 
     public function importar(): void
