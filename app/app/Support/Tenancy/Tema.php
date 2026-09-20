@@ -103,7 +103,7 @@ class Tema
         // A logo da empresa tem prioridade; sem uma logo válida, mantém a logo
         // padrão da aplicação também na tela de login e no painel.
         $logo = $t['logo'] && Storage::disk('public')->exists($t['logo'])
-            ? Storage::disk('public')->url($t['logo'])
+            ? asset('storage/'.$t['logo']) // asset() usa o host da requisição (Storage::url usa APP_URL, que pode não ser o domínio real)
             : asset('images/seer-logo.png');
 
         $painel->brandLogo($logo)->brandLogoHeight('3rem');
