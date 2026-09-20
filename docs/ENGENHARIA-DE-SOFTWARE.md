@@ -242,6 +242,129 @@ classDiagram
     Llm ..> Assistente : reserva por regras
 ```
 
+### Diagrama de banco de dados (ER)
+
+Gerado a partir das migrations (SQLite). Todas as tabelas de negócio têm `company_id` direto ou pelo cliente, o que sustenta o isolamento entre empresas.
+
+```mermaid
+erDiagram
+    companies ||--o{ users : "tem"
+    companies ||--o{ customers : "tem"
+    companies ||--o{ metric_definitions : "define"
+    companies ||--o{ metric_values : "isola"
+    companies ||--o{ customer_periods : "isola"
+    customers ||--o{ customer_metrics : "histórico mensal"
+    customers ||--o{ customer_nps : "pesquisas"
+    customers ||--o{ customer_periods : "valor por mês"
+    customers ||--o{ metric_values : "valores"
+    customers ||--o{ risk_assessments : "avaliações"
+    metric_definitions ||--o{ metric_values : "mede"
+
+    companies {
+        int id PK
+        string name
+        string slug
+        text theme "JSON: cores, fonte, logo, nome"
+        text metric_weights "JSON: ordem e peso dos sinais"
+        text level_thresholds "JSON: cortes dos níveis"
+        int priority_balance "K da fila"
+        text chat_settings "JSON: IA ligada, modelo, instruções"
+        text column_mapping "JSON: último mapeamento"
+        datetime imported_at
+    }
+    users {
+        int id PK
+        int company_id FK
+        string name
+        string email
+        string password
+    }
+    customers {
+        int id PK
+        int company_id FK
+        string external_code "chave lógica com company_id"
+        string segment
+        string size
+        string plan
+        decimal monthly_value
+        int contracted_sla_hours
+        date contract_started_at
+        string status "Ativo ou Cancelado"
+        date cancelled_at
+        datetime resolved_at
+    }
+    customer_metrics {
+        int id PK
+        int customer_id FK
+        date reference_month
+        int tickets_opened
+        int tickets_critical
+        int tickets_reopened
+        int tickets_within_sla
+        decimal sla_percentage
+        decimal avg_resolution_hours
+        int formal_complaints
+        decimal platform_usage_percentage
+        int payment_delay_days
+        int meetings_expected
+        int meetings_completed
+    }
+    customer_nps {
+        int id PK
+        int customer_id FK
+        date reference_month
+        bool answered
+        int score
+        string classification
+    }
+    customer_periods {
+        int id PK
+        int company_id FK
+        int customer_id FK
+        date reference_month
+        decimal monthly_value
+    }
+    metric_definitions {
+        int id PK
+        int company_id FK
+        string code "único por empresa"
+        string label
+        text description
+        string value_type
+        string direction
+        decimal healthy_value
+        decimal critical_value
+        decimal weight
+        bool enabled
+    }
+    metric_values {
+        int id PK
+        int company_id FK
+        int customer_id FK
+        int metric_definition_id FK
+        date reference_month
+        decimal value
+        text text_value
+    }
+    risk_assessments {
+        int id PK
+        int customer_id FK
+        date reference_month
+        int health_score "a atenção, de 0 a 100"
+        decimal exposure_indicator
+        text signals_json "sinais, severidades e parecidos"
+        string model_version
+        datetime calculated_at
+    }
+```
+
+Notas:
+- **Atenção:** a coluna `health_score` guarda a atenção (0 a 100). O nome vem da primeira versão do projeto.
+- **Chaves lógicas** (usadas nas importações, que atualizam sem duplicar): cliente = `company_id` + `external_code`; valor de métrica = `customer_id` + `metric_definition_id` + `reference_month`; avaliação = `customer_id` + `reference_month` + `model_version`.
+- **Campos JSON** ficam como texto em `companies` e em `risk_assessments`.
+- **Colunas não usadas hoje:** `risk_probability`, `expected_revenue_at_risk`, `confidence` e `recommended_action_json` (em `risk_assessments`) existem para uma evolução futura e ficam vazias.
+- **Infraestrutura do Laravel** (fora do diagrama): `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `notifications`, `password_reset_tokens` e `migrations`. As notificações do painel usam `notifications` (por usuário) e as importações e relatórios em segundo plano usam `jobs`.
+
 ## 4. Fluxo de dados
 
 ```mermaid

@@ -110,7 +110,7 @@ Detalhes e exemplos numéricos: [Guia funcional do painel](docs/GUIA-FUNCIONAL-D
 
 ## 🧩 Engenharia de software
 
-Requisitos, **casos de uso**, **diagramas de classes** (domínio e serviços), fluxos de importação e de chat e decisões de projeto estão em [docs/ENGENHARIA-DE-SOFTWARE.md](docs/ENGENHARIA-DE-SOFTWARE.md).
+Requisitos, **casos de uso**, **diagramas de classes** (domínio e serviços), **diagrama de banco de dados (ER)**, fluxos de importação e de chat e decisões de projeto estão em [docs/ENGENHARIA-DE-SOFTWARE.md](docs/ENGENHARIA-DE-SOFTWARE.md).
 
 ## 🌐 Site no ar
 
@@ -166,7 +166,7 @@ InovaApps2026/
 ├── docs/
 │   ├── ARQUITETURA-E-FUNCIONAMENTO.md  # camadas, modelo de dados, limitações
 │   ├── GUIA-FUNCIONAL-DO-PAINEL.md     # como cada número do painel é calculado
-│   ├── ENGENHARIA-DE-SOFTWARE.md       # requisitos, casos de uso, diagramas de classes e fluxos
+│   ├── ENGENHARIA-DE-SOFTWARE.md       # requisitos, casos de uso, classes, banco de dados (ER), fluxos e rotas
 │   ├── IA-CUSTO-E-SEGURANCA.md         # consumo da IA, segurança e como desligar
 │   ├── MODELO-DE-NEGOCIO.md
 │   ├── checklist-do-desafio.md
@@ -194,7 +194,7 @@ InovaApps2026/
 
 - [Arquitetura e funcionamento](docs/ARQUITETURA-E-FUNCIONAMENTO.md): camadas, modelo de dados, limitações conhecidas.
 - [Guia funcional do painel](docs/GUIA-FUNCIONAL-DO-PAINEL.md): como cada métrica, peso e nível é calculado.
-- [Engenharia de software](docs/ENGENHARIA-DE-SOFTWARE.md): requisitos, casos de uso, diagramas de classes e fluxos.
+- [Engenharia de software](docs/ENGENHARIA-DE-SOFTWARE.md): requisitos, casos de uso, diagramas de classes, diagrama de banco de dados (ER), fluxos e rotas.
 - [IA: consumo e segurança](docs/IA-CUSTO-E-SEGURANCA.md): consumo, riscos e como desligar.
 - [Modelo de negócio](docs/MODELO-DE-NEGOCIO.md)
 - [Checklist do desafio](docs/checklist-do-desafio.md): requisitos e status.
