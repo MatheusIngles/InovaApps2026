@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Customer;
+use App\Support\Tenancy\CompanyContext;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -18,6 +19,16 @@ class KpisWidget extends StatsOverviewWidget
     {
         $ativas = Customer::ativas();
         $risco = $ativas->where('score', '>=', 40);
+        $company = app(CompanyContext::class)->current();
+        if (! $company->hasLegacyMetrics()) {
+            return [
+                Stat::make('Clientes ativos', $ativas->count()),
+                Stat::make('Receita mensal ativa', Customer::brl($ativas->sum('valor')))->description('Soma dos contratos mensais informados'),
+                Stat::make('Métricas configuradas', $company->metricDefinitions()->count()),
+                Stat::make('Atenção ≥ 40', $risco->count())->description(Customer::brl($risco->sum('valor')).'/mês em contratos deste grupo')->color('danger'),
+            ];
+        }
+
         $perdida = Customer::where('status', 'Cancelado')->sum('monthly_value');
 
         return [

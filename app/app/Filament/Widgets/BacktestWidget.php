@@ -3,11 +3,17 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Customer;
+use App\Support\Tenancy\CompanyContext;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class BacktestWidget extends StatsOverviewWidget
 {
+    public static function canView(): bool
+    {
+        return app(CompanyContext::class)->current()?->hasLegacyMetrics() ?? false;
+    }
+
     protected static ?int $sort = 5;
 
     protected int|array|null $columns = ['default' => 1, 'md' => 3];

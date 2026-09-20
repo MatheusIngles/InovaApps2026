@@ -138,10 +138,12 @@ class TenancyTest extends TestCase
     {
         $this->actingAs(User::factory()->for($this->a)->create());
 
-        foreach (['/', '/empresas', '/painel', '/assistente', '/configuracoes'] as $url) {
+        foreach (['/', '/empresas', '/painel', '/assistente'] as $url) {
             $this->get($url)->assertRedirect(Planilha::getUrl());
         }
         $this->get('/planilha')->assertOk()->assertSee('Enviar planilha')->assertDontSee('Painel de Controle');
+        $this->get('/configuracoes')->assertRedirect(Planilha::getUrl());
+        $this->get('/modelo/planilha')->assertOk();
 
         $this->cliente($this->a, 'C001'); // primeira carga feita: o painel abre
         $this->get('/empresas')->assertOk();

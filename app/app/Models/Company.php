@@ -41,6 +41,16 @@ class Company extends Model
         return $this->hasMany(Customer::class)->withoutGlobalScopes();
     }
 
+    public function metricDefinitions(): HasMany
+    {
+        return $this->hasMany(MetricDefinition::class);
+    }
+
+    public function hasLegacyMetrics(): bool
+    {
+        return $this->customers()->whereHas('metrics')->exists();
+    }
+
     /** Pesos por métrica, na ordem de prioridade escolhida; métricas não salvas entram ao final com o peso padrão. */
     public function pesos(): array
     {

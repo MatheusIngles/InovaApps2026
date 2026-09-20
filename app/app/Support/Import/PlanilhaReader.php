@@ -16,6 +16,37 @@ class PlanilhaReader
     private const ABAS_DESAFIO = ['clientes', 'atendimento_mensal', 'pesquisas_nps', 'situacao_clientes'];
 
     /** @return array{cabecalhos: list<string>, linhas: list<array<string, mixed>>} */
+    public static function lerModelo(string $caminho, string $extensao, ?int $previa = null): array
+    {
+        if (! is_file($caminho)) {
+            throw new RuntimeException('Arquivo não encontrado.');
+        }
+
+        $max = $previa === null ? null : $previa + 1;
+        $abas = match (strtolower($extensao)) {
+            'xlsx' => self::abasXlsx($caminho, $max),
+            'csv' => ['csv' => self::linhasCsv($caminho, $max)],
+            default => throw new RuntimeException('Formato não suportado: use o modelo .csv ou uma planilha .xlsx com uma única aba.'),
+        };
+        if (count($abas) !== 1) {
+            throw new RuntimeException('Planilha fora do padrão: o modelo deve ter uma única aba.');
+        }
+
+        $linhas = reset($abas);
+        $cabecalhos = array_map(fn ($value): string => trim((string) $value), $linhas[0] ?? []);
+        if (! $cabecalhos || in_array('', $cabecalhos, true) || count($cabecalhos) !== count(array_unique($cabecalhos))) {
+            throw new RuntimeException('Planilha fora do padrão: cabeçalhos vazios ou duplicados.');
+        }
+        foreach (array_slice($linhas, 1) as $row) {
+            if (count($row) > count($cabecalhos)) {
+                throw new RuntimeException('Planilha fora do padrão: uma linha contém mais colunas que o modelo.');
+            }
+        }
+
+        return ['cabecalhos' => $cabecalhos, 'linhas' => self::associar($linhas, $cabecalhos)];
+    }
+
+    /** @return array{cabecalhos: list<string>, linhas: list<array<string, mixed>>} */
     public static function ler(string $caminho, string $extensao, ?int $previa = null): array
     {
         if (! is_file($caminho)) {
@@ -54,6 +85,7 @@ class PlanilhaReader
 
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
+                $abas[$sheet->getName()] = [];
                 foreach ($sheet->getRowIterator() as $i => $row) {
                     if ($max !== null && $i > $max) {
                         break;

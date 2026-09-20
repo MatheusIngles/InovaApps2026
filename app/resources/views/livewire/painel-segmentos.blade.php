@@ -40,7 +40,7 @@
             <h3 class="ev-h3">O que estava elevado nos que cancelaram (último mês antes da saída)</h3>
             @forelse ($atual['elevados'] as $i)
                 <article class="ui-sinal">
-                    <div class="ui-sinal-top"><strong>{{ $i['rotulo'] }}</strong>@if ($i['extra'])<span class="ui-muted">fora do risco <details class="ui-tip"><summary aria-label="Por que está fora do risco">?</summary><span class="ui-tip-content">A atenção usa só os oito sinais configurados. Esta variável é guardada, mas não soma pontos. Aqui ela só aparece se a média dos cancelados for pelo menos 50% acima da dos que ficaram.</span></details></span>@endif</div>
+                    <div class="ui-sinal-top"><strong>{{ $i['rotulo'] }}</strong>@if ($i['extra'])<span class="ui-muted">fora do risco <details class="ui-tip"><summary aria-label="Por que está fora do risco">?</summary><span class="ui-tip-content">Esta variável é guardada, mas não soma pontos na configuração atual. Aqui ela só aparece se a média dos cancelados for pelo menos 50% acima da dos que ficaram.</span></details></span>@endif</div>
                     <p>{{ ucfirst($i['texto']) }}.</p>
                     @if (! $i['extra'] && Risco::acao($i['k']))<p class="ui-acao">{{ Risco::acao($i['k']) }}</p>@endif
                 </article>

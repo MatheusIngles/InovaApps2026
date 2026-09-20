@@ -104,25 +104,34 @@ A,2026-02,Cancelado,2
         $this->assertGreaterThanOrEqual(1295, count($tabela['linhas']));
     }
 
-    public function test_tela_de_planilha_envia_mapeia_e_importa(): void
+    public function test_tela_de_planilha_importa_metrica_livre_apos_confirmacao(): void
     {
         $company = Company::factory()->create();
         $this->actingAs(User::factory()->for($company)->create());
-        $csv = UploadedFile::fake()->createWithContent('carteira.csv', file_get_contents(database_path('data/exemplo_planilha.csv')));
+        $headers = ['cliente_id', 'mes_ref', 'segmento', 'porte', 'plano', 'valor_mensal', 'uso_plataforma_pct'];
+        $row = [
+            'cliente_id' => 'A', 'mes_ref' => '2026-01', 'segmento' => 'Varejo', 'porte' => 'Pequeno',
+            'plano' => 'Básico', 'valor_mensal' => '1000', 'uso_plataforma_pct' => '70',
+        ];
+        $content = implode(';', $headers)."\n".implode(';', array_map(fn ($header) => $row[$header] ?? '', $headers))."\n";
+        $csv = UploadedFile::fake()->createWithContent('carteira.csv', $content);
 
         Livewire::test(ImportarPlanilha::class)
             ->set('arquivo', $csv)
-            ->assertSet('data.mapa.cliente_id', 'Codigo')
-            ->assertSet('data.mapa.uso_plataforma_pct', 'Uso')
+            ->assertSet('cabecalhos', $headers)
+            ->set('metricMappings.0.description', 'Percentual mensal de uso da plataforma')
+            ->set('metricMappings.0.direction', 'lower')
+            ->set('metricMappings.0.healthy_value', 100)
+            ->set('metricMappings.0.critical_value', 0)
             ->call('importar')
             ->assertRedirect('/'); // primeira carga: segue para a tela da empresa
 
         app(CompanyContext::class)->within($company, function () use ($company) {
-            $this->assertSame(6, Customer::count());
-            $this->assertSame(5, Customer::where('status', 'Ativo')->count());
+            $this->assertSame(1, Customer::count());
+            $this->assertSame(1, Customer::where('status', 'Ativo')->count());
             $this->assertSame(0, ChatMessage::count());
             $this->assertNotNull($company->fresh()->imported_at);
-            $this->assertSame('Codigo', $company->fresh()->column_mapping['cliente_id']);
+            $this->assertSame('cliente_id', $company->fresh()->column_mapping['cliente_id']);
         });
     }
 
@@ -139,18 +148,24 @@ A,2026-02,Cancelado,2
         $company = Company::factory()->create();
         $user = User::factory()->for($company)->create();
         $this->actingAs($user);
-        $obs = str_repeat('x', 700000); // 3 linhas de ~700 KB: passa do limite síncrono sem gastar memória no teste
-        $csv = UploadedFile::fake()->createWithContent('grande.csv', "cliente_id,mes_ref,chamados_abertos,obs
-A,2026-01,1,{$obs}
-B,2026-01,1,{$obs}
-C,2026-01,1,{$obs}
-");
+        $headers = ['cliente_id', 'mes_ref', 'segmento', 'porte', 'plano', 'valor_mensal', 'observacao'];
+        $obs = str_repeat('x', 900);
+        $rows = [];
+        for ($i = 1; $i <= 2500; $i++) {
+            $row = [
+                'cliente_id' => 'C'.$i, 'mes_ref' => '2026-01', 'segmento' => 'Varejo', 'porte' => 'Pequeno',
+                'plano' => 'Básico', 'valor_mensal' => '1000', 'observacao' => $obs,
+            ];
+            $rows[] = implode(';', array_map(fn ($header) => $row[$header] ?? '', $headers));
+        }
+        $csv = UploadedFile::fake()->createWithContent('grande.csv', implode(';', $headers)."\n".implode("\n", $rows)."\n");
 
-        $c = Livewire::test(ImportarPlanilha::class)->set('arquivo', $csv);
+        $c = Livewire::test(ImportarPlanilha::class)->set('arquivo', $csv)
+            ->set('metricMappings.0.description', 'Observação textual mensal');
         $caminho = $c->get('caminho');
         $c->call('importar')->assertNoRedirect();
 
-        Queue::assertPushed(ImportarPlanilhaJob::class, fn ($job) => $job->companyId === $company->id && $job->caminho === $caminho);
+        Queue::assertPushed(ImportarPlanilhaJob::class, fn ($job) => $job->companyId === $company->id && $job->caminho === $caminho && $job->structuralMapping !== null);
         $this->assertCount(0, $user->notifications); // ainda não rodou
     }
 

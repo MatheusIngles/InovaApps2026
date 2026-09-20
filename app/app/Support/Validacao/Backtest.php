@@ -5,7 +5,12 @@ namespace App\Support\Validacao;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerMetric;
+use App\Models\MetricValue;
+use App\Support\Metricas\MetricRisk;
 use App\Support\Risco;
+use App\Support\Tenancy\CompanyContext;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -36,6 +41,12 @@ class Backtest
     /** @var array<string, float|int> */
     private array $pesos;
 
+    /** @var array<string, float> */
+    private array $customWeights = [];
+
+    /** @var array<string, string> */
+    private array $customLabels = [];
+
     /** @param array<string, float|int> $pesos */
     public function __construct(array $pesos)
     {
@@ -45,11 +56,16 @@ class Backtest
 
     private function montar(): void
     {
-        $clientes = Customer::with(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month')])->get();
+        $clientes = Customer::with(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month'), 'periods' => fn ($q) => $q->orderBy('reference_month')])->get();
+        $definitions = app(CompanyContext::class)->current()?->metricDefinitions()->get();
+        $this->customWeights = $definitions?->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text')
+            ->mapWithKeys(fn ($definition): array => ['custom:'.$definition->code => (float) $definition->weight])->all() ?? [];
+        $this->customLabels = $definitions?->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text')
+            ->mapWithKeys(fn ($definition): array => ['custom:'.$definition->code => $definition->label])->all() ?? [];
 
         foreach ($clientes as $c) {
             $cancelado = $c->status === 'Cancelado';
-            $meses = self::mesesDoCliente($c, $this->pesos);
+            $meses = self::mesesDoCliente($c, $this->pesos, $definitions);
 
             if ($meses) {
                 $this->series[$c->id] = ['cancelado' => $cancelado, 'saida' => $c->cancelled_at?->format('Y-m'), 'valor' => (float) $c->monthly_value, 'cliente' => $c, 'meses' => $meses];
@@ -64,30 +80,43 @@ class Backtest
      * @param  array<string, float|int>  $pesos
      * @return list<array{mes: string, sev: array<string, float>, score: int, extra: array<string, float>}>
      */
-    public static function mesesDoCliente(Customer $c, array $pesos): array
+    public static function mesesDoCliente(Customer $c, array $pesos, ?Collection $definitions = null): array
     {
+        $c->loadMissing(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month'), 'periods' => fn ($q) => $q->orderBy('reference_month')]);
+        $definitions ??= $c->company->metricDefinitions()->get();
+        $enabledDefinitionIds = $definitions->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text' && (float) $definition->weight > 0)->pluck('id');
         $cancelado = $c->status === 'Cancelado';
         $metricas = $c->metrics->filter(fn ($m) => ! $cancelado || $c->cancelled_at === null || $m->reference_month->lt($c->cancelled_at))->values();
+        $values = $c->metricValues->filter(fn ($value) => $enabledDefinitionIds->contains($value->metric_definition_id) && $value->value !== null
+            && (! $cancelado || $c->cancelled_at === null || $value->reference_month->lt($c->cancelled_at)))->values();
+        $periods = $c->periods->filter(fn ($period) => ! $cancelado || $c->cancelled_at === null || $period->reference_month->lt($c->cancelled_at));
+        $referenceMonths = $metricas->pluck('reference_month')->merge($values->pluck('reference_month'))->merge($periods->pluck('reference_month'))
+            ->map(fn ($date) => $date->format('Y-m'))->unique()->sort()->values();
         $meses = [];
 
-        foreach ($metricas as $i => $m) {
-            if ($i < 2) {
-                continue; // o risco usa a janela dos 3 últimos meses
+        foreach ($referenceMonths as $month) {
+            $reference = Carbon::parse($month.'-01');
+            $availableMetrics = $metricas->filter(fn ($metric) => $metric->reference_month->lte($reference));
+            $windowStart = $reference->copy()->subMonths(2);
+            $hasCustomObservation = $values->contains(fn ($value) => $value->reference_month->gte($windowStart) && $value->reference_month->lte($reference));
+            if ($availableMetrics->count() < 3 && ! $hasCustomObservation) {
+                continue; // sinais padrão precisam de 3 meses; métricas próprias podem começar antes
             }
-            $janela = $metricas->slice(0, $i + 1)->map(fn ($x): array => [
+            $janela = $availableMetrics->map(fn ($x): array => [
                 'mes' => $x->reference_month->format('Y-m'),
                 'chamados_abertos' => $x->tickets_opened, 'chamados_reabertos' => $x->tickets_reopened, 'pct_sla_cumprido' => $x->sla_percentage,
                 'reclamacoes_formais' => $x->formal_complaints, 'uso_plataforma_pct' => $x->platform_usage_percentage,
                 'dias_atraso_pagamento' => $x->payment_delay_days, 'reunioes_previstas' => $x->meetings_expected, 'reunioes_realizadas' => $x->meetings_completed,
             ])->values()->all();
-            $nps = $c->npsResponses->filter(fn ($r) => $r->reference_month->lte($m->reference_month))
+            $nps = $c->npsResponses->filter(fn ($r) => $r->reference_month->lte($reference))
                 ->map(fn ($r): array => ['mes' => $r->reference_month->format('Y-m'), 'respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
-            $r = Risco::calcular($janela, $nps, $pesos);
-            $ult3 = $metricas->slice($i - 2, 3);
+            $r = MetricRisk::calcular($janela, $nps, $pesos, Risco::LIMIARES, $definitions, $values, $reference);
+            $ult3 = $availableMetrics->slice(-3);
 
             $meses[] = [
-                'mes' => $m->reference_month->format('Y-m'),
-                'sev' => array_combine(array_keys(Risco::PESOS), $r['sev']),
+                'mes' => $month,
+                'sev' => array_combine(array_keys(Risco::PESOS), $r['sev']) + $r['custom_severity'],
+                'has_base' => $availableMetrics->isNotEmpty(),
                 'score' => $r['score'],
                 'extra' => array_map(fn (string $col): float => (float) $ult3->avg($col), array_combine(array_keys(self::EXTRAS), array_keys(self::EXTRAS))),
             ];
@@ -140,7 +169,12 @@ class Backtest
     /** Chave de cache: muda quando mudam os pesos, a quantidade de clientes ou as métricas da empresa. */
     public static function chave(Company $company, string $parte): string
     {
-        return 'backtest:'.$parte.':'.$company->id.':'.md5(json_encode($company->pesos())).':'.Customer::count().':'.CustomerMetric::whereIn('customer_id', Customer::pluck('id'))->max('updated_at');
+        return 'backtest:'.$parte.':'.$company->id.':'.md5(json_encode([$company->pesos(), $company->limiares()])).':'.Customer::count().':'.CustomerMetric::whereIn('customer_id', Customer::pluck('id'))->max('updated_at').':'.MetricValue::where('company_id', $company->id)->max('updated_at').':'.$company->metricDefinitions()->max('updated_at');
+    }
+
+    public static function invalidar(Company $company): void
+    {
+        app(CompanyContext::class)->within($company, fn () => Cache::forget(self::chave($company, 'resumo:v2')));
     }
 
     /**
@@ -161,6 +195,7 @@ class Backtest
                 'limiares' => array_map(fn (int $x) => $b->porLimiar($x), $niveis),
                 'cancelamentos' => array_map(fn (int $x) => $b->porCancelamento($x), $niveis),
                 'variaveis' => $b->porVariavel(),
+                'metricas_proprias' => $b->porMetricaPropria(),
                 'extras' => $b->extras(),
                 'perfis' => $b->perfis(),
                 'segmentos' => $b->porSegmento(),
@@ -283,6 +318,34 @@ class Backtest
         return $out;
     }
 
+    /** Métricas próprias são avaliadas só onde há observação na janela, sem imputar zero para ausência de dados. */
+    public function porMetricaPropria(): array
+    {
+        $out = [];
+
+        foreach ($this->customLabels as $key => $label) {
+            $canc = array_values(array_filter(array_map(fn ($s) => end($s['meses'])['sev'][$key] ?? null, $this->cancelados()), fn ($v) => $v !== null));
+            $ret = array_values(array_filter(array_map(fn ($s) => end($s['meses'])['sev'][$key] ?? null, $this->retidos()), fn ($v) => $v !== null));
+            $observados = array_filter($this->cancelados(), fn ($s) => isset(end($s['meses'])['sev'][$key]));
+            $leads = array_filter(array_map(fn ($s) => $this->antecedencia($s, fn ($m) => ($m['sev'][$key] ?? 0) * 100, 50), $observados), fn ($v) => $v !== null);
+
+            $out[$key] = [
+                'rotulo' => $label,
+                'auc' => $canc && $ret ? $this->auc($canc, $ret) : null,
+                'cancelados' => count($canc),
+                'retidos' => count($ret),
+                'media_cancelados' => $canc ? round(array_sum($canc) / count($canc), 2) : null,
+                'media_retidos' => $ret ? round(array_sum($ret) / count($ret), 2) : null,
+                'antecedencia' => $leads ? $this->mediana(array_values($leads)) : null,
+                'detectados' => count($leads),
+                'alarme_falso_pct' => $ret ? round(100 * count(array_filter($ret, fn ($v) => $v >= 0.5)) / count($ret), 1) : null,
+                'peso_atual' => $this->customWeights[$key],
+            ];
+        }
+
+        return $out;
+    }
+
     /**
      * Validação em período separado (sem olhar o futuro): calibra pesos e corte só com o que se sabia até o fim do ano
      * anterior ao último cancelamento e testa nos cancelamentos seguintes.
@@ -328,7 +391,7 @@ class Backtest
         }
         $soma = array_sum($ganho);
         $pesos = $soma > 0 ? array_map(fn ($g) => round($g / $soma * 100, 1), $ganho) : Risco::PESOS;
-        $f = fn (array $pesosUsados) => fn (array $m): float => array_sum(Risco::pontos($m['sev'], $pesosUsados));
+        $f = fn (array $pesosUsados) => fn (array $m): float => $this->scoreComPesos($m, $pesosUsados);
         $auc = fn (array $pos, array $neg, array $p) => $this->auc(array_map($f($p), $pos), array_map($f($p), $neg));
 
         // corte "Alto" do treino: o menor em que o alarme falso entre os ativos do treino fica em até 8%
@@ -498,9 +561,17 @@ class Backtest
     public function aucScore(?array $pesos = null): float
     {
         $pesos ??= $this->pesos;
-        $f = fn (array $s) => array_sum(Risco::pontos(end($s['meses'])['sev'], $pesos));
+        $f = fn (array $s) => $this->scoreComPesos(end($s['meses']), $pesos);
 
         return $this->auc(array_values(array_map($f, $this->cancelados())), array_values(array_map($f, $this->retidos())));
+    }
+
+    private function scoreComPesos(array $month, array $baseWeights): float
+    {
+        $weights = ($month['has_base'] ? $baseWeights : array_fill_keys(array_keys(Risco::PESOS), 0))
+            + array_intersect_key($this->customWeights, $month['sev']);
+
+        return array_sum(Risco::pontos($month['sev'], $weights));
     }
 
     /** @param array<string, float> $sugeridos */

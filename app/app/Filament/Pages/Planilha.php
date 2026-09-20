@@ -30,6 +30,6 @@ class Planilha extends Page
 
     public function getSubheading(): string
     {
-        return 'Ela popula o painel com seus clientes, métricas e risco. Depois, novos meses podem ser acrescentados em Configurações.';
+        return 'Envie uma planilha com cliente, mês, segmento, porte, plano e valor mensal. As demais colunas serão configuradas como métricas antes da importação.';
     }
 }

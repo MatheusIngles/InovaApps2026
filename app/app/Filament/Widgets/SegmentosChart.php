@@ -23,7 +23,8 @@ class SegmentosChart extends ChartWidget
 
     protected function getData(): array
     {
-        $s = Customer::ativas()->groupBy('segmento')->map(fn ($customers) => $customers->avg('score'))->sortDesc();
+        $s = Customer::ativas()->filter(fn (Customer $customer) => $customer->currentAssessment !== null)
+            ->groupBy('segmento')->map(fn ($customers) => $customers->avg('score'))->sortDesc();
 
         return [
             'labels' => $s->keys()->all(),

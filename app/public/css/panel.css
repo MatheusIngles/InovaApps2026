@@ -212,12 +212,27 @@ input, textarea { caret-color: var(--primary-600); }
 
 /* ---------- Planilha (landing pós-login) ---------- */
 .pl, .pl-form { display: flex; flex-direction: column; gap: 1.25rem; }
+.pl-form > label, .metric-entry > label { display: flex; flex-direction: column; gap: .4rem; font-size: .875rem; font-weight: 600; }
+.pl-form textarea { width: 100%; padding: .5rem .7rem; border: 1px solid var(--panel-border); border-radius: .375rem; background: var(--panel-raised); color: var(--panel-text); font: inherit; }
+.pl-form textarea:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 1px; }
 .pl-drop { position: relative; display: flex; flex-direction: column; align-items: center; gap: .25rem; margin-top: 1rem; padding: 2rem 1rem; border: 2px dashed var(--primary-300); border-radius: .75rem; background: var(--panel-raised); color: var(--panel-text); text-align: center; cursor: pointer; transition: background .15s, border-color .15s; }
 .pl-drop:hover, .pl-drop:focus-within { background: var(--panel-border); border-color: var(--primary-500); }
 .pl-drop span { color: var(--panel-muted); font-size: .85rem; }
 .pl-drop-busy { opacity: .7; }
 .pl-file { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .pl-erro { margin: .5rem 0 0; color: #b91c1c; font-size: .875rem; font-weight: 600; }
+.pl > .ui-card > .ui-muted { margin: .6rem 0 1rem; }
+.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.metric-grid label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; color: var(--panel-text); font-size: .875rem; font-weight: 600; }
+.metric-grid input:not([type="checkbox"]), .metric-grid select { width: 100%; min-height: 2.5rem; padding: .5rem .7rem; border: 1px solid var(--panel-border); border-radius: .375rem; background: var(--panel-raised); color: var(--panel-text); font: inherit; }
+.metric-grid input:focus-visible, .metric-grid select:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 1px; }
+.metric-grid label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; align-self: end; min-height: 2.5rem; }
+.metric-entry { min-width: 0; margin: 0; padding: 1.25rem 0 0; border: 0; border-top: 1px solid var(--panel-border); }
+.metric-entry legend { padding: 0 .5rem 0 0; }
+.metric-entry h3 { font-size: .95rem; font-weight: 700; }
+.metric-entry h3 small { margin-left: .5rem; color: var(--panel-muted); font-size: .8rem; font-weight: 400; }
+@media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .metric-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- Cards de empresas coloridos pelo status ---------- */
 .fi-ta-record.nv-crit { background: #fef2f2; box-shadow: 0 0 0 1px #fca5a5, 0 1px 2px rgb(153 27 27 / .08); }

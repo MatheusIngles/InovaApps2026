@@ -27,6 +27,16 @@ class Customer extends Model
         return $this->hasMany(CustomerMetric::class);
     }
 
+    public function metricValues(): HasMany
+    {
+        return $this->hasMany(MetricValue::class);
+    }
+
+    public function periods(): HasMany
+    {
+        return $this->hasMany(CustomerPeriod::class);
+    }
+
     public function npsResponses(): HasMany
     {
         return $this->hasMany(CustomerNps::class);
@@ -108,7 +118,7 @@ class Customer extends Model
 
     public function rotulo(): string
     {
-        return $this->cancelada() ? 'Cancelado' : ($this->resolvida() ? 'Resolvido' : $this->nivel);
+        return $this->cancelada() ? 'Cancelado' : ($this->resolvida() ? 'Resolvido' : ($this->currentAssessment ? $this->nivel : 'Sem avaliação'));
     }
 
     public static function brl(float|int $value): string
@@ -208,6 +218,11 @@ class Customer extends Model
     /** Parcelas de todos os sinais, inclusive as menores que o limite dos destaques. */
     public function contribuicoesScore(): array
     {
+        $saved = $this->currentAssessment?->signals_json['contributions'] ?? null;
+        if (is_array($saved)) {
+            return $saved;
+        }
+
         $severidades = $this->currentAssessment?->signals_json['severity'] ?? null;
 
         if (! is_array($severidades) || count($severidades) !== count(Risco::PESOS)) {
@@ -226,6 +241,7 @@ class Customer extends Model
                 'intensidade' => $severidades[$chave],
                 'peso' => $pesos[$chave],
                 'base' => $base,
+                'equal_share' => 100 / count(Risco::PESOS),
                 'ajuste_prioridade' => round($pontos - $base, 1),
                 'pontos' => $pontos,
             ];
@@ -241,7 +257,7 @@ class Customer extends Model
         $principais = collect($this->contribuicoesScore())->sortByDesc('pontos')->take(3)
             ->map(fn ($item) => "{$item['rotulo']} +{$item['pontos']}")->join('; ');
 
-        return "Atenção por regras (índice de 0 a 100): soma ponderada de 8 sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
+        return "Atenção por regras (índice de 0 a 100): soma ponderada dos sinais de até 3 meses recentes. Principais parcelas: {$principais}. Não é probabilidade de cancelamento.";
     }
 
     public function getSimilaresAttribute(): array

@@ -4,10 +4,20 @@
     use App\Models\Customer;
 
     $e = $this->record;
+    $company = app(\App\Support\Tenancy\CompanyContext::class)->current();
     $rotulo = $e->rotulo();
     $chat = Assistente::getUrl(['empresa' => $e->codigo]);
     $nivelCss = ['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Resolvido' => 'baixo'][$rotulo] ?? 'canc';
     $hist = $e->hist; // uma consulta só
+    $legacy = (bool) $hist;
+    $definitions = $company->metricDefinitions()->orderBy('code')->get();
+    $customHistory = $e->metricValues()->with('definition')
+        ->when($e->cancelled_at, fn ($query) => $query->where('reference_month', '<', $e->cancelled_at))
+        ->orderByDesc('reference_month')->get();
+    $customMonths = $e->periods()->when($e->cancelled_at, fn ($query) => $query->where('reference_month', '<', $e->cancelled_at))
+        ->orderByDesc('reference_month')->pluck('reference_month')->map(fn ($date) => substr($date, 0, 7))
+        ->merge($customHistory->map(fn ($value) => $value->reference_month->format('Y-m')))->unique()->sortDesc()->values();
+    $customCells = $customHistory->keyBy(fn ($value) => $value->reference_month->format('Y-m').':'.$value->metric_definition_id);
     $ultimo = collect($hist)->last();
     $parcelasPorRotulo = collect($e->contribuicoesScore())->keyBy('rotulo');
     $serie = \App\Filament\Widgets\InsatisfacaoChart::serie($e);
@@ -27,7 +37,7 @@
                         <p class="ui-headline">{{ $e->segmento }}, porte {{ $e->porte }}, plano {{ $e->plano }}. Cliente desde {{ date('m/Y', strtotime($e->inicio)) }}{{ $e->cancelada() ? ', cancelou em '.$e->mes_cancel : '' }}.</p>
                     </div>
                     <div class="ui-actions">
-                        <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · atenção {{ $e->score }}/100{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
+                        <span class="ui-badge {{ $nivelCss }}">{{ $e->currentAssessment ? $rotulo.' · atenção '.$e->score.'/100' : $rotulo }}{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
                         @unless ($e->cancelada())
                             <button type="button" class="ui-btn" wire:click="alternarResolvido">{{ $e->resolvida() ? 'Reabrir' : 'Marcar como resolvido' }}</button>
                         @endunless
@@ -50,9 +60,15 @@
                 <h2>Indicadores atuais</h2>
                 <dl class="ui-stats">
                     <div><dt>Contrato/mês</dt><dd>{{ Customer::brl($e->valor) }}</dd></div>
+                    @if ($legacy)
                     <div><dt>Uso da plataforma</dt><dd>{{ $ultimo ? $ultimo['uso'].'%' : '—' }}</dd></div>
                     <div><dt>SLA cumprido</dt><dd>{{ $ultimo && is_numeric($ultimo['sla']) ? $ultimo['sla'].'%' : '—' }}</dd></div>
-                    <div><dt>Atenção <details class="ui-tip"><summary aria-label="Como a atenção é calculada">?</summary><span class="ui-tip-content">Soma das parcelas dos oito sinais avaliados. É um índice de 0 a 100 dos sinais de alerta (quanto maior, antes o cliente merece contato), não a chance de cancelamento.</span></details></dt><dd>{{ $e->score }}/100</dd></div>
+                    @else
+                    <div><dt>Métricas configuradas</dt><dd>{{ $definitions->count() }}</dd></div>
+                    <div><dt>Métricas observadas</dt><dd>{{ $customHistory->pluck('metric_definition_id')->unique()->count() }}</dd></div>
+                    <div><dt>Meses importados</dt><dd>{{ $customMonths->count() }}</dd></div>
+                    @endif
+                    <div><dt>Atenção <details class="ui-tip"><summary aria-label="Como a atenção é calculada">?</summary><span class="ui-tip-content">Soma ponderada dos sinais avaliados, incluindo métricas próprias quando cadastradas. É um índice de 0 a 100, não a chance de cancelamento.</span></details></dt><dd>{{ $e->currentAssessment ? $e->score.'/100' : '—' }}</dd></div>
                     <div><dt>Exposição <details class="ui-tip"><summary aria-label="Como a exposição é calculada">?</summary><span class="ui-tip-content">{{ $e->score }}/100 × {{ Customer::brl($e->valor) }}/mês. É um indicador para priorização, não uma perda prevista.</span></details></dt><dd>{{ Customer::brl($e->exposicao) }}</dd></div>
                 </dl>
             </section>
@@ -90,7 +106,7 @@
                             @if ($parcela)
                                 <details class="ui-tip ui-tip-valor">
                                     <summary aria-label="Como {{ $s['label'] }} contribuiu para a atenção">+{{ $s['pts'] }} pts</summary>
-                                    <span class="ui-tip-content">Parcela da métrica: {{ number_format($parcela['base'], 1, ',', '.') }} pt (intensidade × 12,5). Ajuste da prioridade: {{ $parcela['ajuste_prioridade'] < 0 ? '−' : '+' }}{{ number_format(abs($parcela['ajuste_prioridade']), 1, ',', '.') }} pt (peso {{ number_format($parcela['peso'], 1, ',', '.') }}). Total: {{ number_format($parcela['pontos'], 1, ',', '.') }} pt.</span>
+                                    <span class="ui-tip-content">Parcela da métrica: {{ number_format($parcela['base'], 1, ',', '.') }} pt (intensidade × {{ number_format($parcela['equal_share'] ?? 12.5, 1, ',', '.') }}). Ajuste da prioridade: {{ $parcela['ajuste_prioridade'] < 0 ? '−' : '+' }}{{ number_format(abs($parcela['ajuste_prioridade']), 1, ',', '.') }} pt (peso {{ number_format($parcela['peso'], 1, ',', '.') }}). Total: {{ number_format($parcela['pontos'], 1, ',', '.') }} pt.</span>
                                 </details>
                             @else
                                 <span class="ui-sinal-pontos">+{{ $s['pts'] }} pts</span>
@@ -122,6 +138,7 @@
                 </ul>
             </section>
 
+            @if ($legacy)
             <section class="ui-card ui-pad">
                 <h2>Satisfação (NPS)</h2>
                 <div class="ui-nps">
@@ -131,11 +148,13 @@
                 </div>
                 <p class="ui-muted">— = convidado e não respondeu.</p>
             </section>
+            @endif
         </aside>
         </div>
 
         <section id="empresa-painel-historico" role="tabpanel" aria-labelledby="empresa-tab-historico" x-show="aba === 'historico'" x-cloak class="ui-card ui-pad">
             <h2>Histórico mensal</h2>
+            @if ($hist)
             <div class="ui-table-wrap">
                 <table class="ui-table">
                     <thead><tr><th>Mês</th><th>Chamados</th><th>Reabertos</th><th>SLA %</th><th>Uso %</th><th>Reclam.</th><th>Atraso (d)</th><th>Reuniões</th></tr></thead>
@@ -146,19 +165,39 @@
                     </tbody>
                 </table>
             </div>
+            @endif
+            @if ($customMonths->isNotEmpty() && $definitions->isNotEmpty())
+                <h3>Métricas</h3>
+                <div class="ui-table-wrap">
+                    <table class="ui-table">
+                        <thead><tr><th>Mês</th><th>Valor mensal</th>@foreach ($definitions as $definition)<th title="{{ $definition->description }}">{{ $definition->label }}</th>@endforeach</tr></thead>
+                        <tbody>
+                            @foreach ($customMonths as $month)
+                                @php($period = $e->periods->first(fn ($entry) => $entry->reference_month->format('Y-m') === $month))
+                                <tr><td>{{ $month }}</td><td>{{ $period?->monthly_value !== null ? Customer::brl((float) $period->monthly_value) : '—' }}</td>@foreach ($definitions as $definition)
+                                    @php($observation = $customCells->get($month.':'.$definition->id))
+                                    <td>{{ $observation ? ($definition->value_type === 'text' ? $observation->text_value : number_format((float) $observation->value, $definition->value_type === 'integer' ? 0 : 2, ',', '.')) : '—' }}</td>
+                                @endforeach</tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </section>
 
         <section id="empresa-painel-tendencia" role="tabpanel" aria-labelledby="empresa-tab-tendencia" x-show="aba === 'tendencia'" x-cloak class="ui-main">
             <?php
-                $comparacao = $e->cancelada() ? [] : \App\Support\Validacao\Backtest::resumo(app(\App\Support\Tenancy\CompanyContext::class)->current())['variaveis'];
-                $sev = $e->currentAssessment?->signals_json['severity'] ?? [];
-                $sev = count($sev) === count(\App\Support\Risco::ROTULOS) ? array_combine(array_keys(\App\Support\Risco::ROTULOS), $sev) : [];
+                $resumo = $e->cancelada() ? null : \App\Support\Validacao\Backtest::resumo(app(\App\Support\Tenancy\CompanyContext::class)->current());
+                $comparacao = ($resumo['variaveis'] ?? []) + array_filter($resumo['metricas_proprias'] ?? [], fn ($v) => $v['auc'] !== null);
+                $signals = $e->currentAssessment?->signals_json ?? [];
+                $sev = $signals['severity'] ?? [];
+                $sev = (count($sev) === count(\App\Support\Risco::ROTULOS) ? array_combine(array_keys(\App\Support\Risco::ROTULOS), $sev) : []) + ($signals['custom_severity'] ?? []);
             ?>
             <section class="ui-card ui-pad">
-                <h2>Insatisfação ao longo dos meses</h2>
+                <h2>Atenção ao longo dos meses</h2>
                 @if ($serie['scores'])
                     @livewire(\App\Filament\Widgets\InsatisfacaoChart::class, ['codigo' => $e->codigo], key('insatisfacao-'.$e->codigo))
-                    <p class="ui-muted">A previsão é a reta da tendência recente do índice de atenção (uso, SLA, reclamações, NPS e outros). Não é probabilidade de cancelamento; serve para antecipar a direção.</p>
+                    <p class="ui-muted">A previsão acompanha a tendência recente do índice de atenção calculado com as métricas disponíveis. Não é probabilidade de cancelamento.</p>
                 @else
                     <p class="ui-muted">Faltam meses de histórico para montar a série.</p>
                 @endif
@@ -172,7 +211,7 @@
                         <table class="ui-table">
                             <thead><tr><th>Sinal</th><th>Este cliente</th><th>Média dos que ficaram</th><th>Média dos que cancelaram</th></tr></thead>
                             <tbody>
-                                @foreach (collect($comparacao)->sortByDesc('auc') as $k => $v)
+                                @foreach (collect($comparacao)->filter(fn ($v, $k) => array_key_exists($k, $sev))->sortByDesc('auc') as $k => $v)
                                     @php($minha = $sev[$k] ?? 0)
                                     <tr @if ($minha >= $v['media_cancelados'] * 0.8 && $v['media_cancelados'] >= 0.3) class="ev-atual" @endif>
                                         <td>{{ $v['rotulo'] }}</td>

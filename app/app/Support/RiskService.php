@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\RiskAssessment;
+use App\Support\Metricas\MetricRisk;
 use App\Support\Notificacoes\NotificacaoService;
 use App\Support\Tenancy\CompanyContext;
 use Illuminate\Support\Facades\DB;
@@ -18,16 +19,34 @@ class RiskService
             return DB::transaction(function () use ($company): int {
                 $pesos = $company->pesos();
                 $limiares = $company->limiares();
-                $customers = Customer::with(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month')])->get();
+                $definitions = $company->metricDefinitions()->get();
+                $enabledDefinitionIds = $definitions->filter(fn ($definition) => $definition->enabled && $definition->value_type !== 'text' && (float) $definition->weight > 0)->pluck('id');
+                $customers = Customer::with(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month'), 'periods' => fn ($q) => $q->orderBy('reference_month')])->get();
                 $results = [];
 
                 foreach ($customers as $customer) {
                     $metrics = $customer->metrics->filter(fn ($m) => $customer->cancelled_at === null || $m->reference_month->lt($customer->cancelled_at));
+                    $values = $customer->metricValues->filter(fn ($value) => $enabledDefinitionIds->contains($value->metric_definition_id)
+                        && $value->value !== null
+                        && ($customer->cancelled_at === null || $value->reference_month->lt($customer->cancelled_at)));
                     $referenceMonth = $metrics->last()?->reference_month;
+                    $latestCustomMonth = $values->last()?->reference_month;
+                    if ($latestCustomMonth !== null && ($referenceMonth === null || $latestCustomMonth->gt($referenceMonth))) {
+                        $referenceMonth = $latestCustomMonth;
+                    }
+                    $latestPeriod = $customer->periods->filter(fn ($period) => $customer->cancelled_at === null || $period->reference_month->lt($customer->cancelled_at))
+                        ->last()?->reference_month;
+                    if ($latestPeriod !== null && ($referenceMonth === null || $latestPeriod->gt($referenceMonth))) {
+                        $referenceMonth = $latestPeriod;
+                    }
 
-                    if ($referenceMonth === null) {
+                    if ($referenceMonth === null || ($metrics->isEmpty() && ! $values->contains(fn ($value) => $value->reference_month->gte($referenceMonth->copy()->subMonths(2)) && $value->reference_month->lte($referenceMonth)))) {
+                        RiskAssessment::where('customer_id', $customer->id)->where('model_version', 'rules-v1')->delete();
+
                         continue;
                     }
+                    RiskAssessment::where('customer_id', $customer->id)->where('model_version', 'rules-v1')
+                        ->where('reference_month', '>', $referenceMonth)->delete();
 
                     $history = $metrics->map(fn ($m): array => [
                         'mes' => $m->reference_month->format('Y-m'),
@@ -43,10 +62,13 @@ class RiskService
                     $nps = $customer->npsResponses->filter(fn ($r) => $r->reference_month->lte($referenceMonth))
                         ->map(fn ($r): array => ['mes' => $r->reference_month->format('Y-m'), 'respondeu' => $r->answered, 'nota_nps' => $r->score])->values()->all();
 
-                    $results[$customer->id] = Risco::calcular($history, $nps, $pesos, $limiares) + ['customer' => $customer, 'reference_month' => $referenceMonth];
+                    $results[$customer->id] = MetricRisk::calcular($history, $nps, $pesos, $limiares, $definitions, $values, $referenceMonth)
+                        + ['customer' => $customer, 'reference_month' => $referenceMonth, 'has_base' => $metrics->isNotEmpty()];
                 }
 
                 $cancelled = array_filter($results, fn (array $r): bool => $r['customer']->status === 'Cancelado');
+                $vector = fn (array $r): array => ($r['has_base'] ? array_combine(array_keys(Risco::PESOS), $r['sev']) : [])
+                    + $r['custom_severity'];
 
                 foreach ($results as $customerId => $result) {
                     $customer = $result['customer'];
@@ -57,11 +79,21 @@ class RiskService
                             continue;
                         }
 
+                        $currentVector = $vector($result);
+                        $otherVector = $vector($other);
+                        $sharedKeys = array_keys(array_intersect_key($currentVector, $otherVector));
+                        if (! $sharedKeys) {
+                            continue;
+                        }
+
                         $similar[] = [
                             'codigo' => $other['customer']->external_code,
                             'nome' => $other['customer']->displayName(),
                             'mes_cancel' => $other['customer']->cancelled_at?->format('Y-m'),
-                            'sim' => Risco::semelhanca($result['sev'], $other['sev']),
+                            'sim' => Risco::semelhanca(
+                                array_map(fn ($key) => $currentVector[$key], $sharedKeys),
+                                array_map(fn ($key) => $otherVector[$key], $sharedKeys),
+                            ),
                         ];
                     }
 
@@ -80,7 +112,7 @@ class RiskService
                             'exposure_indicator' => round($result['score'] / 100 * (float) $customer->monthly_value, 2),
                             'expected_revenue_at_risk' => null,
                             'confidence' => null,
-                            'signals_json' => ['evidence' => $result['sinais'], 'severity' => $result['sev'], 'similar' => array_slice($similar, 0, 3)],
+                            'signals_json' => ['evidence' => $result['sinais'], 'severity' => $result['sev'], 'custom_severity' => $result['custom_severity'], 'contributions' => $result['contributions'], 'similar' => array_slice($similar, 0, 3)],
                             'recommended_action_json' => null,
                             'calculated_at' => now(),
                         ],

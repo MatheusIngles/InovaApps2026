@@ -24,7 +24,7 @@ class InsatisfacaoChart extends ChartWidget
     /** @return array{meses: list<string>, scores: list<int>, previsao: ?array, cancelada: bool} */
     public static function serie(Customer $cliente): array
     {
-        $cliente->loadMissing(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month')]);
+        $cliente->loadMissing(['metrics' => fn ($q) => $q->orderBy('reference_month'), 'npsResponses' => fn ($q) => $q->orderBy('reference_month'), 'metricValues' => fn ($q) => $q->orderBy('reference_month')]);
         $meses = Backtest::mesesDoCliente($cliente, app(CompanyContext::class)->current()->pesos());
         $scores = array_column($meses, 'score');
         $cancelada = $cliente->status === 'Cancelado';
