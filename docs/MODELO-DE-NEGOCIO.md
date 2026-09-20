@@ -26,7 +26,7 @@ Preço: **valor fixo mensal por faixa de contas monitoradas** (hipótese: R$ 0,5
 Com a carteira do desafio: se o Seer evitar **10% dos cancelamentos** (2 dos 22), preserva cerca de **R$ 27 mil por mês, R$ 330 mil por ano**. Mesmo um preço de algumas dezenas de milhares por ano se paga em poucos meses.
 
 ## Custos e margem
-- Infraestrutura pequena: aplicação web + banco; o processamento do score é leve.
+- Infraestrutura pequena: aplicação web + banco; o processamento da atenção é leve.
 - IA: o modelo **local (Ollama)** cobre o uso comum sem custo por chamada; a API externa só entra em perguntas complexas (custo variável controlado).
 - Diferencial de custo de aquisição: implantação por planilha, sem projeto de integração no início.
 
@@ -40,5 +40,5 @@ Receita retida atribuída a alertas, antecedência mediana do alerta, taxa de al
 
 ## Riscos e limites
 - Poucos eventos por carteira (dezenas de cancelamentos): os números são indicativos; a calibração melhora conforme o histórico cresce.
-- O score não é uma probabilidade de cancelamento: ordena o atendimento, não prevê perda.
+- A atenção não é uma probabilidade de cancelamento: ordena o atendimento, não prevê perda.
 - Dependência da qualidade e da periodicidade dos dados enviados.

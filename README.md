@@ -64,11 +64,52 @@ PHP 8.3+ · Laravel 13 · Filament 5 · Livewire 4 · Tailwind CSS 4 · Vite 8 �
 
 ---
 
+## 🧮 Como a Atenção é calculada
+
+A **Atenção** é um índice de **0 a 100** que diz o quanto um cliente precisa de contato. **Não é a probabilidade de cancelar**: ela ordena o atendimento. É calculada por regras fixas, sem IA, então o resultado é sempre o mesmo para os mesmos dados e dá para explicar cada ponto.
+
+1. **Janela e mediana.** Para cada cliente, o sistema usa os **3 últimos meses** e tira a **mediana** de cada sinal. Assim, uma piora de um mês só não pesa.
+2. **Severidade (0 a 1) por sinal.** Cada sinal vira uma nota: 0 é saudável e 1 é crítico.
+
+| Sinal padrão | Peso | Severidade |
+|---|---|---|
+| Uso da plataforma | 20 | (85 − uso%) ÷ 35 |
+| SLA cumprido | 15 | (85 − SLA%) ÷ 45 |
+| Satisfação (NPS) | 15 | metade da nota `(8 − nota) ÷ 6` e metade das pesquisas sem resposta |
+| Reuniões realizadas | 12 | (0,8 − realizadas ÷ previstas) ÷ 0,6 |
+| Reincidência de chamados | 10 | (reabertos ÷ abertos) ÷ 0,25 |
+| Reclamações formais | 10 | reclamações em 3 meses ÷ 4 |
+| Atraso de pagamento | 10 | dias de atraso ÷ 10 |
+| Tendência de queda | 8 | queda do uso frente ao início do histórico ÷ 30 p.p. |
+
+   Toda severidade fica entre 0 e 1. Métricas próprias da empresa seguem a mesma ideia: `(valor − saudável) ÷ (crítico − saudável)`, limitado entre 0 e 1.
+3. **Média ponderada.** `Atenção = soma(severidade × peso) ÷ soma(pesos) × 100`, arredondada. Os pesos, a ordem de prioridade e as métricas ativas são configuráveis por empresa; mudar qualquer um recalcula a carteira.
+4. **Nível.** Baixo (abaixo de 25), Médio (25 a 39), Alto (40 a 54) e Crítico (55 ou mais). Os cortes também são configuráveis. Médio, Alto e Crítico estão **em alerta**.
+5. **Fila de atendimento.** Primeiro quem está em alerta, depois os demais. Dentro de cada grupo, a ordem é `atenção × (atenção + K) × valor mensal do contrato`, com **K = 50** por padrão. O contrato grande desempata, mas nunca põe alguém sem alerta na frente de alguém em alerta. Clientes marcados como resolvidos vão para o fim, e os cancelados ficam por último.
+6. **Prazo de contato** (capacidade de 3 contatos por dia): posições 1 a 3 "contato hoje", até 9 "em até 3 dias", até 15 "esta semana", os demais no ciclo normal.
+7. **Exposição mensal** = `atenção ÷ 100 × valor mensal`. É um indicador para comparar, não uma perda prevista.
+8. **Clientes parecidos com cancelados.** O sistema compara o perfil de severidades do cliente com o de quem cancelou e mostra os mais semelhantes.
+9. **Validação.** A tela de evidências e o relatório em PDF mostram, com os cancelados da própria base, quais sinais separam quem saiu de quem ficou, e o Configurador sugere pesos e cortes a partir disso.
+
+Detalhes e exemplos numéricos: [Guia funcional do painel](docs/GUIA-FUNCIONAL-DO-PAINEL.md).
+
+## 🤖 IA: custo, segurança e como desligar
+
+- **A IA não calcula a atenção.** Ela só explica os resultados em texto (chat, relatório e configuração recomendada). Sem IA, o núcleo do produto funciona igual.
+- **Ordem de uso:** API da NVIDIA → Ollama (modelo local no servidor) → respostas por regras.
+- **Custo:** depende do número de perguntas, não do tamanho da carteira, porque só um resumo vai ao modelo. Com uma empresa de 20 usuários, a estimativa fica na casa de poucas dezenas de dólares por mês, e é zero com o Ollama local ou com a IA desligada. A conta e as hipóteses estão em [docs/IA-CUSTO-E-SEGURANCA.md](docs/IA-CUSTO-E-SEGURANCA.md).
+- **Segurança:** só um resumo dos dados da própria empresa é enviado; a IA não escreve nem executa nada; tentativas de manipular o assistente são barradas; a resposta é sanitizada; a chave da API fica só no servidor; a conversa não é gravada no banco.
+- **A empresa pode desligar a IA** em **Configurações › Assistente de IA**. Desligada, nada sai do servidor e o chat responde às **perguntas prontas por regras**, usando os dados reais da carteira da empresa, calculados localmente (não são dados de exemplo). O operador também pode desligar para todas com `LLM_ENABLED=false`.
+
+## 🧩 Engenharia de software
+
+Requisitos, **casos de uso**, **diagramas de classes** (domínio e serviços), fluxos de importação e de chat e decisões de projeto estão em [docs/ENGENHARIA-DE-SOFTWARE.md](docs/ENGENHARIA-DE-SOFTWARE.md).
+
 ## 🌐 Site no ar
 
 Está publicado em **https://sitedemerda.com.br**.
 
-O nome do domínio **não é proposital**. Era um domínio que um dos membros do time já tinha e usava para subir aplicações de teste. Para colocar o Seer em produção rápido, sem gastar tempo com registro e configuração de DNS de um domínio novo, a gente reaproveitou esse. Se o projeto seguir adiante, o certo é trocar por um domínio próprio (basta mudar `APP_URL` no `.env` e o proxy).
+O nome do domínio **não é proposital**. Era um domínio que um dos membros do time já tinha e usava para subir aplicações de teste. Para colocar o Seer em produção rápido, sem gastar tempo com registro e configuração de DNS de um domínio novo, a gente reaproveitou esse.
 
 ## 🖥️ Onde o site roda
 
@@ -83,8 +124,6 @@ O Seer roda em um servidor físico próprio, um PC de mesa (gabinete Multilaser)
 | Armazenamento | SSD NVMe de 240 GB (223,6 GiB) |
 | Sistema operacional | Ubuntu 24.04.5 LTS |
 | PHP | 8.4 (`php artisan serve` com 4 workers, mais `queue:work`, ambos via `nohup`) |
-
-O selo "AMD FX" no gabinete é da carcaça antiga: o processador de hoje é Intel.
 
 ## ▶️ Como rodar
 
@@ -112,18 +151,33 @@ Contas de demonstração (só para desenvolvimento; o seeder se recusa a rodar e
 
 ```
 InovaApps2026/
-├── dados/                           # dados do desafio e de teste
-│   ├── Desafio - INOVAAPPS 2026.pdf # enunciado
-│   ├── INOVAAPPS_base_de_dados.xlsx # base de exemplo (usada pelo seeder e pelos testes)
-│   └── exemplo_planilha.csv         # planilha pequena para testar a importação
-├── docs/                            # documentação técnica, funcional, negócio e checklist
-├── .github/workflows/deploy.yaml    # deploy automático via SSH
-└── app/                             # projeto Laravel (veja app/README.md)
-    ├── app/Filament/                # Painel, Planilha, Configurações, Assistente, Empresas
-    ├── app/Livewire/                # AssistenteChat, ImportarPlanilha, RelatorioEmpresa
-    ├── app/Jobs/                    # ImportarPlanilhaJob (fila)
-    ├── app/Models/                  # Company, Customer, MetricDefinition, MetricValue...
-    ├── app/Support/                 # Risco, RiskService, Import, Llm, Tenancy, Relatorio, Metricas
+├── dados/                              # dados do desafio e de teste
+│   ├── Desafio - INOVAAPPS 2026.pdf    # enunciado
+│   ├── INOVAAPPS_base_de_dados.xlsx    # base de exemplo (seeder e testes)
+│   └── exemplo_planilha.csv            # planilha pequena para testar a importação
+├── docs/
+│   ├── ARQUITETURA-E-FUNCIONAMENTO.md  # camadas, modelo de dados, limitações
+│   ├── GUIA-FUNCIONAL-DO-PAINEL.md     # como cada número do painel é calculado
+│   ├── ENGENHARIA-DE-SOFTWARE.md       # requisitos, casos de uso, diagramas de classes e fluxos
+│   ├── IA-CUSTO-E-SEGURANCA.md         # custo da IA, segurança e como desligar
+│   ├── MODELO-DE-NEGOCIO.md
+│   ├── checklist-do-desafio.md
+│   └── imagens/                        # foto do servidor
+├── .github/workflows/deploy.yaml       # deploy automático via SSH
+└── app/                                # projeto Laravel (veja app/README.md)
+    ├── app/Filament/                   # Painel, Planilha, Configurações, Assistente, Empresas, Login
+    ├── app/Livewire/                   # AssistenteChat, ImportarPlanilha, RelatorioEmpresa, MetricDefinitions
+    ├── app/Jobs/                       # importação e relatórios em fila
+    ├── app/Models/                     # Company, Customer, MetricDefinition, MetricValue, RiskAssessment...
+    ├── app/Support/
+    │   ├── Risco.php, RiskService.php  # cálculo da atenção e recálculo da carteira
+    │   ├── Metricas/                   # MetricRisk (métricas próprias) e SinaisExtras
+    │   ├── Import/                     # leitura de planilhas, dicionário e importação dinâmica
+    │   ├── Llm/                        # IA: cascata, contexto, escopo e perguntas prontas
+    │   ├── Validacao/                  # backtest e configurador
+    │   └── Relatorio/, Notificacoes/, Tenancy/
+    ├── app/Http/Middleware/            # contexto da empresa e cabeçalhos de segurança
+    ├── app/Console/Commands/           # seer:ativar-sinais-extras
     ├── database/{migrations,seeders}
     └── tests/
 ```
@@ -132,6 +186,8 @@ InovaApps2026/
 
 - [Arquitetura e funcionamento](docs/ARQUITETURA-E-FUNCIONAMENTO.md): camadas, modelo de dados, limitações conhecidas.
 - [Guia funcional do painel](docs/GUIA-FUNCIONAL-DO-PAINEL.md): como cada métrica, peso e nível é calculado.
+- [Engenharia de software](docs/ENGENHARIA-DE-SOFTWARE.md): requisitos, casos de uso, diagramas de classes e fluxos.
+- [IA: custo e segurança](docs/IA-CUSTO-E-SEGURANCA.md): custo estimado, riscos e como desligar.
 - [Modelo de negócio](docs/MODELO-DE-NEGOCIO.md)
 - [Checklist do desafio](docs/checklist-do-desafio.md): requisitos e status.
 

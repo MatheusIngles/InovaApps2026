@@ -76,6 +76,9 @@ class Configurador
         $contexto = self::contexto($company);
 
         try {
+            if (! ($company->chat()['enabled'])) {
+                throw new \RuntimeException('IA desativada para esta empresa.');
+            }
             $r = Llm::responder(str_replace('{{contexto}}', $contexto, config('llm.prompt_configuracao')), [['role' => 'user', 'content' => 'Explique a configuração recomendada para a minha carteira.']], $company->chat()['ollama_model'] ?? null);
 
             return ['texto' => $r['texto'], 'fonte' => $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)'];

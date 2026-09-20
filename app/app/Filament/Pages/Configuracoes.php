@@ -109,6 +109,17 @@ class Configuracoes extends Page implements HasSchemas
                     ]),
                     View::make('filament.components.salvar-configuracao'),
                 ]),
+                Tab::make('Assistente de IA')->schema([
+                    Section::make('Uso de inteligência artificial')
+                        ->description('Com a IA desligada, nada da sua carteira é enviado a provedores externos: o chat responde às perguntas prontas com regras fixas sobre os dados da empresa, e o relatório e a explicação de configuração usam textos por regras. A atenção e a fila não mudam, porque não dependem de IA.')
+                        ->schema([
+                            Toggle::make('ia')->label('Usar o assistente de IA')->live()
+                                ->afterStateUpdated(function (bool $state): void {
+                                    CompanyConfig::definirIa(app(CompanyContext::class)->current(), $state);
+                                    Notification::make()->title($state ? 'IA ligada' : 'IA desligada: respostas por regras')->success()->send();
+                                }),
+                        ]),
+                ]),
                 Tab::make('Acrescentar novos meses')->schema([
                     View::make('filament.components.novos-meses'),
                 ]),

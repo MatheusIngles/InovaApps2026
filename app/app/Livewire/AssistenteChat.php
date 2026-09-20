@@ -71,7 +71,7 @@ MODO CONVERSA POR VOZ: sua resposta será lida em voz alta. Fale como numa conve
             }
             $this->mensagens[] = ['eu' => false, 'texto' => $r['texto'], 'fonte' => $r['provedor'] === 'api' ? 'Modelo avançado (API)' : 'Modelo local (Ollama)'];
         } catch (\Throwable) {
-            $this->mensagens[] = ['eu' => false, 'texto' => Assistente::responder($texto, $empresa?->codigo), 'fonte' => 'Respostas por regras (IA indisponível)'];
+            $this->mensagens[] = ['eu' => false, 'texto' => Assistente::responder($texto, $empresa?->codigo), 'fonte' => $config['enabled'] ? 'Respostas por regras (IA indisponível)' : 'Respostas por regras (IA desligada)'];
         }
     }
 

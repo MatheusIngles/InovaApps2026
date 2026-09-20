@@ -9,10 +9,10 @@ O InovaApps é um painel interno para gestão de carteira de clientes, acompanha
 O sistema responde a três perguntas principais:
 
 1. Quais clientes estão ativos e qual é o nível de risco de cada um?
-2. Quais clientes devem receber atenção primeiro, considerando score e valor mensal?
-3. Quais sinais explicam o score e qual ação operacional é recomendada?
+2. Quais clientes devem receber atenção primeiro, considerando a atenção e o valor mensal?
+3. Quais sinais explicam a atenção e qual ação operacional é recomendada?
 
-O produto não é, no estado atual, um modelo estatístico de previsão de churn. O score é determinístico, baseado em regras explícitas, e a comparação com clientes cancelados é exploratória.
+O produto não é, no estado atual, um modelo estatístico de previsão de churn. A atenção é determinística, baseada em regras explícitas, e a comparação com clientes cancelados é exploratória.
 
 ## 2. Stack e dependências
 
@@ -172,7 +172,7 @@ Armazena o resultado calculado para um cliente, mês de referência e versão de
 
 Campos relevantes:
 
-- `health_score`: score de regras entre 0 e 100;
+- `health_score`: índice de atenção por regras entre 0 e 100;
 - `exposure_indicator`: exposição financeira mensal indicativa;
 - `risk_probability`: reservado para probabilidade estatística; atualmente nulo;
 - `expected_revenue_at_risk`: reservado para receita esperada em risco; atualmente nulo;
@@ -250,7 +250,7 @@ A migration [2026_09_19_134141_add_rule_score_to_risk_assessments_table.php](../
 |---|---|---|
 | `customer_id` | foreign key | cliente avaliado |
 | `reference_month` | date | último mês considerado |
-| `health_score` | unsigned tinyint nullable | score efetivo, 0 a 100 |
+| `health_score` | unsigned tinyint nullable | atenção efetiva, 0 a 100 |
 | `risk_probability` | decimal(7,6) nullable | não calculado |
 | `exposure_indicator` | decimal(14,2) nullable | exposição indicativa |
 | `expected_revenue_at_risk` | decimal(14,2) nullable | não calculado |
@@ -346,7 +346,7 @@ O cálculo considera os três meses mais recentes de métricas (`w`) e, quando e
 
 ### 8.2 Sinais e pesos
 
-O score final é a soma de oito severidades entre 0 e 1, multiplicadas por pesos que totalizam 100:
+A atenção final é a soma de oito severidades entre 0 e 1, multiplicadas por pesos que totalizam 100:
 
 | Sinal | Peso | Interpretação |
 |---|---:|---|
@@ -363,7 +363,7 @@ A pontuação de cada sinal é:
 
 ```text
 pontos_sinal = arredondar(severidade_sinal x peso_sinal, 1)
-score = arredondar(soma dos pontos_sinal)
+atenção = arredondar(soma dos pontos_sinal)
 ```
 
 A severidade é limitada ao intervalo `[0, 1]` pela função de saturação. Portanto, cada sinal não ultrapassa o próprio peso.
@@ -401,7 +401,7 @@ A implementação usa números decimais com ponto no código PHP; a vírgula aci
 
 ### 8.4 Níveis
 
-| Score | Nível |
+| Atenção | Nível |
 |---:|---|
 | 0 a 24 | Baixo |
 | 25 a 39 | Médio |
@@ -451,21 +451,21 @@ Widgets registrados em [app/Filament/Widgets](../app/app/Filament/Widgets):
 - **KPIs** ([KpisWidget.php](../app/app/Filament/Widgets/KpisWidget.php))
   - clientes ativos;
   - receita mensal ativa;
-  - quantidade de ativos com score alto ou crítico;
+  - quantidade de ativos com atenção alta ou crítica;
   - receita já perdida, calculada a partir do valor mensal dos cancelados.
 - **Clientes ativos por nível** ([NiveisChart.php](../app/app/Filament/Widgets/NiveisChart.php))
   - gráfico doughnut com Baixo, Médio, Alto e Crítico.
 - **Risco médio por segmento** ([SegmentosChart.php](../app/app/Filament/Widgets/SegmentosChart.php))
-  - média do score dos ativos agrupada por segmento.
+  - média da atenção dos ativos agrupada por segmento.
 - **Uso x SLA** ([TendenciaChart.php](../app/app/Filament/Widgets/TendenciaChart.php))
   - médias mensais da carteira ativa, em percentual.
 - **Comparação exploratória** ([BacktestWidget.php](../app/app/Filament/Widgets/BacktestWidget.php))
-  - score médio de cancelados versus ativos;
-  - quantidade de cancelados e ativos com score maior ou igual a 40.
+  - atenção média de cancelados versus ativos;
+  - quantidade de cancelados e ativos com atenção maior ou igual a 40.
 - **Fila de atendimento** ([FilaTable.php](../app/app/Filament/Widgets/FilaTable.php))
   - oito ativos com maior exposição mensal;
   - link para o detalhe da empresa;
-  - nível, score, contrato e principal sinal.
+  - nível, atenção, contrato e principal sinal.
 
 A comparação do backtest é explicitamente exploratória e não valida previsão de churn.
 
@@ -482,13 +482,13 @@ Características:
 - ativos aparecem antes dos cancelados;
 - dentro da ordenação, maior exposição aparece primeiro;
 - cancelados ficam visualmente atenuados;
-- o card apresenta nome, código, segmento, porte, nível, score, valor e principal sinal.
+- o card apresenta nome, código, segmento, porte, nível, atenção, valor e principal sinal.
 
 ### 9.3 Detalhe de empresa
 
 A página de detalhe mostra:
 
-- nível e score de sinais;
+- nível e atenção de sinais;
 - contrato mensal e exposição mensal indicativa;
 - plano e SLA contratado;
 - evidências dos últimos três meses;
@@ -523,7 +523,7 @@ Perguntas sobre a carteira cobrem:
 
 Perguntas sobre uma empresa cobrem:
 
-- evidências do score;
+- evidências da atenção;
 - ações recomendadas;
 - empresas canceladas similares;
 - histórico de NPS;
@@ -610,9 +610,9 @@ Serviços previstos na configuração, mas não usados diretamente pelo domínio
 
 ## 13. Limitações e riscos conhecidos
 
-- O cálculo atual é um score de regras, não uma probabilidade de churn.
+- O cálculo atual é um índice de atenção por regras, não uma probabilidade de churn.
 - `risk_probability`, `expected_revenue_at_risk`, `confidence` e `recommended_action_json` não são preenchidos pelo seeder atual.
-- `tickets_critical`, `tickets_within_sla` e `avg_resolution_hours` são armazenados, mas não entram no score atual.
+- `tickets_critical`, `avg_resolution_hours` e `tickets_opened` entram na atenção como métricas extras (a importação as ativa quando há dados; `php artisan seer:ativar-sinais-extras` faz o mesmo para bases já importadas). `tickets_within_sla` continua só armazenado.
 - Não existe recálculo agendado: o risco é recalculado ao importar dados novos e ao alterar pesos ou limiares (`RiskService::recalcular`).
 - Não há CRUD nem edição manual de clientes e não há histórico de importações. A planilha é enviada pela interface (tela Planilha e Configurações › Acrescentar novos meses).
 - Não há API pública, integração com CRM nem e-mail de operação. Há notificações no painel (mudança de nível, reaproximação) e relatórios em PDF.

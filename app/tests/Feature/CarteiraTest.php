@@ -21,6 +21,7 @@ use App\Support\Llm\Escopo;
 use App\Support\Llm\Llm;
 use App\Support\Llm\PerguntasProntas;
 use App\Support\Risco;
+use App\Support\Tenancy\CompanyConfig;
 use App\Support\Tenancy\CompanyContext;
 use App\Support\Validacao\Backtest;
 use Database\Seeders\CustomerDataSeeder;
@@ -286,6 +287,17 @@ class CarteiraTest extends TestCase
         Livewire::test(AssistenteChat::class)->set('codigo', $top->codigo)->call('enviar', 'Por que está em risco?')
             ->assertSee('Resposta local')->assertSee('Modelo local');
         Http::assertSent(fn ($r) => str_contains($r->url(), '/api/chat') && str_contains($r['messages'][0]['content'], $top->nome));
+    }
+
+    public function test_empresa_pode_desligar_a_ia_e_o_chat_responde_por_regras_sem_chamada_externa(): void
+    {
+        $this->entrar();
+        CompanyConfig::definirIa(app(CompanyContext::class)->current(), false);
+        Http::fake();
+
+        Livewire::test(AssistenteChat::class)->call('enviar', 'Resumo da carteira')->assertSee('IA desligada');
+        Http::assertNothingSent();
+        $this->assertFalse(CompanyConfig::ler(app(CompanyContext::class)->current())['ia']);
     }
 
     public function test_chat_barra_pedido_para_sair_do_contexto_sem_chamar_a_ia(): void

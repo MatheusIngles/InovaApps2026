@@ -35,7 +35,14 @@ class CompanyConfig
             'limiares' => $company->limiares(),
             'tema' => $company->tema(),
             'prioridade' => $company->prioridadeK(),
+            'ia' => $company->chat()['enabled'],
         ];
+    }
+
+    /** Liga ou desliga a IA da empresa. Desligada, o chat, o relatório e o configurador usam só respostas por regras, sem enviar nada a provedores externos. */
+    public static function definirIa(Company $company, bool $ligada): void
+    {
+        $company->update(['chat_settings' => [...$company->chat(), 'enabled' => $ligada]]);
     }
 
     /**
