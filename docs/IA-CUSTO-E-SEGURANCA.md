@@ -6,7 +6,7 @@ Perguntas que costumam aparecer sobre o uso de inteligência artificial no proje
 
 | Usa IA | Não usa IA |
 |---|---|
-| Chat do assistente (explicar, resumir e sugerir ações) | **Cálculo da atenção** (regras e pesos fixos) |
+| Chat do assistente (explicar, resumir e sugerir ações) | **Cálculo da atenção** (regras e pesos configuráveis por empresa) |
 | Texto do relatório de evidências em PDF | Fila de atendimento e prazos |
 | Explicação da configuração recomendada | Níveis, exposição mensal e notificações |
 | | Validação com cancelados (backtest) |
