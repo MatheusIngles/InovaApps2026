@@ -147,7 +147,7 @@ class ConfiguracaoEmpresaTest extends TestCase
         $this->actingAs(User::factory()->for($company)->create());
         app(CompanyContext::class)->within($company, fn () => Customer::factory()->create(['company_id' => $company->id])); // já fez a carga inicial
 
-        $this->get('/configuracoes')->assertOk()->assertSee('Prioridades')->assertSee('Fila de prioridade')->assertSee('Níveis de risco')->assertSee('Identidade visual')
+        $this->get('/configuracoes')->assertOk()->assertSee('Prioridades')->assertSee('Fila de prioridade')->assertSee('Níveis de atenção')->assertSee('Identidade visual')
             ->assertSee('Prioridade das métricas')->assertSee('Acrescentar novos meses')->assertSee('Enviar planilha')->assertSee('#115e59', false)->assertSee('Inter')
             ->assertDontSee('Chat com IA')->assertDontSee('Modelo local (Ollama)');
         Livewire::test(Configuracoes::class)->set('data.limiares.critico', 70)->call('salvar')->assertHasNoErrors();

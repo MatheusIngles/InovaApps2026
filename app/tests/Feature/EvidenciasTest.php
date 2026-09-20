@@ -97,6 +97,51 @@ class EvidenciasTest extends TestCase
         $this->actingAs($user)->get(route('relatorios.download', ['arquivo' => $arquivo]))->assertOk();
     }
 
+    public function test_validacao_temporal_calibra_ate_o_corte_e_testa_nos_cancelamentos_seguintes(): void
+    {
+        $company = Company::factory()->create();
+        app(CompanyContext::class)->within($company, function () use ($company) {
+            $meses = collect(range(0, 17))->map(fn (int $i) => date('Y-m', strtotime('2025-01-01 +'.$i.' month')))->all();
+            $cria = function (string $codigo, ?int $saida) use ($company, $meses) {
+                $c = Customer::factory()->create(['company_id' => $company->id, 'external_code' => $codigo, 'status' => $saida ? 'Cancelado' : 'Ativo', 'cancelled_at' => $saida ? $meses[$saida].'-01' : null]);
+                foreach ($meses as $i => $mes) {
+                    CustomerMetric::factory()->create(['customer_id' => $c->id, 'reference_month' => $mes.'-01', 'platform_usage_percentage' => $saida && $i >= $saida - 3 ? 15 : 90,
+                        'sla_percentage' => 100, 'tickets_opened' => 0, 'tickets_reopened' => 0, 'formal_complaints' => 0, 'payment_delay_days' => 0,
+                        'meetings_expected' => 1, 'meetings_completed' => 1]);
+                }
+            };
+            foreach ([9, 10, 11, 10, 11] as $i => $saida) {
+                $cria("T$i", $saida); // 5 cancelamentos em 2025 (calibração)
+            }
+            foreach ([15, 16, 17] as $i => $saida) {
+                $cria("V$i", $saida); // 3 cancelamentos em 2026 (teste)
+            }
+            foreach (range(1, 6) as $i) {
+                $cria("OK$i", null);
+            }
+        });
+
+        $v = app(CompanyContext::class)->within($company, fn () => Backtest::resumo($company))['validacao_temporal'];
+
+        $this->assertTrue($v['suficiente']);
+        $this->assertSame('2025-12', $v['corte']);
+        $this->assertSame(5, $v['treino']['cancelados']);
+        $this->assertSame(3, $v['teste']['cancelados']);
+        $this->assertGreaterThan(0.9, $v['auc']['teste_pesos_treino']); // o padrão aprendido em 2025 vale em 2026
+        $this->assertSame(3, $v['detectados']);
+        $this->assertSame(0.0, $v['alarme_falso_pct']);
+        $this->assertGreaterThan(0, $v['pesos_treino']['uso']);
+    }
+
+    public function test_validacao_temporal_fica_insuficiente_sem_cancelamentos_dos_dois_lados(): void
+    {
+        $company = $this->carteira(); // 1 cancelamento só
+
+        $v = app(CompanyContext::class)->within($company, fn () => Backtest::resumo($company))['validacao_temporal'];
+
+        $this->assertFalse($v['suficiente']);
+    }
+
     public function test_previsao_do_proximo_mes_segue_a_tendencia(): void
     {
         $sobe = Previsao::proximoMes([10, 20, 30, 40]);

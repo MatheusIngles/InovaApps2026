@@ -52,7 +52,7 @@ class Configurador
             $linhas[] = sprintf('- %s: separação %.2f; antecedência %s; alarme falso %s%%; peso sugerido %s', $v['rotulo'], $v['auc'], $v['antecedencia'] === null ? 'n/d' : $v['antecedencia'].' meses', $v['alarme_falso_pct'], $v['peso_sugerido']);
         }
         $linhas[] = '';
-        $linhas[] = 'VARIÁVEIS FORA DO SCORE: são colunas guardadas da planilha que o score atual não usa (ele só soma os sinais acima). A separação é o AUC, calculado com a média dos 3 últimos meses de cada cliente, comparando cancelados (mês antes da saída) e retidos (mês mais recente); mostra correlação, não causa.';
+        $linhas[] = 'VARIÁVEIS FORA DO SCORE: são colunas guardadas da planilha que o cálculo da atenção não usa (ele só soma os sinais acima). A separação é o AUC, calculado com a média dos 3 últimos meses de cada cliente, comparando cancelados (mês antes da saída) e retidos (mês mais recente); mostra correlação, não causa.';
         $linhas[] = 'VARIÁVEIS FORA DO SCORE (separação): '.collect($r['extras'])->map(fn ($v) => $v['rotulo'].' '.number_format($v['auc'], 2, ',', ''))->implode('; ').'.';
         $linhas[] = '';
         $linhas[] = 'EFEITO DE CADA CORTE ATUAL (cancelados alertados / antecedência mediana / alarme falso entre retidos):';
@@ -96,7 +96,7 @@ class Configurador
         return "**Prioridade das métricas.** As que mais separam quem cancelou de quem ficou: {$top}. {$desligadas}\n\n"
             ."**Cortes de alerta.** Recomendados: Médio ≥ {$rec['limiares']['medio']}, Alto ≥ {$rec['limiares']['alto']}, Crítico ≥ {$rec['limiares']['critico']}. "
             ."Com o corte Alto atual (≥ {$alto['limiar']}), {$alto['detectados']} dos {$alto['cancelados']} cancelados foram alertados antes de sair, com {$antecedencia} e {$alto['alarme_falso_pct']}% de alarme falso entre os que ficaram. Cortes mais baixos avisam mais cedo, mas geram mais alarme falso.\n\n"
-            .'**Equilíbrio risco × valor.** O K da fila define o quanto o valor do contrato pesa contra o risco (padrão '.Company::PRIORIDADE_PADRAO.'); é uma decisão de negócio, não dos dados.'."\n\n"
-            .'**Cuidados.** São poucos cancelamentos e a análise usa os mesmos dados da calibração; o score ordena o atendimento, não é probabilidade de cancelamento. Tudo pode ser ajustado em Configurações.';
+            .'**Equilíbrio atenção × valor.** O K da fila define o quanto o valor do contrato pesa contra a atenção (padrão '.Company::PRIORIDADE_PADRAO.'); é uma decisão de negócio, não dos dados.'."\n\n"
+            .'**Cuidados.** São poucos cancelamentos e a análise usa os mesmos dados da calibração; a atenção ordena o atendimento, não é probabilidade de cancelamento. Tudo pode ser ajustado em Configurações.';
     }
 }

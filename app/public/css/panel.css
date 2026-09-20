@@ -125,7 +125,8 @@ input, textarea { caret-color: var(--primary-600); }
 .ui-sinal .ui-acao { color: var(--panel-link); font-weight: 600; }
 .ui-table-wrap { overflow-x: auto; }
 .ui-table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 36rem; }
-.ui-table th { text-align: left; padding: .5rem .6rem; background: var(--panel-raised); color: var(--primary-200); font-weight: 700; white-space: nowrap; }
+.ui-table th { text-align: left; padding: .5rem .6rem; background: var(--panel-raised); color: var(--primary-800); font-weight: 700; white-space: nowrap; } /* legível no tema claro (antes primary-200 sobre fundo claro) */
+.fi.dark .ui-table th { color: var(--primary-200); }
 .ui-table td { padding: .5rem .6rem; border-top: 1px solid var(--panel-border); color: var(--panel-muted); font-variant-numeric: tabular-nums; }
 .ui-list { list-style: none; margin: .75rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }
 .ui-list a { display: flex; gap: .75rem; align-items: center; padding: .5rem; border-radius: .6rem; text-decoration: none; color: var(--panel-text); }
@@ -318,7 +319,10 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .ev-seg-multi { display: flex; flex-wrap: wrap; gap: .25rem; border-radius: 1.25rem; margin: .5rem 0 1rem; }
 .ev-linha { cursor: pointer; }
 .ev-seg button:focus-visible { outline: 3px solid var(--primary-300); outline-offset: 2px; }
-.ev-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; }
+.ev:has(> .ev-kpis) { container-type: inline-size; }
+.ev-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; } /* 4 em largo, 2 em médio, 1 em estreito: sem cartão sozinho na última linha */
+@container (min-width: 52rem) { .ev-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container (max-width: 24rem) { .ev-kpis { grid-template-columns: minmax(0, 1fr); } }
 .ev-kpi { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .35rem; }
 .ev-kpi span { font-size: .85rem; color: var(--panel-muted); }
 .ev-kpi strong { font-size: 1.7rem; font-weight: 800; color: var(--panel-text); line-height: 1.1; }
@@ -368,3 +372,29 @@ body:has(.chatbot) .ac-voz:not(.no-topo) { bottom: 7rem; }
 .fi-tt button[aria-pressed="true"] { color: var(--primary-400); background: color-mix(in srgb, var(--primary-500) 12%, transparent); }
 .fi-tt small { font-size: .7em; font-weight: 800; }
 .fi-tt-nivel { font-size: .75rem; font-variant-numeric: tabular-nums; }
+
+/* Indicadores: 2 colunas alinhadas no celular (sem os divisores laterais, que desalinhavam ao quebrar linha) */
+@media (max-width: 640px) {
+  .ui-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .ui-stats div, .ui-stats div:first-child { padding: 0; border-left: 0; }
+}
+
+/* Abas no celular: quebram em linhas em vez de rolar na horizontal (as últimas ficavam escondidas) */
+@media (max-width: 640px) {
+  .fi-tabs, .empresa-abas-nav { flex-wrap: wrap; overflow-x: visible; row-gap: .25rem; }
+}
+
+/* Leitura em voz alta: ao clicar, as ondas do som surgem em sequência e um anel se expande; ligado, as ondas pulsam. */
+@keyframes ac-onda-surge { 0% { opacity: 0; transform: translateX(-4px) scale(.6); } 60% { opacity: 1; transform: translateX(0) scale(1.15); } 100% { opacity: 1; transform: none; } }
+@keyframes ac-onda-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes ac-anel { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-500) 55%, transparent); } 100% { box-shadow: 0 0 0 .9rem transparent; } }
+@keyframes ac-alto-falante { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.18); } 70% { transform: scale(.94); } }
+.ac-voz .ac-onda { transform-box: fill-box; transform-origin: left center; }
+.ac-voz.tocou { animation: ac-anel .6s ease-out; }
+.ac-voz.tocou svg { animation: ac-alto-falante .45s ease-out; }
+.ac-voz.tocou.ligado .ac-onda-1 { animation: ac-onda-surge .4s ease-out both; }
+.ac-voz.tocou.ligado .ac-onda-2 { animation: ac-onda-surge .4s .18s ease-out both; }
+.ac-voz.ligado:not(.tocou) .ac-onda-1 { animation: ac-onda-pulsa 1.4s ease-in-out infinite; }
+.ac-voz.ligado:not(.tocou) .ac-onda-2 { animation: ac-onda-pulsa 1.4s .3s ease-in-out infinite; }
+.ac-voz:not(.ligado) .ac-onda-2 { opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .ac-voz, .ac-voz svg, .ac-voz .ac-onda { animation: none !important; } }

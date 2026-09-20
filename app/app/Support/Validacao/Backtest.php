@@ -9,10 +9,10 @@ use App\Support\Risco;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Backtest do score com o histórico da carteira: responde às três perguntas do desafio
+ * Backtest do risco com o histórico da carteira: responde às três perguntas do desafio
  * (antecedência do sinal, separação/alarme falso e quanto cada variável pesa) só com os dados importados.
  *
- * Para cada cliente e mês (com pelo menos 3 meses de histórico) recalcula severidades e score como o sistema faria
+ * Para cada cliente e mês (com pelo menos 3 meses de histórico) recalcula severidades e risco como o sistema faria
  * naquele mês. "Cancelados": os meses antes da saída. "Retidos": clientes ativos, em todos os meses.
  * Limite honesto: poucos eventos (a base tem 22 cancelamentos) e avaliação nos mesmos dados usados para calibrar.
  */
@@ -23,7 +23,7 @@ class Backtest
 
     public const MINIMO_CANCELADOS = 5;
 
-    /** Variáveis candidatas que o score não usa (média dos 3 últimos meses, valor bruto). */
+    /** Variáveis candidatas que o risco não usa (média dos 3 últimos meses, valor bruto). */
     public const EXTRAS = [
         'tickets_critical' => 'Chamados críticos',
         'avg_resolution_hours' => 'Tempo médio de resolução (h)',
@@ -58,7 +58,7 @@ class Backtest
     }
 
     /**
-     * Severidades, score e variáveis extras de cada mês de um cliente (a partir do 3º mês, que fecha a janela do score).
+     * Severidades, risco e variáveis extras de cada mês de um cliente (a partir do 3º mês, que fecha a janela do risco).
      * Para cancelados só entram os meses anteriores à saída.
      *
      * @param  array<string, float|int>  $pesos
@@ -72,7 +72,7 @@ class Backtest
 
         foreach ($metricas as $i => $m) {
             if ($i < 2) {
-                continue; // o score usa a janela dos 3 últimos meses
+                continue; // o risco usa a janela dos 3 últimos meses
             }
             $janela = $metricas->slice(0, $i + 1)->map(fn ($x): array => [
                 'chamados_abertos' => $x->tickets_opened, 'chamados_reabertos' => $x->tickets_reopened, 'pct_sla_cumprido' => $x->sla_percentage,
@@ -107,7 +107,7 @@ class Backtest
     }
 
     /**
-     * Antecedência do alerta persistente: há quantos meses da saída o score passou de $limiar e ficou acima até o fim.
+     * Antecedência do alerta persistente: há quantos meses da saída o risco passou de $limiar e ficou acima até o fim.
      * Nulo = não estava em alerta no último mês antes da saída (não detectado).
      *
      * @param  callable(array): float  $valor  valor do mês a comparar
@@ -151,7 +151,7 @@ class Backtest
     {
         $pesos = $company->pesos();
 
-        return Cache::remember(self::chave($company, 'resumo'), now()->addHour(), function () use ($company, $pesos): array {
+        return Cache::remember(self::chave($company, 'resumo:v2'), now()->addHour(), function () use ($company, $pesos): array {
             $b = new self($pesos);
             $l = $company->limiares();
             $niveis = ['medio' => $l['medio'], 'alto' => $l['alto'], 'critico' => $l['critico']];
@@ -163,6 +163,7 @@ class Backtest
                 'extras' => $b->extras(),
                 'perfis' => $b->perfis(),
                 'segmentos' => $b->porSegmento(),
+                'validacao_temporal' => $b->validacaoTemporal(),
                 'evidencia_suficiente' => $b->evidenciaSuficiente(),
                 'auc_atual' => $b->aucScore(),
                 'auc_sugerido' => $b->aucComPesosSugeridos(),
@@ -281,7 +282,81 @@ class Backtest
         return $out;
     }
 
-    /** Variáveis candidatas que o score não usa, na mesma régua (AUC). */
+    /**
+     * Validação em período separado (sem olhar o futuro): calibra pesos e corte só com o que se sabia até o fim do ano
+     * anterior ao último cancelamento e testa nos cancelamentos seguintes.
+     *
+     * Treino: cancelados até o corte (último mês antes da saída) contra os clientes ainda ativos naquele mês (mesmo os que
+     * saíram depois: na época eram ativos). Teste: cancelados depois do corte contra os que nunca cancelaram (mês mais recente).
+     *
+     * @return array{suficiente: bool, corte: ?string, treino: array{cancelados: int, ativos: int}, teste: array{cancelados: int, ativos: int}, pesos_treino: array<string, float>, corte_alto: ?int, auc: array<string, float>, detectados: int, alarme_falso_pct: float}
+     */
+    public function validacaoTemporal(): array
+    {
+        $saidas = array_filter(array_column($this->cancelados(), 'saida'));
+        $vazio = ['suficiente' => false, 'corte' => null, 'treino' => ['cancelados' => 0, 'ativos' => 0], 'teste' => ['cancelados' => 0, 'ativos' => 0], 'pesos_treino' => [], 'corte_alto' => null, 'auc' => [], 'detectados' => 0, 'alarme_falso_pct' => 0.0];
+
+        if (! $saidas) {
+            return $vazio;
+        }
+        $corte = ((int) substr(max($saidas), 0, 4) - 1).'-12';
+        $daSaida = fn (array $s): array => end($s['meses']);
+        $noCorte = fn (array $s): ?array => collect($s['meses'])->firstWhere('mes', $corte);
+
+        $trainPos = array_values(array_map($daSaida, array_filter($this->cancelados(), fn ($s) => $s['saida'] <= $corte)));
+        $trainNeg = array_values(array_filter(array_map(
+            fn ($s) => ($s['cancelado'] && $s['saida'] <= $corte) ? null : $noCorte($s),
+            $this->series,
+        )));
+        $testPos = array_values(array_map($daSaida, array_filter($this->cancelados(), fn ($s) => $s['saida'] > $corte)));
+        $testNeg = array_values(array_map($daSaida, $this->retidos()));
+
+        $r = $vazio;
+        $r['corte'] = $corte;
+        $r['treino'] = ['cancelados' => count($trainPos), 'ativos' => count($trainNeg)];
+        $r['teste'] = ['cancelados' => count($testPos), 'ativos' => count($testNeg)];
+
+        if (count($trainPos) < self::MINIMO_CANCELADOS || count($testPos) < 3 || count($trainNeg) < self::MINIMO_CANCELADOS || count($testNeg) < self::MINIMO_CANCELADOS) {
+            return $r;
+        }
+
+        // pesos calibrados só no treino: proporcionais ao quanto cada variável separa (acima de 0,5)
+        $ganho = [];
+        foreach (array_keys(Risco::PESOS) as $k) {
+            $ganho[$k] = max(0.0, $this->auc(array_column(array_column($trainPos, 'sev'), $k), array_column(array_column($trainNeg, 'sev'), $k)) - 0.5);
+        }
+        $soma = array_sum($ganho);
+        $pesos = $soma > 0 ? array_map(fn ($g) => round($g / $soma * 100, 1), $ganho) : Risco::PESOS;
+        $f = fn (array $pesosUsados) => fn (array $m): float => array_sum(Risco::pontos($m['sev'], $pesosUsados));
+        $auc = fn (array $pos, array $neg, array $p) => $this->auc(array_map($f($p), $pos), array_map($f($p), $neg));
+
+        // corte "Alto" do treino: o menor em que o alarme falso entre os ativos do treino fica em até 8%
+        $scoresNeg = array_map($f($pesos), $trainNeg);
+        $corteAlto = null;
+        foreach (range(1, 100) as $t) {
+            if (count(array_filter($scoresNeg, fn ($v) => $v >= $t)) / count($scoresNeg) <= 0.08) {
+                $corteAlto = $t;
+                break;
+            }
+        }
+        $testPosScores = array_map($f($pesos), $testPos);
+        $testNegScores = array_map($f($pesos), $testNeg);
+
+        $r['suficiente'] = true;
+        $r['pesos_treino'] = $pesos;
+        $r['corte_alto'] = $corteAlto;
+        $r['auc'] = [
+            'treino' => $auc($trainPos, $trainNeg, $pesos),
+            'teste_pesos_treino' => $auc($testPos, $testNeg, $pesos),
+            'teste_pesos_padrao' => $auc($testPos, $testNeg, Risco::PESOS),
+        ];
+        $r['detectados'] = $corteAlto === null ? 0 : count(array_filter($testPosScores, fn ($v) => $v >= $corteAlto));
+        $r['alarme_falso_pct'] = $corteAlto === null ? 0.0 : round(100 * count(array_filter($testNegScores, fn ($v) => $v >= $corteAlto)) / count($testNegScores), 1);
+
+        return $r;
+    }
+
+    /** Variáveis candidatas que o risco não usa, na mesma régua (AUC). */
     public function extras(): array
     {
         $canc = array_map(fn ($s) => end($s['meses']), $this->cancelados());
@@ -329,7 +404,7 @@ class Backtest
                     'efeito' => min(1.0, ($mc - $mr) / max(1.0, $mr)), 'texto' => sprintf('média de %s nos cancelados contra %s nos que ficaram', number_format($mc, 1, ',', '.'), number_format($mr, 1, ',', '.'))];
             }
             usort($itens, fn ($a, $b) => $b['efeito'] <=> $a['efeito']);
-            // variáveis do score: as 3 mais elevadas (a partir de 15 pontos acima dos retidos); extras (fora do score): só se 50% acima
+            // variáveis do score: as 3 mais elevadas (a partir de 15 pontos acima dos retidos); extras (fora do risco): só se 50% acima
             $elevados = array_slice(array_filter($itens, fn ($i) => ! $i['extra'] && $i['efeito'] >= 0.15), 0, 3);
             $elevados = array_merge($elevados, array_slice(array_filter($itens, fn ($i) => $i['extra'] && $i['efeito'] >= 0.5), 0, 2));
 
@@ -370,7 +445,7 @@ class Backtest
     }
 
     /**
-     * Cortes de nível calibrados pela carteira: o menor score em que o alarme falso (meses de clientes retidos acima do corte)
+     * Cortes de nível calibrados pela carteira: o menor risco em que o alarme falso (meses de clientes retidos acima do corte)
      * fica dentro do alvo: 30% para Médio, 8% para Alto e 2% para Crítico. Respeita a ordem e um espaço mínimo entre níveis.
      *
      * @return array{medio: int, alto: int, critico: int}
@@ -418,7 +493,7 @@ class Backtest
         return $out;
     }
 
-    /** AUC do score completo (último mês antes da saída vs. mês mais recente dos retidos) com os pesos dados. */
+    /** AUC do risco completo (último mês antes da saída vs. mês mais recente dos retidos) com os pesos dados. */
     public function aucScore(?array $pesos = null): float
     {
         $pesos ??= $this->pesos;

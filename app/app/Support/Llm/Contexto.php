@@ -19,7 +19,7 @@ class Contexto
 ".$prompt.'
 
 '.self::prioridades().'
-Use a ordem e os pesos dessas métricas para explicar o score e priorizar as recomendações. Métricas desativadas não contribuem para o score. Não confunda o peso configurado com a pontuação efetiva do cliente; para explicar o risco atual, cite os sinais e os pontos da avaliação.
+Use a ordem e os pesos dessas métricas para explicar a atenção (índice de 0 a 100) e priorizar as recomendações. Métricas desativadas não contribuem para a atenção. Não confunda o peso configurado com a pontuação efetiva do cliente; para explicar o risco atual, cite os sinais e os pontos da avaliação.
 '.($company->chat()['instrucoes'] ? '
 
 INSTRUÇÕES DA EMPRESA:
@@ -36,7 +36,7 @@ INSTRUÇÕES DA EMPRESA:
 
         $pesos = $company->pesos();
         $total = array_sum($pesos);
-        $linhas = ['PRIORIDADES DAS MÉTRICAS DESTA EMPRESA (ordem configurada; participação no score):'];
+        $linhas = ['PRIORIDADES DAS MÉTRICAS DESTA EMPRESA (ordem configurada; participação na atenção):'];
         $posicao = 0;
 
         foreach ($pesos as $chave => $peso) {
@@ -62,15 +62,15 @@ INSTRUÇÕES DA EMPRESA:
     public static function empresa(Customer $c): string
     {
         $linhas = [
-            "EMPRESA EM FOCO: {$c->nome} (código {$c->codigo})",
+            "CLIENTE EM FOCO: {$c->nome} (código {$c->codigo})",
             "Segmento: {$c->segmento} | Porte: {$c->porte} | Plano: {$c->plano} | Cliente desde: {$c->inicio}",
             'Contrato: '.Customer::brl($c->valor)."/mês, SLA contratado {$c->sla_h}h",
-            'Situação: '.($c->cancelada() ? "CANCELADA em {$c->mes_cancel}" : 'ATIVA')." | Risco: {$c->score}% ({$c->nivel}) | Exposição mensal: ".Customer::brl($c->exposicao),
+            'Situação: '.($c->cancelada() ? "CANCELADA em {$c->mes_cancel}" : 'ATIVA')." | Atenção: {$c->score}/100 ({$c->nivel}) | Exposição mensal: ".Customer::brl($c->exposicao),
             '',
             'SINAIS DE ALERTA (últimos 3 meses):',
             ...($c->sinais ? array_map(fn ($s) => "- {$s['label']}: {$s['texto']} → ação sugerida: {$s['acao']}", $c->sinais) : ['- nenhum sinal relevante']),
             '',
-            'EMPRESAS QUE CANCELARAM EM ESTADO SIMILAR:',
+            'CLIENTES QUE CANCELARAM EM ESTADO SIMILAR:',
             ...array_map(fn ($s) => "- {$s['nome']}: {$s['sim']}% de semelhança, saiu em {$s['mes_cancel']}", $c->similares),
             '',
             'NPS (mês: nota): '.implode(', ', array_map(fn ($n) => "{$n['mes']}: {$n['nota']}", array_slice($c->nps, -8))),
@@ -86,10 +86,10 @@ INSTRUÇÕES DA EMPRESA:
     {
         $ativas = Customer::ativas();
         $linhas = [
-            'CONTEXTO: visão geral da carteira (sem empresa específica em foco).',
+            'CONTEXTO: visão geral da carteira (sem cliente específico em foco).',
             "Clientes ativos: {$ativas->count()} | Receita mensal ativa: ".Customer::brl($ativas->sum('valor')).' | Exposição mensal total: '.Customer::brl($ativas->sum('exposicao')),
             'FILA DE ATENDIMENTO (top 10 por prioridade = risco × valor do contrato):',
-            ...$ativas->take(10)->map(fn ($c, $i) => ($i + 1).". {$c->nome} ({$c->codigo}) — {$c->nivel}, risco {$c->score}%, ".Customer::brl($c->valor).'/mês, principal motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->all(),
+            ...$ativas->take(10)->map(fn ($c, $i) => ($i + 1).". {$c->nome} ({$c->codigo}) — {$c->nivel}, atenção {$c->score}/100, ".Customer::brl($c->valor).'/mês, principal motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->all(),
         ];
 
         return implode("\n", $linhas);

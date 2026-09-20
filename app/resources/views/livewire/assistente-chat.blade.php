@@ -39,10 +39,10 @@
         </div>
         <div class="chatbot-tools">
             <x-filament::input.wrapper>
-                <x-filament::input.select wire:model.live="codigo" aria-label="Empresa em foco">
+                <x-filament::input.select wire:model.live="codigo" aria-label="Cliente em foco">
                     <option value="">Carteira inteira</option>
                     @foreach ($empresas as $e)
-                        <option value="{{ $e->codigo }}">{{ $e->codigo }} · {{ $e->nome }}{{ $e->cancelada() ? ' (cancelada)' : '' }}</option>
+                        <option value="{{ $e->codigo }}">{{ $e->codigo }} · {{ $e->nome }}{{ $e->cancelada() ? ' (cancelado)' : '' }}</option>
                     @endforeach
                 </x-filament::input.select>
             </x-filament::input.wrapper>
@@ -57,7 +57,7 @@
         @empty
             <div class="chatbot-vazio" x-show="!pendente">
                 <h2>{{ $foco ? 'Pergunte sobre '.$foco->nome : 'Como posso ajudar com a carteira?' }}</h2>
-                <p>{{ $foco ? 'Tenho o contexto completo desta empresa: contrato, sinais de risco, NPS, histórico e cancelados parecidos.' : 'Escolha uma empresa acima ou cite o código dela (ex.: C012) para uma resposta específica.' }}</p>
+                <p>{{ $foco ? 'Tenho o contexto completo deste cliente: contrato, sinais de risco, NPS, histórico e cancelados parecidos.' : 'Escolha um cliente acima ou cite o código dele (ex.: C012) para uma resposta específica.' }}</p>
                 <div class="chatbot-sug">
                     @foreach ($sugestoes as $s)
                         <button type="button" x-on:click="enviar(@js($s))" :disabled="pendente">{{ $s }}</button>

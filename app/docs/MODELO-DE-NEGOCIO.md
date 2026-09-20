@@ -31,7 +31,7 @@ Com a carteira do desafio: se o Seer evitar **10% dos cancelamentos** (2 dos 22)
 - Diferencial de custo de aquisição: implantação por planilha, sem projeto de integração no início.
 
 ## Como cresce
-1. Entrada pelo desafio: prova com a carteira real (antecedência do alerta e alarme falso mostrados na tela de Evidências).
+1. Entrada pelo desafio: prova com a carteira real (antecedência do alerta e alarme falso mostrados no relatório de evidências e na aba Por segmento).
 2. Expansão: mais contas e mais unidades da mesma empresa; integração automática dos dados (fim da planilha).
 3. Aprendizado: cada cancelamento novo recalibra os pesos da própria carteira, o que aumenta a precisão com o uso.
 

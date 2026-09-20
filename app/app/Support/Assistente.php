@@ -23,7 +23,7 @@ class Assistente
             $resposta = Contexto::prioridades();
 
             if ($c) {
-                $resposta .= "\n\n{$c->nome}: risco {$c->score}% ({$c->nivel}).";
+                $resposta .= "\n\n{$c->nome}: atenção {$c->score}/100 ({$c->nivel}).";
                 $resposta .= "\nSinais que mais contribuíram nesta avaliação: ".
                     (collect($c->sinais)->map(fn ($s) => "{$s['label']} (+{$s['pts']} pts)")->join(', ') ?: 'nenhum sinal em destaque').'.';
             }
@@ -36,7 +36,7 @@ class Assistente
 
     private static function sobreEmpresa(Customer $c, string $q): string
     {
-        $cab = "{$c['nome']} ({$c['codigo']}) — {$c['nivel']}, risco {$c['score']}%.";
+        $cab = "{$c['nome']} ({$c['codigo']}) — {$c['nivel']}, atenção {$c['score']}/100.";
         $sinais = collect($c['sinais']);
         if ($c['status'] === 'Cancelado') {
             $cab .= " Cancelou em {$c['mes_cancel']}.";
@@ -70,17 +70,17 @@ class Assistente
         $risco = $a->where('score', '>=', 40);
 
         if (Str::contains($q, ['receita', 'exposi', 'dinheiro', 'financeir'])) {
-            return 'Exposição mensal indicativa (risco × valor): '.Customer::brl($a->sum('exposicao')).' de '.Customer::brl($a->sum('valor')).
+            return 'Exposição mensal indicativa (atenção × valor): '.Customer::brl($a->sum('exposicao')).' de '.Customer::brl($a->sum('valor')).
                 '. Clientes com risco alto/crítico somam '.Customer::brl($risco->sum('valor')).'/mês.';
         }
         if (Str::contains($q, ['segmento', 'setor'])) {
-            return "Risco médio por segmento (ativos):\n".$a->groupBy('segmento')->map(fn ($g) => round($g->avg('score')))
+            return "Atenção média por segmento (ativos):\n".$a->groupBy('segmento')->map(fn ($g) => round($g->avg('score')))
                 ->sortDesc()->map(fn ($v, $k) => "• $k: $v")->join("\n");
         }
         if (Str::contains($q, ['cancel', 'churn', 'saiu', 'sairam'])) {
             $x = Customer::dashboard()->where('customers.status', 'Cancelado')->get();
 
-            return "{$x->count()} clientes cancelaram (".Customer::brl($x->sum('valor')).'/mês). Na última avaliação anterior à saída, tinham score médio '.round($x->avg('score')).
+            return "{$x->count()} clientes cancelaram (".Customer::brl($x->sum('valor')).'/mês). Na última avaliação anterior à saída, tinham atenção média '.round($x->avg('score')).
                 ' vs '.round($a->avg('score')).' dos ativos na avaliação mais recente; comparação exploratória.';
         }
         if (Str::contains($q, ['resumo', 'quantos', 'carteira', 'geral'])) {
@@ -92,6 +92,6 @@ class Assistente
                 Customer::brl($c->valor).'/mês, motivo: '.($c->sinais[0]['label'] ?? 'sem sinal forte'))->join("\n");
         }
 
-        return 'Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre uma empresa: cite o código, ex.: "por que C012 está em risco?" ou "o que fazer com C012?".';
+        return 'Posso responder sobre a carteira (resumo, quem ligar primeiro, receita em risco, segmentos, cancelamentos) ou sobre um cliente: cite o código, ex.: "por que C012 está em risco?" ou "o que fazer com C012?".';
     }
 }
