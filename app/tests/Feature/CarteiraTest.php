@@ -15,8 +15,10 @@ use App\Models\CustomerNps;
 use App\Models\RiskAssessment;
 use App\Models\User;
 use App\Support\Assistente;
+use App\Support\Llm\Contexto;
 use App\Support\Llm\Escopo;
 use App\Support\Llm\Llm;
+use App\Support\Llm\PerguntasProntas;
 use App\Support\Risco;
 use App\Support\Tenancy\CompanyContext;
 use Database\Seeders\CustomerDataSeeder;
@@ -235,6 +237,41 @@ class CarteiraTest extends TestCase
         $this->assertSame('Contato esta semana', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA * 4, 'Médio'));
         $this->assertSame('Acompanhar no ciclo normal', Risco::prazoPorPosicao(Risco::CONTATOS_POR_DIA * 5 + 1, 'Alto'));
         $this->assertSame('Acompanhar no ciclo normal', Risco::prazoPorPosicao(1, 'Baixo')); // sem alerta, sem prazo
+    }
+
+    public function test_perguntas_prontas_sao_25_ou_mais_unicas_e_passam_pela_barreira_de_escopo(): void
+    {
+        $todas = [...PerguntasProntas::CARTEIRA, ...PerguntasProntas::CLIENTE];
+
+        $this->assertGreaterThanOrEqual(25, count($todas));
+        $this->assertSame($todas, array_values(array_unique($todas)));
+        foreach ($todas as $pergunta) {
+            $this->assertFalse(Escopo::tentaBurlar($pergunta), "A barreira de escopo bloquearia: $pergunta");
+            $this->assertLessThanOrEqual(500, mb_strlen($pergunta));
+        }
+    }
+
+    public function test_chat_entrega_ao_campo_as_perguntas_prontas_da_carteira_ou_do_cliente(): void
+    {
+        $this->entrar();
+        $top = Customer::ativas()->first();
+
+        $this->assertSame(PerguntasProntas::CARTEIRA, Livewire::test(AssistenteChat::class)->viewData('prontas'));
+        $this->assertSame(PerguntasProntas::CLIENTE, Livewire::test(AssistenteChat::class)->set('codigo', $top->codigo)->viewData('prontas'));
+        $this->get('/assistente')->assertOk()->assertSee('chatbot-prontas', false)->assertSee('role="combobox"', false);
+    }
+
+    public function test_contexto_da_ia_explica_atencao_niveis_fila_e_traz_os_destaques_ja_calculados(): void
+    {
+        $this->entrar();
+        $ctx = Contexto::sistema(null);
+        $fila = Customer::ativas()->take(10);
+
+        $this->assertStringContainsString('NÃO é a probabilidade', $ctx);
+        $this->assertStringContainsString('Ordem da fila de atendimento', $ctx);
+        $this->assertStringContainsString('Baixo (abaixo de', $ctx);
+        $this->assertStringContainsString('maior atenção = '.$fila->sortByDesc('score')->first()->nome, $ctx);
+        $this->assertStringContainsString('maior contrato = '.$fila->sortByDesc('valor')->first()->nome, $ctx);
     }
 
     public function test_chat_usa_ollama_com_contexto_da_empresa(): void
