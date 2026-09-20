@@ -86,7 +86,7 @@ Não existe API própria, prefixo `/api`, controller de domínio ou endpoint pú
 
 ### 3.4 Autorização
 
-[User.php](../app/Models/User.php) permite acesso ao painel para qualquer usuário autenticado. Não há perfis, papéis, permissões por equipe ou isolamento por tenant.
+Multi-tenancy: todo usuário pertence a uma empresa (`company_id`). O middleware [SetCompanyContext.php](../app/Http/Middleware/SetCompanyContext.php) define a empresa ativa (a do usuário; em telas públicas, por subdomínio ou `?empresa=`, via [TenantResolver.php](../app/Support/Tenancy/TenantResolver.php)) e o trait `BelongsToCompany` filtra toda consulta e grava o `company_id` em toda inserção. Dados, configuração, chat e relatórios são isolados por empresa. Dentro da empresa, todo usuário autenticado tem acesso integral: não há perfis, papéis nem permissões por equipe.
 
 ## 4. Organização do código
 
@@ -126,7 +126,7 @@ Comportamentos importantes:
 - `ativas()` retorna somente clientes com status `Ativo`.
 - `ordenar()` coloca ativos antes de cancelados e ordena pela exposição decrescente.
 - `score` vem de `health_score`.
-- `exposicao` vem de `priority_score`.
+- `exposicao` vem de `exposure_indicator`.
 - `nivel` é derivado pelos limiares de [Risco.php](../app/Support/Risco.php).
 - `sinais` e `similares` são lidos de `signals_json`.
 - `hist` e `nps` transformam os dados persistidos em estruturas próprias para a tela.
@@ -173,7 +173,7 @@ Armazena o resultado calculado para um cliente, mês de referência e versão de
 Campos relevantes:
 
 - `health_score`: score de regras entre 0 e 100;
-- `priority_score`: exposição financeira mensal indicativa;
+- `exposure_indicator`: exposição financeira mensal indicativa;
 - `risk_probability`: reservado para probabilidade estatística; atualmente nulo;
 - `expected_revenue_at_risk`: reservado para receita esperada em risco; atualmente nulo;
 - `confidence`: reservado para confiança do modelo; atualmente nulo;
@@ -252,7 +252,7 @@ A migration [2026_09_19_134141_add_rule_score_to_risk_assessments_table.php](../
 | `reference_month` | date | último mês considerado |
 | `health_score` | unsigned tinyint nullable | score efetivo, 0 a 100 |
 | `risk_probability` | decimal(7,6) nullable | não calculado |
-| `priority_score` | decimal(14,2) nullable | exposição indicativa |
+| `exposure_indicator` | decimal(14,2) nullable | exposição indicativa |
 | `expected_revenue_at_risk` | decimal(14,2) nullable | não calculado |
 | `confidence` | string nullable | não calculado |
 | `signals_json` | json nullable | evidências, severidades e similares |
@@ -412,13 +412,22 @@ Um sinal aparece na interface quando seus pontos atingem pelo menos 35% do peso 
 
 ### 8.5 Exposição e prioridade
 
-A exposição mensal indicativa, persistida em `priority_score`, é:
+A exposição mensal indicativa, persistida em `exposure_indicator` (antes `priority_score`), é:
 
 ```text
-exposição_mensal = score / 100 x valor_mensal_do_contrato
+exposição_mensal = atenção / 100 x valor_mensal_do_contrato
 ```
 
-Isso não é uma perda esperada estatística. É uma aproximação operacional que combina intensidade de sinais com valor do contrato para ordenar a fila de atendimento.
+Isso não é uma perda esperada estatística: é um indicador de tamanho do que está em jogo.
+
+A **ordem da fila** não usa esse campo. Ela é calculada na consulta, em um só lugar (`Customer::RANKING_SQL` e `Customer::ranking()`), porque depende do `K` configurável da empresa e não pode ficar defasada:
+
+```text
+1º grupo: clientes ativos em alerta (atenção >= corte Médio); 2º grupo: os demais ativos; cancelados por último
+dentro de cada grupo: atenção x (atenção + K) x valor_mensal_do_contrato, do maior para o menor
+```
+
+Assim, um contrato grande desempata entre clientes que já pedem contato, mas nenhum cliente sem alerta passa na frente de um em alerta.
 
 ### 8.6 Similaridade
 
@@ -493,12 +502,14 @@ A página Filament está em [Assistente.php](../app/Filament/Pages/Assistente.ph
 O componente:
 
 - mantém mensagens no estado da sessão do componente;
-- limita a pergunta a 300 caracteres;
 - permite foco na carteira ou em uma empresa;
 - não persiste conversas;
-- não chama LLM ou API externa.
+- limita a pergunta a 500 caracteres;
+- responde com um LLM: Ollama local por padrão, ou uma API compatível com OpenAI para contextos maiores (`config/llm.php`), com o contexto da empresa ou do cliente em foco;
+- barra perguntas fora do assunto e tentativas de mudar as regras ([Escopo.php](../app/Support/Llm/Escopo.php)): um filtro antes da chamada e uma instrução no prompt, que faz o modelo responder `FORA_DO_ESCOPO`;
+- se o LLM estiver indisponível, cai nas respostas por regras.
 
-A lógica de resposta está em [Assistente.php](../app/Support/Assistente.php). Ela normaliza caixa e acentos, identifica códigos no formato `C###` e usa palavras-chave.
+As respostas por regras estão em [Assistente.php](../app/Support/Assistente.php). Elas normalizam caixa e acentos, identificam códigos no formato `C###` e usam palavras-chave.
 
 Perguntas sobre a carteira cobrem:
 
@@ -600,16 +611,17 @@ Serviços previstos na configuração, mas não usados diretamente pelo domínio
 - O cálculo atual é um score de regras, não uma probabilidade de churn.
 - `risk_probability`, `expected_revenue_at_risk`, `confidence` e `recommended_action_json` não são preenchidos pelo seeder atual.
 - `tickets_critical`, `tickets_within_sla` e `avg_resolution_hours` são armazenados, mas não entram no score atual.
-- Não existe recálculo agendado; o cálculo acontece no seeding.
-- Não há CRUD, edição manual, upload de planilha pela interface ou histórico de importações.
-- Não há API pública, integração com CRM, notificações, exportação ou e-mail de operação.
-- O assistente é baseado em palavras-chave e não mantém histórico persistente.
-- Todos os usuários autenticados têm acesso integral ao painel.
+- Não existe recálculo agendado: o risco é recalculado ao importar dados novos e ao alterar pesos ou limiares (`RiskService::recalcular`).
+- Não há CRUD nem edição manual de clientes e não há histórico de importações. A planilha é enviada pela interface (tela Planilha e Configurações › Acrescentar novos meses).
+- Não há API pública, integração com CRM nem e-mail de operação. Há notificações no painel (mudança de nível, reaproximação) e relatórios em PDF.
+- O assistente usa LLM (Ollama local ou API externa), com fallback por regras; a conversa não é persistida e o modelo pode errar. A barreira de escopo é um filtro mais uma instrução ao modelo, e não é infalível.
+- Todos os usuários autenticados têm acesso integral ao painel da própria empresa; não há papéis nem permissões.
 - Existem credenciais demonstrativas fixas no seeder.
-- A lista de empresas é somente leitura.
+- A lista de clientes é somente leitura.
 - Os dados do dashboard dependem da existência de avaliações `rules-v1`.
 - A comparação entre ativos e cancelados é exploratória; não deve ser interpretada como validação estatística.
-- O README principal ainda é o README padrão do Laravel; este documento é a referência atual da arquitetura e do comportamento funcional.
+- A janela de NPS é de 3 meses do calendário (até o mês de referência); sem pesquisa nesse período o sinal de NPS fica neutro. O histórico exibido e o cálculo param no mês anterior à saída de clientes cancelados.
+- A validação em período separado (calibra até o fim do ano anterior ao último cancelamento e testa nos seguintes) usa poucos cancelamentos; os números são indicativos. O "alerta em quem ficou" não é erro certo: um cliente ativo ainda pode cancelar depois.
 
 ## 14. Referências principais
 

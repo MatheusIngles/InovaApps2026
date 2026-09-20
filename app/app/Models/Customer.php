@@ -56,7 +56,7 @@ class Customer extends Model
                 ->on('assessment.customer_id', '=', 'customers.id')
                 ->on('assessment.reference_month', '=', 'latest_assessment.reference_month')
                 ->where('assessment.model_version', '=', 'rules-v1'))
-            ->select('customers.*', 'assessment.health_score as score', 'assessment.priority_score as exposicao')
+            ->select('customers.*', 'assessment.health_score as score', 'assessment.exposure_indicator as exposicao')
             ->with('currentAssessment');
     }
 
@@ -72,7 +72,15 @@ class Customer extends Model
 
         return $query->orderByRaw("customers.status = 'Cancelado'")
             ->orderByRaw('(assessment.health_score >= ?) DESC', [$emAlerta])
-            ->orderByRaw('assessment.health_score * (assessment.health_score + ?) * customers.monthly_value DESC', [$k]);
+            ->orderByRaw(self::RANKING_SQL.' DESC', [$k]);
+    }
+
+    /** Valor de ordenação da fila (único lugar da fórmula): atenção × (atenção + K) × valor mensal do contrato. */
+    public const RANKING_SQL = 'assessment.health_score * (assessment.health_score + ?) * customers.monthly_value';
+
+    public static function ranking(int $atencao, float $valorMensal, int $k): float
+    {
+        return $atencao * ($atencao + $k) * $valorMensal;
     }
 
     public static function ativas(): Collection
@@ -152,7 +160,7 @@ class Customer extends Model
 
     public function getExposicaoAttribute(mixed $value): float
     {
-        return (float) ($value ?? $this->currentAssessment?->priority_score ?? 0);
+        return (float) ($value ?? $this->currentAssessment?->exposure_indicator ?? 0);
     }
 
     public function getNivelAttribute(): string
@@ -163,6 +171,25 @@ class Customer extends Model
     public function getSinaisAttribute(): array
     {
         return $this->currentAssessment?->signals_json['evidence'] ?? [];
+    }
+
+    /** Por que o cliente está na fila: os $quantos principais sinais, em frases curtas. */
+    public function porQue(int $quantos = 2): string
+    {
+        $textos = array_map(fn (array $s): string => $s['texto'], array_slice($this->sinais, 0, $quantos));
+
+        return $textos ? implode('; ', $textos) : 'Sem sinais relevantes';
+    }
+
+    /** O que fazer e com que urgência (nulo para cancelados): urgência do nível + ação do principal sinal. */
+    public function proximoPasso(): ?string
+    {
+        if ($this->cancelada()) {
+            return null;
+        }
+        $acao = $this->sinais[0]['acao'] ?? 'Manter o acompanhamento normal.';
+
+        return (Risco::PRAZOS[$this->nivel] ?? 'Acompanhar').' · '.$acao;
     }
 
     /** Parcelas de todos os sinais, inclusive as menores que o limite dos destaques. */
@@ -209,9 +236,15 @@ class Customer extends Model
         return $this->currentAssessment?->signals_json['similar'] ?? [];
     }
 
+    /** Meses até a saída (o cálculo, o backtest e o gráfico ignoram os posteriores ao cancelamento). */
+    private function antesDaSaida(HasMany $query): HasMany
+    {
+        return $this->cancelled_at ? $query->where('reference_month', '<', $this->cancelled_at) : $query;
+    }
+
     public function getHistAttribute(): array
     {
-        return $this->metrics()->orderBy('reference_month')->get()->map(fn (CustomerMetric $metric): array => [
+        return $this->antesDaSaida($this->metrics()->orderBy('reference_month'))->get()->map(fn (CustomerMetric $metric): array => [
             'mes' => $metric->reference_month->format('Y-m'),
             'abertos' => $metric->tickets_opened,
             'criticos' => $metric->tickets_critical,
@@ -226,7 +259,7 @@ class Customer extends Model
 
     public function getNpsAttribute(): array
     {
-        return $this->npsResponses()->orderBy('reference_month')->get()->map(fn (CustomerNps $response): array => [
+        return $this->antesDaSaida($this->npsResponses()->orderBy('reference_month'))->get()->map(fn (CustomerNps $response): array => [
             'mes' => $response->reference_month->format('Y-m'),
             'nota' => $response->answered ? (string) $response->score : '—',
         ])->all();

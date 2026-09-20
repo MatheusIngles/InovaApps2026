@@ -103,7 +103,7 @@
 
         @if ($validacao_temporal['suficiente'])
             <h3 class="ev-h3">Isso vale para o futuro?</h3>
-            <p class="ui-muted">Calibrando só com os {{ $validacao_temporal['treino']['cancelados'] }} cancelamentos até {{ substr($validacao_temporal['corte'], 5, 2) }}/{{ substr($validacao_temporal['corte'], 0, 4) }} e testando nos {{ $validacao_temporal['teste']['cancelados'] }} seguintes, o alerta pegou <b>{{ $validacao_temporal['detectados'] }} de {{ $validacao_temporal['teste']['cancelados'] }}</b> com {{ $n($validacao_temporal['alarme_falso_pct'], 1) }}% de alarme falso (separação {{ $n($validacao_temporal['auc']['teste_pesos_treino'], 2) }} no teste contra {{ $n($validacao_temporal['auc']['treino'], 2) }} na calibração). Detalhes no relatório de evidências.</p>
+            <p class="ui-muted">Calibrando só com os {{ $validacao_temporal['treino']['cancelados'] }} cancelamentos até {{ substr($validacao_temporal['corte'], 5, 2) }}/{{ substr($validacao_temporal['corte'], 0, 4) }} e testando nos {{ $validacao_temporal['teste']['cancelados'] }} seguintes, o alerta pegou <b>{{ $validacao_temporal['detectados'] }} de {{ $validacao_temporal['teste']['cancelados'] }}</b> com {{ $n($validacao_temporal['alarme_falso_pct'], 1) }}% de alerta em quem ficou (separação {{ $n($validacao_temporal['auc']['teste_pesos_treino'], 2) }} no teste contra {{ $n($validacao_temporal['auc']['treino'], 2) }} na calibração). Detalhes no relatório de evidências.</p>
         @endif
 
         @if ($evidencia_suficiente)

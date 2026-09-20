@@ -73,14 +73,16 @@ class EmpresaResource extends Resource
                     Split::make([
                         TextColumn::make('score')->size(TextSize::Large)->weight(FontWeight::Bold)
                             ->formatStateUsing(fn ($state) => "Atenção {$state}/100")
-                            ->description('8 sinais com pesos ajustáveis; veja as parcelas no cliente.')
                             ->tooltip(fn (Customer $e) => $e->resumoScore()),
                         TextColumn::make('valor')->alignEnd()
                             ->state(fn (Customer $e) => $e->cancelada() ? "Cancelou em {$e->mes_cancel}" : Customer::brl($e->valor).'/mês'),
                     ]),
-                    TextColumn::make('sinais')->color('gray')->size(TextSize::Small)->limit(70)
-                        ->state(fn (Customer $e) => $e->sinais[0]['texto'] ?? 'Sem sinais relevantes')
+                    TextColumn::make('sinais')->color('gray')->size(TextSize::Small)->limit(120)
+                        ->state(fn (Customer $e) => 'Por quê: '.$e->porQue())->tooltip(fn (Customer $e) => $e->porQue(5))
                         ->searchable(['segment', 'external_code']),
+                    TextColumn::make('proximo_passo')->size(TextSize::Small)->weight(FontWeight::Medium)->limit(120)
+                        ->icon('heroicon-o-arrow-right-circle')->state(fn (Customer $e) => $e->proximoPasso())
+                        ->tooltip(fn (Customer $e) => $e->proximoPasso()),
                 ])->space(3),
             ])
             ->filters([
