@@ -1,5 +1,23 @@
 <div class="chatbot" x-data="{
             ouvindo: false, erro: '', rec: null, pendente: null,
+            prontas: @js($prontas), texto: '', ativo: -1, fechado: false, focado: false,
+            /** Sem acento e em minúsculas, para casar 'atencao' com 'atenção'. */
+            norm(s) { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); },
+            /** Campo vazio e em foco: todas as perguntas prontas. Digitando: as que contêm todas as palavras digitadas. */
+            get sugeridas() {
+                if (!this.focado || this.fechado || this.pendente) return [];
+                const q = this.norm(this.texto).trim();
+                if (!q) return this.prontas;
+                const palavras = q.split(/\s+/);
+                return this.prontas.filter(p => { const n = this.norm(p); return n !== q && palavras.every(w => n.includes(w)); }).slice(0, 8);
+            },
+            mover(passo) {
+                const n = this.sugeridas.length;
+                if (!n) return;
+                this.ativo = this.ativo < 0 ? (passo > 0 ? 0 : n - 1) : (this.ativo + passo + n) % n;
+                this.$nextTick(() => document.querySelector('.chatbot-prontas .ativa')?.scrollIntoView({ block: 'nearest' }));
+            },
+            escolher(pergunta) { this.ativo = -1; this.enviar(pergunta); },
             suportado: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
             alternar() {
                 if (this.ouvindo) { this.rec.stop(); return; }
@@ -23,6 +41,7 @@
                 const campo = this.$refs.campo;
                 texto = (texto ?? campo.value).trim().slice(0, 500);
                 if (!texto || this.pendente) return;
+                this.fechado = true; // não reabre a lista sozinha depois da resposta
                 if (this.ouvindo) this.rec.stop();
                 this.pendente = texto;
                 campo.value = '';
@@ -74,7 +93,21 @@
 
     <form class="chatbot-form" x-on:submit.prevent="enviar()">
         <div class="chatbot-composer" :class="{ 'ouvindo': ouvindo }">
+            <ul class="chatbot-prontas" id="chatbot-prontas" role="listbox" aria-label="Perguntas sugeridas" x-show="sugeridas.length" x-cloak>
+                <template x-for="(p, i) in sugeridas" :key="p">
+                    <li role="option" :aria-selected="i === ativo">
+                        <button type="button" tabindex="-1" :class="{ 'ativa': i === ativo }" x-on:mousedown.prevent="escolher(p)" x-text="p"></button>
+                    </li>
+                </template>
+            </ul>
             <input type="text" x-ref="campo" wire:model="pergunta" maxlength="500" autocomplete="off" autofocus
+                   role="combobox" aria-autocomplete="list" aria-controls="chatbot-prontas" :aria-expanded="sugeridas.length > 0"
+                   x-init="focado = document.activeElement === $el"
+                   x-on:focus="focado = true; fechado = false" x-on:blur="focado = false" x-on:click="fechado = false"
+                   x-on:input="texto = $event.target.value; ativo = -1; fechado = false"
+                   x-on:keydown.arrow-down.prevent="fechado ? fechado = false : mover(1)" x-on:keydown.arrow-up.prevent="fechado ? fechado = false : mover(-1)"
+                   x-on:keydown.escape="fechado = true; ativo = -1"
+                   x-on:keydown.enter="if (ativo >= 0 && sugeridas[ativo]) { $event.preventDefault(); escolher(sugeridas[ativo]); }"
                    :placeholder="ouvindo ? 'Ouvindo… pode falar' : @js($foco ? 'Pergunte algo sobre '.$foco->nome.'…' : 'Pergunte sobre a carteira…')" aria-label="Sua pergunta">
             <button type="button" class="chatbot-mic" x-show="suportado" x-cloak x-on:click="alternar()" :aria-pressed="ouvindo"
                     :aria-label="ouvindo ? 'Parar de ouvir' : 'Falar a pergunta'" :title="ouvindo ? 'Parar de ouvir' : 'Falar a pergunta'">

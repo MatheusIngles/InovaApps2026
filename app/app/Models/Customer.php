@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['company_id', 'external_code', 'segment', 'size', 'plan', 'monthly_value', 'contracted_sla_hours', 'contract_started_at', 'status', 'cancelled_at'])]
+#[Fillable(['company_id', 'external_code', 'segment', 'size', 'plan', 'monthly_value', 'contracted_sla_hours', 'contract_started_at', 'status', 'cancelled_at', 'resolved_at'])]
 class Customer extends Model
 {
     /** @use HasFactory<CustomerFactory> */
@@ -71,7 +71,9 @@ class Customer extends Model
         $k = $company?->prioridadeK() ?? Company::PRIORIDADE_PADRAO;
         $emAlerta = $company?->limiares()['medio'] ?? Risco::LIMIARES['medio'];
 
+        // Resolvidos ficam depois dos demais ativos e fora do grupo em alerta.
         return $query->orderByRaw("customers.status = 'Cancelado'")
+            ->orderByRaw('customers.resolved_at IS NOT NULL')
             ->orderByRaw('(assessment.health_score >= ?) DESC', [$emAlerta])
             ->orderByRaw(self::RANKING_SQL.' DESC', [$k]);
     }
@@ -99,9 +101,14 @@ class Customer extends Model
         return $this->status === 'Cancelado';
     }
 
+    public function resolvida(): bool
+    {
+        return ! $this->cancelada() && $this->resolved_at !== null;
+    }
+
     public function rotulo(): string
     {
-        return $this->cancelada() ? 'Cancelado' : $this->nivel;
+        return $this->cancelada() ? 'Cancelado' : ($this->resolvida() ? 'Resolvido' : $this->nivel);
     }
 
     public static function brl(float|int $value): string
@@ -166,7 +173,7 @@ class Customer extends Model
 
     public function getNivelAttribute(): string
     {
-        return Risco::nivel($this->score, app(CompanyContext::class)->current()?->limiares());
+        return $this->resolvida() ? 'Baixo' : Risco::nivel($this->score, app(CompanyContext::class)->current()?->limiares());
     }
 
     public function getSinaisAttribute(): array
@@ -187,6 +194,9 @@ class Customer extends Model
     {
         if ($this->cancelada()) {
             return null;
+        }
+        if ($this->resolvida()) {
+            return 'Resolvido · acompanhar no ciclo normal';
         }
         $acao = $this->sinais[0]['acao'] ?? 'Manter o acompanhamento normal.';
 
@@ -276,6 +286,7 @@ class Customer extends Model
             'contracted_sla_hours' => 'integer',
             'contract_started_at' => 'date',
             'cancelled_at' => 'date',
+            'resolved_at' => 'datetime',
         ];
     }
 }

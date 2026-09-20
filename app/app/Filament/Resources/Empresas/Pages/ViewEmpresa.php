@@ -23,6 +23,12 @@ class ViewEmpresa extends ViewRecord
         return '';
     }
 
+    public function alternarResolvido(): void
+    {
+        $this->record->update(['resolved_at' => $this->record->resolved_at ? null : now()]);
+        $this->record->refresh();
+    }
+
     public function getBreadcrumbs(): array
     {
         return [];

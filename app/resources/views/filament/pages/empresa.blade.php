@@ -6,7 +6,7 @@
     $e = $this->record;
     $rotulo = $e->rotulo();
     $chat = Assistente::getUrl(['empresa' => $e->codigo]);
-    $nivelCss = ['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo'][$rotulo] ?? 'canc';
+    $nivelCss = ['Crítico' => 'crit', 'Alto' => 'alto', 'Médio' => 'med', 'Baixo' => 'baixo', 'Resolvido' => 'baixo'][$rotulo] ?? 'canc';
     $hist = $e->hist; // uma consulta só
     $ultimo = collect($hist)->last();
     $parcelasPorRotulo = collect($e->contribuicoesScore())->keyBy('rotulo');
@@ -28,9 +28,11 @@
                     </div>
                     <div class="ui-actions">
                         <span class="ui-badge {{ $nivelCss }}">{{ $rotulo }} · atenção {{ $e->score }}/100{{ $e->cancelada() ? ' antes da saída' : '' }}</span>
+                        @unless ($e->cancelada())
+                            <button type="button" class="ui-btn" wire:click="alternarResolvido">{{ $e->resolvida() ? 'Reabrir' : 'Marcar como resolvido' }}</button>
+                        @endunless
                         <a class="ui-btn primary" href="{{ $chat }}">Conversar com a IA</a>
                         <livewire:relatorio-empresa :codigo="$e->codigo" :key="'relatorio-'.$e->codigo" />
-                        <a class="ui-btn" href="{{ EmpresaResource::getUrl() }}">Todos os clientes</a>
                     </div>
                 </div>
         </section>
